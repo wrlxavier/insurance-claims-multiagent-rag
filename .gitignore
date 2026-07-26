@@ -219,3 +219,31 @@ __marimo__/
 
 # AI context files - for agentic tools and other AI-powered applications, in dev mode.
 _ai_context/
+
+# --- Project-specific: derived/regenerable artifacts ---
+
+# Parsed clause corpus (Parquet/JSONL) — rebuilt via `make parse`
+build/
+
+# Raw text extraction cache, keyed by document id + extractor version
+data/cache/extraction/
+
+# OCR output cache, keyed by document id + DPI
+data/cache/ocr/
+
+# Embeddings and vector index artifacts — rebuilt via `make build-index`
+data/index/
+*.faiss
+*.ann
+
+# Evaluation run outputs (Markdown/JSON reports) — keep the committed
+# reference reports in docs/, but not every local re-run
+eval/runs/
+
+# Model weights/caches if downloaded locally (reranker, embedding model)
+.cache/
+models/*.bin
+models/*.safetensors
+
+# Langfuse / tracing local data if run without Docker volumes
+langfuse_data/
