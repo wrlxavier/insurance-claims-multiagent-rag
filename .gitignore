@@ -250,7 +250,7 @@ langfuse_data/
 # --- Project-specific: dev mode artifacts ---
 
 # AI context files - for agentic tools and other AI-powered applications, in dev mode.
-_ai_context/
+.ai_context/
 
 # AI markdown files
 CLAUDE.md
