@@ -123,7 +123,9 @@ on CNPJ, not on the insurer name — code that groups by name will silently merg
 them.
 
 **Legacy layouts.** Four documents were filed between 2004 and 2006. All four
-were checked and carry a text layer, so OCR is not required; the difficulty they
+were checked and carry a text layer, but two documents, 15414604545202481.pdf (KOVR, id 20) and 
+15414618005202301.pdf (Too Seguros, id 25), have a text layer that is not machine-readable, 
+so OCR is required; the difficulty they
 pose is structural — older typesetting, repeated headers and footers, and reading
 order that extraction tools recover imperfectly.
 
@@ -175,10 +177,6 @@ built the system being evaluated. Mitigations are documented in
 [`EVALUATION.md`](EVALUATION.md).
 
 ## Reproducibility
-
-The selection criteria above are not only prose. `scripts/verify_corpus.py`
-encodes the corpus size, the line distribution, the indemnity-regime split and
-the per-insurer cap as assertions, and fails if the corpus stops satisfying them.
 
 Per-document provenance — insurer, CNPJ, process number, filed version, retrieval
 timestamp and the reason each document was selected — is recorded in

@@ -57,7 +57,7 @@ from SUSEP's open product catalogue so the corpus can be joined back to it.
 | `susep_subramo` | *Verbatim.* Full SUSEP sub-line description, in Portuguese. Source of `indemnity_regime`. |
 | `susep_version` | Which filed version of the product was downloaded. See "Version pinning" below. |
 | `version_start_date` | Start of that version's commercialisation period, `YYYY-MM-DD`. |
-| `page_count` | Pages in the PDF. Filled by `scripts/verify_corpus.py --write`. |
+| `page_count` | Pages in the PDF. |
 | `retrieved_at` | Download timestamp, ISO 8601 with UTC offset. Constant across the corpus: one collection session. |
 | `source_url` | Portal the documents were retrieved from. |
 | `selection_rationale` | Why this document is in the corpus. Authored, not sourced. |
