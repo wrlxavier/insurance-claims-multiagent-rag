@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AI context files - for agentic tools and other AI-powered applications, in dev mode.
+_ai_context/
