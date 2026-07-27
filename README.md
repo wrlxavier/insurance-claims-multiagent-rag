@@ -7,6 +7,14 @@ insurers and remain their property — see NOTICE.md.
 
 ## Development Commands
 
+### Environment variables
+
+Copy the example file and fill in the values for your environment:
+
+```bash
+cp .env.example .env
+```
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):
