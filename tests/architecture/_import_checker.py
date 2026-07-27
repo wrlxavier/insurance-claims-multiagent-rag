@@ -74,8 +74,5 @@ def find_forbidden_imports(
 
 def format_violations(violations: list[ForbiddenImport]) -> str:
     """Render violations as a readable multi-line report for assert messages."""
-    lines = [
-        f"  {v.file}:{v.line} imports '{v.module}'"
-        for v in violations
-    ]
+    lines = [f"  {v.file}:{v.line} imports '{v.module}'" for v in violations]
     return "\n".join(lines)
