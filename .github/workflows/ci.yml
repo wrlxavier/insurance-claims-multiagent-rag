@@ -1,0 +1,46 @@
+name: CI
+
+# paths-ignore below is an M0 placeholder: skip CI when a change only touches
+# Markdown docs. Once M1 adds heavy PDF-parsing jobs, revisit this filter so
+# it also skips those specific jobs (not the whole pipeline) on non-parsing
+# changes.
+on:
+  push:
+    branches: [main, staging]
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+
+jobs:
+  quality:
+    name: Lint, format, type-check, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy --strict app/src
+
+      - name: Unit tests
+        run: PYTHONPATH=app/src uv run pytest -m unit
