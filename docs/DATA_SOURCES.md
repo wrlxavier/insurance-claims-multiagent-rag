@@ -123,11 +123,22 @@ on CNPJ, not on the insurer name — code that groups by name will silently merg
 them.
 
 **Legacy layouts.** Four documents were filed between 2004 and 2006. All four
-were checked and carry a text layer, but two documents, 15414604545202481.pdf (KOVR, id 20) and 
-15414618005202301.pdf (Too Seguros, id 25), have a text layer that is not machine-readable, 
-so OCR is required; the difficulty they
-pose is structural — older typesetting, repeated headers and footers, and reading
-order that extraction tools recover imperfectly.
+carry a usable text layer; the difficulty they pose is structural — older
+typesetting, repeated headers and footers, and reading order that extraction
+tools recover imperfectly — not extractability.
+
+**OCR is required for 2 of 30 documents**, unrelated to filing vintage:
+`15414604545202481.pdf` (KOVR, RCF-A, id 20, filed 2024) and
+`15414618005202301.pdf` (Too Seguros, ASSIST, id 25, filed 2023). Both embed
+subset fonts without a ToUnicode map, so standard text extraction returns
+almost nothing (30 and 35 characters per page on average, against ~2,000+ for
+every other document) even though the pages render normally and OCR recovers
+their text without loss. The audit behind this number — page count, font
+count, fonts with a Unicode map, extracted characters per page and a verdict
+per document — is in [`TEXT_LAYER_AUDIT.md`](TEXT_LAYER_AUDIT.md), produced by
+`scripts/audit_text_layer.py` and cross-checked against a second extraction
+backend. The verdict is also recorded per document in the `extraction_mode`
+column of `data/policies/manifest.csv`.
 
 ## Deviations from the original plan
 
