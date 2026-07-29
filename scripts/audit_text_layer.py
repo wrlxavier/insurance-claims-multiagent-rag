@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Audit the text layer of every policy PDF and flag documents that need OCR.
+
+Some documents in the corpus embed subset fonts without a ToUnicode map: the
+page renders normally but standard text extraction returns almost nothing.
+This script measures extraction quality per document with two independent
+backends (pypdf and poppler's ``pdftotext``), classifies each document as
+``text`` / ``partial`` / ``ocr_required``, writes a Markdown report to
+``docs/TEXT_LAYER_AUDIT.md`` and stamps the verdict onto ``manifest.csv`` as
+an ``extraction_mode`` column.
+"""
+
+from __future__ import annotations
+
+import csv
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from pypdf import PdfReader
+
+RAW_DIR = Path("data/policies/raw")
+MANIFEST_PATH = Path("data/policies/manifest.csv")
+REPORT_PATH = Path("docs/TEXT_LAYER_AUDIT.md")
+
+# A page under this many extracted characters is treated as effectively blank.
+LOW_CHAR_PAGE_THRESHOLD = 40
+# A document averaging below this many characters per page has no usable text layer.
+OCR_REQUIRED_AVG_THRESHOLD = 200.0
+# A document with more than this share of low-character pages is only partly usable.
+PARTIAL_LOW_PAGE_SHARE_THRESHOLD = 0.10
+
+
+@dataclass(frozen=True)
+class DocumentAudit:
+    """Per-document extraction metrics and verdict."""
+
+    filename: str
+    page_count: int
+    font_count: int
+    fonts_with_unicode_map: int
+    chars_pypdf: int
+    avg_chars_per_page_pypdf: float
+    low_char_pages: int
+    chars_pdftotext: int
+    avg_chars_per_page_pdftotext: float
+    verdict: str
+    backend_agreement: bool
+
+
+def extract_pypdf_per_page(reader: PdfReader) -> list[int]:
+    """Return the extracted-character count of each page via pypdf."""
+    return [len(page.extract_text() or "") for page in reader.pages]
+
+
+def inspect_fonts(reader: PdfReader) -> tuple[int, int]:
+    """Return (distinct font count, fonts with at least one ToUnicode map)."""
+    fonts: dict[str, bool] = {}
+    for page in reader.pages:
+        resources = page.get("/Resources")
+        if resources is None:
+            continue
+        font_dict = resources.get("/Font")
+        if font_dict is None:
+            continue
+        for font_ref in font_dict.values():
+            font_obj = font_ref.get_object()
+            name = str(font_obj.get("/BaseFont", "?"))
+            has_unicode = "/ToUnicode" in font_obj
+            fonts[name] = fonts.get(name, False) or has_unicode
+    return len(fonts), sum(1 for has_unicode in fonts.values() if has_unicode)
+
+
+def extract_pdftotext_char_count(path: Path) -> int:
+    """Return the total character count extracted via poppler's pdftotext."""
+    result = subprocess.run(
+        ["pdftotext", str(path), "-"],
+        capture_output=True,
+        check=True,
+    )
+    return len(result.stdout.decode("utf-8", errors="replace"))
+
+
+def classify(avg_chars_per_page: float, low_page_share: float) -> str:
+    """Classify a document as text / partial / ocr_required."""
+    if avg_chars_per_page < OCR_REQUIRED_AVG_THRESHOLD:
+        return "ocr_required"
+    if low_page_share > PARTIAL_LOW_PAGE_SHARE_THRESHOLD:
+        return "partial"
+    return "text"
+
+
+def audit_document(path: Path) -> DocumentAudit:
+    """Run both extraction backends over one document and classify it."""
+    reader = PdfReader(path)
+    page_count = len(reader.pages)
+
+    per_page_pypdf = extract_pypdf_per_page(reader)
+    chars_pypdf = sum(per_page_pypdf)
+    avg_pypdf = chars_pypdf / page_count
+    low_char_pages = sum(
+        1 for count in per_page_pypdf if count < LOW_CHAR_PAGE_THRESHOLD
+    )
+    low_page_share = low_char_pages / page_count
+
+    font_count, fonts_with_unicode_map = inspect_fonts(reader)
+
+    chars_pdftotext = extract_pdftotext_char_count(path)
+    avg_pdftotext = chars_pdftotext / page_count
+
+    verdict = classify(avg_pypdf, low_page_share)
+    secondary_verdict = classify(avg_pdftotext, low_page_share)
+    backend_agreement = (verdict == "text") == (secondary_verdict == "text")
+
+    return DocumentAudit(
+        filename=path.name,
+        page_count=page_count,
+        font_count=font_count,
+        fonts_with_unicode_map=fonts_with_unicode_map,
+        chars_pypdf=chars_pypdf,
+        avg_chars_per_page_pypdf=avg_pypdf,
+        low_char_pages=low_char_pages,
+        chars_pdftotext=chars_pdftotext,
+        avg_chars_per_page_pdftotext=avg_pdftotext,
+        verdict=verdict,
+        backend_agreement=backend_agreement,
+    )
+
+
+def run_audit() -> list[DocumentAudit]:
+    """Audit every PDF under RAW_DIR, sorted by filename."""
+    paths = sorted(RAW_DIR.glob("*.pdf"))
+    return [audit_document(path) for path in paths]
+
+
+def render_report(audits: list[DocumentAudit]) -> str:
+    """Render the Markdown audit report."""
+    lines = [
+        "# Text layer audit",
+        "",
+        "Generated by `scripts/audit_text_layer.py` over all documents in "
+        "`data/policies/raw/`. Two independent extraction backends are compared "
+        "(pypdf and poppler's `pdftotext`) so that a low character count reflects "
+        "the document, not the tool.",
+        "",
+        f"- Low-character-page threshold: {LOW_CHAR_PAGE_THRESHOLD} extracted "
+        "characters.",
+        f"- `ocr_required` threshold: average below {OCR_REQUIRED_AVG_THRESHOLD:.0f} "
+        "characters per page.",
+        f"- `partial` threshold: more than "
+        f"{PARTIAL_LOW_PAGE_SHARE_THRESHOLD:.0%} of pages low-character, "
+        "while the document average stays above the `ocr_required` threshold.",
+        "",
+        "| Filename | Pages | Fonts | Fonts w/ Unicode map | Chars/page (pypdf) | "
+        "Chars/page (pdftotext) | Low-char pages | Verdict | Backends agree |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+    ]
+    for audit in audits:
+        lines.append(
+            f"| {audit.filename} | {audit.page_count} | {audit.font_count} | "
+            f"{audit.fonts_with_unicode_map} | {audit.avg_chars_per_page_pypdf:.1f} | "
+            f"{audit.avg_chars_per_page_pdftotext:.1f} | {audit.low_char_pages} | "
+            f"{audit.verdict} | {'yes' if audit.backend_agreement else 'NO'} |"
+        )
+
+    verdict_counts = dict.fromkeys(("text", "partial", "ocr_required"), 0)
+    for audit in audits:
+        verdict_counts[audit.verdict] += 1
+    disagreements = [a.filename for a in audits if not a.backend_agreement]
+
+    lines += [
+        "",
+        "## Summary",
+        "",
+        f"- `text`: {verdict_counts['text']}",
+        f"- `partial`: {verdict_counts['partial']}",
+        f"- `ocr_required`: {verdict_counts['ocr_required']}",
+        f"- Documents out of {len(audits)} total.",
+        "- Backend disagreements: "
+        + (", ".join(disagreements) if disagreements else "none"),
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def update_manifest(audits: list[DocumentAudit]) -> None:
+    """Add or overwrite the extraction_mode column on manifest.csv."""
+    verdict_by_filename = {audit.filename: audit.verdict for audit in audits}
+
+    with MANIFEST_PATH.open(newline="", encoding="utf-8") as manifest_file:
+        reader = csv.DictReader(manifest_file)
+        fieldnames = list(reader.fieldnames or [])
+        rows = list(reader)
+
+    if "extraction_mode" not in fieldnames:
+        fieldnames.append("extraction_mode")
+
+    for row in rows:
+        row["extraction_mode"] = verdict_by_filename[row["filename"]]
+
+    with MANIFEST_PATH.open("w", newline="", encoding="utf-8") as manifest_file:
+        writer = csv.DictWriter(manifest_file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def main() -> None:
+    """Run the audit, write the report and update the manifest."""
+    audits = run_audit()
+    REPORT_PATH.write_text(render_report(audits), encoding="utf-8")
+    update_manifest(audits)
+    for audit in audits:
+        print(f"{audit.filename}: {audit.verdict}")
+
+
+if __name__ == "__main__":
+    main()
