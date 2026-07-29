@@ -19,6 +19,7 @@ cannot decide whether a real claim is covered under a real policy. That
 distinction is load-bearing for this project and is reflected in the wording of
 every agent prompt and every evaluation label.
 
+Canonical scope statement: [`../docs/SCOPE.md`](../docs/SCOPE.md).
 Provenance, rights and takedown contact: [`../NOTICE.md`](../NOTICE.md).
 Selection methodology: [`../docs/DATA_SOURCES.md`](../docs/DATA_SOURCES.md).
 

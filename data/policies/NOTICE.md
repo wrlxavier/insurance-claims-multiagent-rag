@@ -68,7 +68,8 @@ claim. A system reading these documents can assess whether a described event is
 **consistent or inconsistent with the conditions of a registered product**. It
 cannot determine whether a real claim is covered under a real policy, because the
 contract-level facts that determination requires are absent by construction. See
-`README.md` and `docs/EVALUATION.md`.
+`docs/SCOPE.md` for the canonical statement, and `README.md` and
+`docs/EVALUATION.md`.
 
 ## No personal data
 

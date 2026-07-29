@@ -180,7 +180,8 @@ incidental.
 supports claims about property, life or health insurance.
 
 **Registered products, not contracts.** The most consequential limitation, and
-the one that constrains what the system may assert. Spelled out in
+the one that constrains what the system may assert. Canonical statement in
+[`SCOPE.md`](SCOPE.md); also spelled out in
 [`../data/README.md`](../data/README.md).
 
 **Author-curated evaluation.** The golden set is curated by the same person who
