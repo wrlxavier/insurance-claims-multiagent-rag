@@ -16,3 +16,7 @@ repos:
           - pydantic-settings>=2.12.0
           - pytest>=9.1.1
           - pypdf>=6.14.2
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout

@@ -16,6 +16,7 @@ dependencies = [
 dev = [
     "ipykernel>=7.3.0",
     "mypy>=2.3.0",
+    "nbstripout>=0.9.1",
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "ruff>=0.16.0",
@@ -46,6 +47,7 @@ exclude = [
     ".mypy_cache",
     ".tox",
     ".ai_context",
+    "notebooks/scratch/",
     # "__init__.py",  # it will be excluded via per-file-ignores
 ]
 
@@ -98,7 +100,7 @@ line-ending = "auto"
 
 [tool.mypy]
 files = ["app/src", "tests", "scripts"]
-exclude = ["build/"]
+exclude = ["build/", "notebooks/scratch/"]
 strict = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
