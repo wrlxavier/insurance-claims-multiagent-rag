@@ -20,6 +20,36 @@ Commits follow `type(scope): subject`, e.g. `feat(ci): add CI workflow` or
 `docs(compliance): add canonical scope statement`. Common types: `feat`,
 `fix`, `docs`, `refactor`, `test`, `chore`.
 
+## Pre-commit hooks
+
+Run once per clone to enable the hooks automatically on every `git commit`:
+
+```bash
+uv run pre-commit install
+```
+
+Today the hooks run lint, format and type checks, and strip outputs,
+execution counts and metadata from notebooks (`.ipynb`) via `nbstripout`
+before each commit. This keeps notebook diffs small and keeps heavy binary
+output out of the history. Results that need to be preserved (figures,
+tables) should be exported to `docs/` or `outputs/` rather than kept as
+notebook output.
+
+To test the hooks manually before committing:
+
+```bash
+uv run pre-commit run --all-files            # run everything, same as CI
+uv run pre-commit run                        # run only on staged files
+uv run pre-commit run <hook-id> --all-files  # run a single hook, e.g. nbstripout
+```
+
+Hooks that auto-fix files (such as `nbstripout`) make the first commit
+attempt fail — `git add` the modified files and commit again.
+
+Notebooks under `notebooks/scratch/` are disposable exploration and are not
+held to the same quality/review bar as the "official" notebooks (e.g. the
+ones feeding `docs/PARSING.md`).
+
 ## Before opening a pull request
 
 Run the full quality gate locally:
