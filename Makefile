@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check
+.PHONY: install lint format format-check typecheck test test-integration check extract-text
 
 help:
 	@echo "Available targets:"
@@ -12,6 +12,7 @@ help:
 	@echo "  test              - Run unit tests"
 	@echo "  test-integration  - Run integration tests"
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
+	@echo "  extract-text      - Extract and cache text from the policy corpus"
 
 install:
 	uv sync
@@ -35,3 +36,6 @@ test-integration:
 	@echo "Integration tests not implemented yet."
 
 check: lint format-check typecheck test
+
+extract-text:
+	PYTHONPATH=app/src uv run python scripts/extract_text.py

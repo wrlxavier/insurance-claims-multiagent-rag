@@ -39,3 +39,21 @@ uv run pre-commit install
 ```bash
 uv run pre-commit run --all-files
 ```
+
+### Jupyter kernel for notebooks
+
+Notebooks under `notebooks/` should run against this project's virtual
+environment rather than a globally installed kernel. Register a
+project-bound kernel with:
+
+```bash
+./scripts/setup_dev_kernel.sh
+```
+
+This adds `ipykernel` as a dev dependency (via `uv`) and registers a Jupyter
+kernel named "Insurance Claims (uv)". Select it in Jupyter/VS Code, or launch
+directly with:
+
+```bash
+uv run jupyter lab
+```

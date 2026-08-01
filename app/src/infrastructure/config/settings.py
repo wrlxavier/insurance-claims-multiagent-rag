@@ -169,6 +169,21 @@ class LlmSettings(BaseSettings):
     reranker_model: str = Field(alias="RERANKER_MODEL")
 
 
+class ParsingSettings(BaseSettings):
+    """Settings used by the text-extraction pipeline."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    low_char_page_threshold: int = Field(
+        alias="EXTRACTION_LOW_CHAR_PAGE_THRESHOLD", default=40
+    )
+
+
 class Settings(DatabaseSettings, LlmSettings):
     """Application settings loaded from environment variables."""
 
@@ -194,3 +209,9 @@ def get_llm_settings() -> LlmSettings:
 def get_settings() -> Settings:
     """Get cached application settings."""
     return Settings()
+
+
+@lru_cache
+def get_parsing_settings() -> ParsingSettings:
+    """Get cached settings used by the text-extraction pipeline."""
+    return ParsingSettings()
