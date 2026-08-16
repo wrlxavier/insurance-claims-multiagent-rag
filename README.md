@@ -12,6 +12,19 @@ cannot say whether a real claim is covered or denied. See
 
 ## Development Commands
 
+### System dependencies
+
+Two policy PDFs have no extractable text layer and are OCR'd via
+[Tesseract](https://github.com/tesseract-ocr/tesseract) (see [M1-02]).
+Install it locally before running `make extract-text`:
+
+```bash
+sudo apt update && sudo apt install tesseract-ocr tesseract-ocr-por
+```
+
+Verify with `tesseract --version`, and confirm the Portuguese language pack
+is present with `tesseract --list-langs`.
+
 ### Environment variables
 
 Copy the example file and fill in the values for your environment:
