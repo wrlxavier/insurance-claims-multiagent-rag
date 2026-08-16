@@ -38,6 +38,9 @@ route around the license.
 ## Everything else
 
 All other current dependencies (`pydantic`, `pydantic-settings`, `pypdf`,
-`pyarrow`) are permissively licensed (MIT/Apache-2.0/BSD family) and impose
-no obligations beyond attribution already satisfied by this repository's own
-`LICENSE`.
+`pyarrow`, `pytesseract`, `pillow`) are permissively licensed
+(MIT/Apache-2.0/BSD family) and impose no obligations beyond attribution
+already satisfied by this repository's own `LICENSE`. The same applies to
+Tesseract OCR itself (Apache-2.0), a system-level (not Python-packaged)
+dependency invoked via `pytesseract` -- see the README for install
+instructions.

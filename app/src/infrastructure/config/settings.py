@@ -182,6 +182,7 @@ class ParsingSettings(BaseSettings):
     low_char_page_threshold: int = Field(
         alias="EXTRACTION_LOW_CHAR_PAGE_THRESHOLD", default=40
     )
+    ocr_dpi: int = Field(alias="OCR_DPI", default=150)
 
 
 class Settings(DatabaseSettings, LlmSettings):

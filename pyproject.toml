@@ -10,6 +10,8 @@ dependencies = [
     "pyarrow>=14",
     "pymupdf>=1.24",
     "pypdf>=6.14.2",
+    "pytesseract>=0.3.13",
+    "pillow>=12.3.0",
 ]
 
 [dependency-groups]
@@ -106,5 +108,5 @@ warn_unused_configs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["fitz", "pyarrow", "pyarrow.parquet"]
+module = ["fitz", "pyarrow", "pyarrow.parquet", "pytesseract"]
 ignore_missing_imports = true

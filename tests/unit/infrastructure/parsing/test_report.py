@@ -26,16 +26,24 @@ def test_render_report_includes_extracted_document_stats() -> None:
 
 
 @pytest.mark.unit
-def test_render_report_marks_ocr_required_rows_as_not_extracted() -> None:
+def test_render_report_labels_ocr_rows_as_extracted_via_ocr() -> None:
     row = ExtractionReportRow(
         document_id="20",
         filename="15414604545202481.pdf",
         route=ExtractionRoute.OCR_REQUIRED,
+        page_count=33,
+        total_chars=66000,
+        avg_chars_per_page=2000.0,
+        flagged_pages=(7,),
     )
 
     report = render_report([row], threshold=40)
 
-    assert "routed to OCR, not extracted (see M1-02)" in report
+    assert "extracted (OCR)" in report
+    assert "15414604545202481.pdf" in report
+    assert "33" in report
+    assert "66000" in report
+    assert "7" in report
 
 
 @pytest.mark.unit
@@ -53,11 +61,15 @@ def test_render_report_summarizes_routes_and_flags() -> None:
         document_id="20",
         filename="b.pdf",
         route=ExtractionRoute.OCR_REQUIRED,
+        page_count=5,
+        total_chars=500,
+        avg_chars_per_page=100.0,
+        flagged_pages=(2, 4),
     )
 
     report = render_report([extracted, ocr_required], threshold=40)
 
-    assert "Extracted now: 1" in report
-    assert "Routed to OCR (not extracted, see M1-02): 1" in report
+    assert "Extracted from text layer: 1" in report
+    assert "Extracted via OCR: 1" in report
     assert "Documents out of 2 total." in report
-    assert "Flagged low-character pages across all extracted documents: 1" in report
+    assert "Flagged low-character pages across all documents: 3" in report

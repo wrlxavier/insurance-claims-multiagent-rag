@@ -30,10 +30,10 @@ typecheck:
 	uv run mypy --strict app/src
 
 test:
-	PYTHONPATH=app/src uv run pytest
+	PYTHONPATH=app/src uv run pytest -m "not integration"
 
 test-integration:
-	@echo "Integration tests not implemented yet."
+	PYTHONPATH=app/src uv run pytest -m integration
 
 check: lint format-check typecheck test
 
