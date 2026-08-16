@@ -111,5 +111,10 @@ warn_unused_configs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["fitz", "pyarrow", "pyarrow.parquet", "pytesseract"]
+module = [
+    "fitz.*",
+    "pyarrow.*",
+    "pytesseract.*",
+    "langchain_core.*",
+]
 ignore_missing_imports = true

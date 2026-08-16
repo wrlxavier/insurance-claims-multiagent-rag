@@ -1,8 +1,10 @@
 """LLM Implementation of the ClauseClassifierPort."""
 
 # Assuming langchain integration as requested by the stack context
-from langchain_core.language_models.chat_models import BaseChatModel  # type: ignore
-from langchain_core.prompts import ChatPromptTemplate  # type: ignore
+from typing import cast
+
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from application.ports.clause_classifier import ClauseClassifierPort
@@ -49,7 +51,6 @@ class LangchainClauseClassifier(ClauseClassifierPort):
             A tuple of (ClauseType, confidence).
         """
         chain = self.prompt | self.llm
-        result: LLMClassificationOutput = chain.invoke(
-            {"title": clause_title, "text": clause_text}
-        )
+        raw_result = chain.invoke({"title": clause_title, "text": clause_text})
+        result = cast(LLMClassificationOutput, raw_result)
         return result.clause_type, result.confidence
