@@ -1,0 +1,14 @@
+priority,heading_pattern,clause_type
+10,^riscos excluidos$,exclusion
+10,^prejuizos nao indenizaveis$,exclusion
+10,^bens nao compreendidos no seguro$,exclusion
+10,^riscos nao cobertos$,exclusion
+20,^exclusoes$,exclusion
+10,^cobertura basica$,coverage
+10,^coberturas basicas$,coverage
+10,^coberturas adicionais$,coverage
+10,^definicoes$,definition
+10,^glossario$,definition
+10,^procedimentos em caso de sinistro$,procedure
+10,^liquidacao de sinistros$,procedure
+10,^condicoes gerais$,condition
