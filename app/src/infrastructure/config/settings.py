@@ -183,6 +183,9 @@ class ParsingSettings(BaseSettings):
         alias="EXTRACTION_LOW_CHAR_PAGE_THRESHOLD", default=40
     )
     ocr_dpi: int = Field(alias="OCR_DPI", default=150)
+    clause_tree_orphan_ratio_threshold: float = Field(
+        alias="CLAUSE_TREE_ORPHAN_RATIO_THRESHOLD", default=0.15
+    )
 
 
 class Settings(DatabaseSettings, LlmSettings):
