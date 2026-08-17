@@ -411,6 +411,8 @@ class _ClauseBuilder:
         self.content_lines: list[str] = []
         self.page_start: int | None = None
         self.page_end: int | None = None
+        self.bundle_section: str | None = None
+        self.bundle_confidence: str | None = None
 
     def touch_page(self, page_number: int) -> None:
         if self.page_start is None:
@@ -430,6 +432,8 @@ class _ClauseBuilder:
             content_lines=tuple(self.content_lines),
             page_start=self.page_start if self.page_start is not None else 0,
             page_end=self.page_end if self.page_end is not None else 0,
+            bundle_section=self.bundle_section,
+            bundle_confidence=self.bundle_confidence,
             is_depth_anomaly=self.is_depth_anomaly,
         )
 
@@ -603,6 +607,46 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
                 )
             )
         index = next_index
+
+    def is_numbering_start(label: str) -> bool:
+        clean = re.sub(r"[^0-9]", "", label)
+        return clean == "1"
+
+    restarting_roots = []
+    root_ids = [cid for cid in order if builders[cid].parent_id is None]
+
+    for root_id in root_ids:
+        root_builder = builders[root_id]
+        if root_builder.depth == 0:
+            has_start = any(
+                builders[child_id].depth == 1
+                and is_numbering_start(builders[child_id].numbering_label)
+                for child_id in root_builder.child_ids
+            )
+            if has_start:
+                restarting_roots.append(root_id)
+
+    is_bundle = len(restarting_roots) > 1
+
+    if is_bundle:
+        for root_id in root_ids:
+            root_builder = builders[root_id]
+            if root_id in restarting_roots:
+                section_name = root_builder.title if root_builder.depth == 0 else None
+                confidence = "high"
+            else:
+                section_name = None
+                confidence = "low"
+
+            def propagate(
+                cid: str, current_section: str | None, current_confidence: str | None
+            ) -> None:
+                builders[cid].bundle_section = current_section
+                builders[cid].bundle_confidence = current_confidence
+                for child_id in builders[cid].child_ids:
+                    propagate(child_id, current_section, current_confidence)
+
+            propagate(root_id, section_name, confidence)
 
     clauses = tuple(builders[clause_id].freeze() for clause_id in order)
     roots = tuple(clause for clause in clauses if clause.parent_id is None)
