@@ -32,6 +32,7 @@ class Clause:
 
     document_id: str
     clause_id: str
+    path: str
     numbering_label: str
     title: str
     convention: HeadingConvention

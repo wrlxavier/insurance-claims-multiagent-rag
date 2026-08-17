@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse
 
 help:
 	@echo "Available targets:"
@@ -13,6 +13,9 @@ help:
 	@echo "  test-integration  - Run integration tests"
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
 	@echo "  extract-text      - Extract and cache text from the policy corpus"
+	@echo "  remove-boilerplate - Remove boilerplate from the cached extraction"
+	@echo "  build-clause-tree - Recover the clause tree from the cleaned corpus"
+	@echo "  parse             - Rebuild the parsed-clause corpus under build/"
 
 install:
 	uv sync
@@ -39,3 +42,12 @@ check: lint format-check typecheck test
 
 extract-text:
 	PYTHONPATH=app/src uv run python scripts/extract_text.py
+
+remove-boilerplate:
+	PYTHONPATH=app/src uv run python scripts/remove_boilerplate.py
+
+build-clause-tree:
+	PYTHONPATH=app/src uv run python scripts/build_clause_tree.py
+
+parse: extract-text remove-boilerplate build-clause-tree
+	PYTHONPATH=app/src uv run python scripts/build_corpus.py

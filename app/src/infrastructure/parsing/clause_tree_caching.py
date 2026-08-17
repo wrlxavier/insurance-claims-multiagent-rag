@@ -30,6 +30,7 @@ CLAUSE_TREE_CACHE_DIR = Path("data/cache/clause_trees")
 _ROW_SCHEMA = pa.schema(
     [
         ("clause_id", pa.string()),
+        ("path", pa.string()),
         ("numbering_label", pa.string()),
         ("title", pa.string()),
         ("convention", pa.string()),
@@ -39,6 +40,8 @@ _ROW_SCHEMA = pa.schema(
         ("content_lines", pa.string()),
         ("page_start", pa.int64()),
         ("page_end", pa.int64()),
+        ("bundle_section", pa.string()),
+        ("bundle_confidence", pa.string()),
         ("is_depth_anomaly", pa.bool_()),
     ]
 )
@@ -60,6 +63,7 @@ def write_clause_tree_cache(tree: ClauseTree, path: Path) -> None:
     rows = [
         {
             "clause_id": clause.clause_id,
+            "path": clause.path,
             "numbering_label": clause.numbering_label,
             "title": clause.title,
             "convention": clause.convention.value,
@@ -69,6 +73,8 @@ def write_clause_tree_cache(tree: ClauseTree, path: Path) -> None:
             "content_lines": "\n".join(clause.content_lines),
             "page_start": clause.page_start,
             "page_end": clause.page_end,
+            "bundle_section": clause.bundle_section or "",
+            "bundle_confidence": clause.bundle_confidence or "",
             "is_depth_anomaly": clause.is_depth_anomaly,
         }
         for clause in tree.all_clauses
@@ -122,6 +128,7 @@ def read_clause_tree_cache(path: Path) -> ClauseTree:
         Clause(
             document_id=document_id,
             clause_id=row["clause_id"],
+            path=row["path"],
             numbering_label=row["numbering_label"],
             title=row["title"],
             convention=HeadingConvention(row["convention"]),
@@ -133,6 +140,8 @@ def read_clause_tree_cache(path: Path) -> ClauseTree:
             ),
             page_start=row["page_start"],
             page_end=row["page_end"],
+            bundle_section=row["bundle_section"] or None,
+            bundle_confidence=row["bundle_confidence"] or None,
             is_depth_anomaly=row["is_depth_anomaly"],
         )
         for row in table.to_pylist()

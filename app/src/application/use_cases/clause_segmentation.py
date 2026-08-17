@@ -46,6 +46,7 @@ detection rule here changes, so stale cached output is invalidated.
 
 import re
 import statistics
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
@@ -58,7 +59,7 @@ from domain.clause_tree import (
 )
 from domain.extracted_text import ExtractedDocument, ExtractedPage, ExtractedSpan
 
-CLAUSE_SEGMENTATION_VERSION = "v1"
+CLAUSE_SEGMENTATION_VERSION = "v2"
 
 NUMBERED_BOLD_THRESHOLD = 0.5
 PART_BOLD_THRESHOLD = 0.9
@@ -384,6 +385,21 @@ def _detect_heading(
     )
 
 
+def _slugify(text: str) -> str:
+    """Turn a heading title into a stable, human-readable path segment.
+
+    Used only for [HeadingConvention.UNNUMBERED_PART], which carries no
+    ``numbering_label``. Anchoring the segment to the title's own text
+    (not to scan position) keeps the segment -- and therefore the
+    [Clause.clause_id] built from it -- stable when an unrelated part is
+    inserted or removed elsewhere in the document.
+    """
+    normalized = unicodedata.normalize("NFKD", text)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
+    return slug or "part"
+
+
 class _ClauseBuilder:
     """Mutable accumulator for one clause while the document is being walked."""
 
@@ -392,6 +408,7 @@ class _ClauseBuilder:
         *,
         document_id: str,
         clause_id: str,
+        path: str,
         numbering_label: str,
         title: str,
         convention: HeadingConvention,
@@ -401,6 +418,7 @@ class _ClauseBuilder:
     ) -> None:
         self.document_id = document_id
         self.clause_id = clause_id
+        self.path = path
         self.numbering_label = numbering_label
         self.title = title
         self.convention = convention
@@ -423,6 +441,7 @@ class _ClauseBuilder:
         return Clause(
             document_id=self.document_id,
             clause_id=self.clause_id,
+            path=self.path,
             numbering_label=self.numbering_label,
             title=self.title,
             convention=self.convention,
@@ -485,12 +504,18 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
     stack: list[_ClauseBuilder] = []
     orphan_char_count = 0
     total_char_count = 0
-    clause_counter = 0
+    # Segment collisions are counted per parent bucket (keyed by parent_id,
+    # None for document roots), so a duplicate segment under one parent
+    # never affects sibling counts under a different parent -- the id
+    # scheme's whole point is that an edit in one branch of the tree must
+    # not shift the clause_id of a node in an unrelated branch.
+    sibling_segment_counts: dict[str | None, dict[str, int]] = {}
 
-    def next_id() -> str:
-        nonlocal clause_counter
-        clause_counter += 1
-        return f"{document.document_id}:{clause_counter}"
+    def next_segment(parent_id: str | None, base: str) -> str:
+        counts = sibling_segment_counts.setdefault(parent_id, {})
+        counts[base] = counts.get(base, 0) + 1
+        occurrence = counts[base]
+        return base if occurrence == 1 else f"{base}-{occurrence}"
 
     def open_clause(match: _HeadingMatch, page_number: int, depth: int) -> None:
         if match.convention == HeadingConvention.UNNUMBERED_PART:
@@ -498,11 +523,21 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         else:
             while stack and stack[-1].depth >= depth:
                 stack.pop()
-        parent_id = stack[-1].clause_id if stack else None
-        clause_id = next_id()
+        parent = stack[-1] if stack else None
+        parent_id = parent.clause_id if parent else None
+        parent_path = parent.path if parent else None
+
+        # numbering_label is empty only for UNNUMBERED_PART, whose segment
+        # is anchored to the title's own text instead -- see [_slugify].
+        base_segment = match.numbering_label or _slugify(match.title)
+        segment = next_segment(parent_id, base_segment)
+        path = f"{parent_path}/{segment}" if parent_path else segment
+        clause_id = f"{document.document_id}:{path}"
+
         builder = _ClauseBuilder(
             document_id=document.document_id,
             clause_id=clause_id,
+            path=path,
             numbering_label=match.numbering_label,
             title=match.title,
             convention=match.convention,

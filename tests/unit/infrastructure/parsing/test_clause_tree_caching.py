@@ -38,6 +38,7 @@ def _tree() -> ClauseTree:
     root = Clause(
         document_id="17",
         clause_id="17:1",
+        path="1",
         numbering_label="1",
         title="1. OBJETO DO SEGURO",
         convention=HeadingConvention.NUMBERED_DECIMAL,
@@ -47,11 +48,14 @@ def _tree() -> ClauseTree:
         content_lines=("Corpo do objeto.",),
         page_start=1,
         page_end=2,
+        bundle_section=None,
+        bundle_confidence=None,
         is_depth_anomaly=False,
     )
     child = Clause(
         document_id="17",
         clause_id="17:2",
+        path="1/1.1",
         numbering_label="1.1",
         title="1.1 Âmbito Geográfico",
         convention=HeadingConvention.NUMBERED_DECIMAL,
@@ -61,6 +65,8 @@ def _tree() -> ClauseTree:
         content_lines=(),
         page_start=2,
         page_end=2,
+        bundle_section="1. OBJETO DO SEGURO",
+        bundle_confidence="high",
         is_depth_anomaly=True,
     )
     warning = ClauseTreeWarning(
