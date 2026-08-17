@@ -33,11 +33,81 @@ reading, both evidence-backed:
   lettered items (``a)``, ``b)``...) don't match the numbering regex, so
   they're correctly excluded before bold fraction is even considered.
 
-Font size is not discarded -- it is demoted from a required gate to
-provenance carried on each detected line, available for future tuning, but
-not load-bearing for the current heuristic: numbering-pattern depth is the
-authority for tree structure, per the DoD's own framing ("respecting the
-document's own structure").
+[M1-04b] adds a third signal on top of the two above, needed because bold
+fraction, the numbering-pattern gate, and font size (see below) are all
+identical between a genuine UNNUMBERED_PART product title and pure
+typographical noise in some documents: doc 10 (Bradesco)'s real product
+intro "RESUMO DE COBERTURAS DA ASSISTÊNCIA À MOTOCICLETAS" and its noise
+"NÃO ESTÃO COBERTOS:" (repeated ~20 times as a benefits-tier template) sit
+at the exact same font (TimesNewRomanPS-BoldMT, 9.0pt), so no font/position
+signal available in this corpus discriminates them; TOC text is discarded
+entirely by [M1-03]'s boilerplate removal, so "is this in the TOC" isn't
+an available signal without new extraction plumbing, out of scope here.
+**A genuine part title is introduced exactly once in a document; repeated
+list-item/table labels are not** -- so an UNNUMBERED_PART candidate whose
+title recurs (per [_recurrence_key], which reuses [_slugify]'s accent/
+punctuation folding to catch corpus inconsistencies like doc 10's "NÃO
+ESTÃO COBERTOS" vs "NÃO ESTÃO COBERTOS:", or "ENVIO DE TÁXI" vs "ENVIO DE
+TAXI") is demoted to plain content instead of opening a new root
+([_prescan_recurring_unnumbered_titles]). This must be all-or-nothing per
+title, not per-occurrence: doc 16 (AKAD RCF-V) reuses "CONDIÇÕES ESPECIAIS"
+3 times for 3 distinct coverage variants, each correctly followed by its
+own "1. Riscos Cobertos" restart, and must be kept; doc 10's "ARGENTINA,
+PARAGUAI, URUGUAI E CHILE." recurs 8 times and only 3 of those occurrences
+happen to precede an unrelated "1." elsewhere, so a per-occurrence rule
+would leave it partially, wrongly promoted. Accepted trade-off: doc 3
+(AKAD)'s "ÂMBITO GEOGRÁFICO" recurs twice for two legitimately separate
+endorsement clauses that have zero numbered children either way (their
+body bold fraction never clears [NUMBERED_BOLD_THRESHOLD], a pre-existing,
+unrelated quirk) -- this rule demotes it, misattributing ~300 chars of
+prose to the preceding clause. No content is lost and no existing test
+covers it; a content-length heuristic doesn't rescue it without also
+un-fixing doc 10, where noise items have larger content spans than doc
+10's own genuine parts.
+
+**Retroactive note (found while regenerating the corpus via ``make parse``
+after [M1-04b] landed, applied 2026-08-17).** Doc 5 (KOVR) surfaced a case
+[M1-04b]'s original DoD had flagged as worth investigating but the
+recurrence signal above doesn't address: it recovered *zero* clauses
+(orphan ratio 1.000), failing ``scripts/build_clause_tree.py``'s threshold
+check outright, even though [scripts.audit_text_layer]'s two independent
+backends agree the extracted text is fully legible (2,914 chars/page, no
+low-character pages). The cause is structural, not textual: doc 5 has no
+"bold"-named font (ratio 0.13%, same tier as doc 4) *and*, unlike doc 4,
+no dedicated second font either -- 99.4% of its characters share one font
+name (``NewJuneRegular``), so tier 2's "not the dominant font" fallback has
+nothing to key off (every span reports the same name). Every other corpus
+document that reaches tier 2 has a real, substantially-shared second font
+(doc 4 78.8%, doc 8 50.8%, doc 18 82.8% modal-font share), so
+[MODAL_FONT_CHAR_SHARE_THRESHOLD] cleanly isolates doc 5 as the one case
+needing a third tier. That tier is font size: doc 5's 34 top-level headings
+(``"1) DISPOSIÇÕES INICIAIS"`` ... ``"34) FORO"``, confirmed by inspecting
+every line >= 11.9pt in the document) are set at a clean, isolated 12.0pt
+against a 10.657pt modal body size (a 12.6% delta), with zero bold signal
+whatsoever -- [HEADING_FONT_SIZE_RATIO_THRESHOLD] catches this while
+staying under the document's next-largest recurring size (11.61pt, the
+cover title and inline URLs mixed together, an 8.9% delta and not a
+reliable heading signal). Fixed in [_heavy_font_predicate] (a third
+fallback tier) and [_bold_fraction] (now keyed on ``(font_name,
+font_size)`` instead of ``font_name`` alone); ``CLAUSE_SEGMENTATION_VERSION``
+bumped ``v3`` -> ``v4``. Effect: doc 5 recovers 0 -> 33 root clauses and
+its orphan ratio drops 1.000 -> 0.009, with the whole rest of the 30-doc
+corpus byte-identical (confirmed via ``scripts/build_clause_tree.py
+--continue-on-orphan-failure``), since doc 5 is the only document in the
+corpus whose modal-font share clears [MODAL_FONT_CHAR_SHARE_THRESHOLD].
+Doc 5 is not fully recovered -- its ``"N.M."`` sub-items share the same
+font *and* size as body prose, so they correctly stay ungated content
+under their parent ``"N)"`` root (``max_depth`` stays 0) rather than
+guessing at a threshold with no corpus evidence behind it; a real signal
+for that finer level is left for future work if [M1-08]'s sample surfaces
+it as a material accuracy loss.
+
+Font size is demoted from a required gate to provenance carried on each
+detected line for the numbering-pattern conventions -- not load-bearing
+there, since numbering-pattern depth is the authority for tree structure,
+per the DoD's own framing ("respecting the document's own structure") --
+but it *is* load-bearing as the tier-3 UNNUMBERED_PART fallback above, for
+the narrow case where no font-weight signal survives at all.
 
 ``CLAUSE_SEGMENTATION_VERSION`` feeds the downstream cache key (see
 [infrastructure.parsing.clause_tree_caching]): bump it whenever any
@@ -59,7 +129,7 @@ from domain.clause_tree import (
 )
 from domain.extracted_text import ExtractedDocument, ExtractedPage, ExtractedSpan
 
-CLAUSE_SEGMENTATION_VERSION = "v2"
+CLAUSE_SEGMENTATION_VERSION = "v4"
 
 NUMBERED_BOLD_THRESHOLD = 0.5
 PART_BOLD_THRESHOLD = 0.9
@@ -92,6 +162,20 @@ MIN_COLUMN_Y_OVERLAP_RATIO = 0.6
 # mode sits at 0.00-0.13%, so this threshold cleanly separates "the literal
 # 'bold' signal is trustworthy for this document" from "it is not".
 HAS_BOLD_FONT_CHAR_RATIO_THRESHOLD = 0.02
+
+# [M1-04b] doc 5 (KOVR) has no bold-named font AND no dedicated second font
+# at all -- 99.4% of its characters share one font name, vs. every other
+# corpus document that reaches this fallback tier (doc 4/Sura 78.8%, doc 8
+# 50.8%, doc 18 82.8%) having a real, substantially-shared second font. This
+# threshold cleanly separates "no dedicated heading font exists" (only doc 5
+# in the corpus) from "a dedicated heading font exists, just not bold-named".
+MODAL_FONT_CHAR_SHARE_THRESHOLD = 0.95
+# Doc 5's real headings ("N) TÍTULO", confirmed across all 34 of them) sit
+# at 12.0pt against a 10.657pt modal/body size -- a 12.6% delta. The next
+# most common larger size in the document (11.61pt, used for the cover
+# title and inline URLs, not a reliable heading signal) is only an 8.9%
+# delta, so this threshold cleanly separates the two.
+HEADING_FONT_SIZE_RATIO_THRESHOLD = 1.10
 
 # A depth-1 token (bare integer) requires its trailing dot -- "24 Horas" and
 # "7 dias" are real table-cell content in the corpus (a service-tier grid),
@@ -147,13 +231,15 @@ class _HeadingMatch:
 
 
 def _bold_fraction(
-    spans: list[ExtractedSpan], is_heavy: Callable[[str], bool]
+    spans: list[ExtractedSpan], is_heavy: Callable[[str, float], bool]
 ) -> float:
     """Fraction of a line's characters set in a "heavy" (heading-weight) font."""
     total = sum(len(span.text) for span in spans)
     if total == 0:
         return 0.0
-    heavy = sum(len(span.text) for span in spans if is_heavy(span.font_name))
+    heavy = sum(
+        len(span.text) for span in spans if is_heavy(span.font_name, span.font_size)
+    )
     return heavy / total
 
 
@@ -169,31 +255,79 @@ def _document_bold_ratio(document: ExtractedDocument) -> float:
     return bold_chars / total_chars if total_chars else 0.0
 
 
-def _document_modal_font_name(document: ExtractedDocument) -> str:
-    """Character-weighted modal font name -- the document's dominant body font."""
+def _document_font_name_weights(document: ExtractedDocument) -> dict[str, int]:
+    """Character-weighted count of each font name used in the document."""
     weights: dict[str, int] = {}
     for page in document.pages:
         for span in page.spans:
             weights[span.font_name] = weights.get(span.font_name, 0) + len(span.text)
+    return weights
+
+
+def _document_modal_font_name(document: ExtractedDocument) -> str:
+    """Character-weighted modal font name -- the document's dominant body font."""
+    weights = _document_font_name_weights(document)
     if not weights:
         return ""
     return max(weights, key=lambda name: weights[name])
 
 
-def _heavy_font_predicate(document: ExtractedDocument) -> Callable[[str], bool]:
-    """Build the per-document "is this font_name heading/emphasis weight" test.
+def _document_modal_font_share(document: ExtractedDocument) -> float:
+    """Character-weighted share of the document set in its single modal font.
 
-    Ordinarily a font whose name literally contains "bold". When the whole
-    document's bold-named-character ratio is below
-    [HAS_BOLD_FONT_CHAR_RATIO_THRESHOLD] (see that constant's docstring for
-    the corpus evidence), that literal signal is untrustworthy for this
-    document, so fall back to "is not the document's dominant font" as the
-    heavy-weight signal instead.
+    Close to 1.0 means the document uses essentially one font throughout --
+    i.e. there is no dedicated second font a heading could be set in, so the
+    "is not the dominant font" fallback below has nothing to key off.
+    """
+    weights = _document_font_name_weights(document)
+    total = sum(weights.values())
+    if total == 0:
+        return 0.0
+    return max(weights.values()) / total
+
+
+def _document_modal_font_size(document: ExtractedDocument) -> float:
+    """Character-weighted modal font size -- the document's dominant body size."""
+    weights: dict[float, int] = {}
+    for page in document.pages:
+        for span in page.spans:
+            weights[span.font_size] = weights.get(span.font_size, 0) + len(span.text)
+    if not weights:
+        return 0.0
+    return max(weights, key=lambda size: weights[size])
+
+
+def _heavy_font_predicate(
+    document: ExtractedDocument,
+) -> Callable[[str, float], bool]:
+    """Build the per-document "is this span heading/emphasis weight" test.
+
+    Three tiers, each a fallback for when the previous one has nothing to
+    key off:
+
+    1. Ordinarily a font whose name literally contains "bold".
+    2. When the whole document's bold-named-character ratio is below
+       [HAS_BOLD_FONT_CHAR_RATIO_THRESHOLD] (see that constant's docstring
+       for the corpus evidence), that literal signal is untrustworthy, so
+       fall back to "is not the document's dominant font" -- the doc 4
+       (Sura) case, where headings use a wholly separate subset font.
+    3. [M1-04b]: doc 5 (KOVR) has neither -- 99.4% of its characters share
+       one font name ([MODAL_FONT_CHAR_SHARE_THRESHOLD]), with no dedicated
+       heading font at all, so tier 2 also has nothing to key off (every
+       span reports the same font_name). Its real headings are set 12.6%
+       larger than body text (12.0pt vs a 10.66pt modal size) with no bold
+       signal whatsoever -- see the module docstring for the full
+       calibration evidence.
     """
     if _document_bold_ratio(document) >= HAS_BOLD_FONT_CHAR_RATIO_THRESHOLD:
-        return lambda font_name: "bold" in font_name.lower()
-    modal_font_name = _document_modal_font_name(document)
-    return lambda font_name: font_name != modal_font_name and font_name != ""
+        return lambda font_name, font_size: "bold" in font_name.lower()
+    if _document_modal_font_share(document) < MODAL_FONT_CHAR_SHARE_THRESHOLD:
+        modal_font_name = _document_modal_font_name(document)
+        return lambda font_name, font_size: (
+            font_name != modal_font_name and font_name != ""
+        )
+    size_gate = _document_modal_font_size(document) * HEADING_FONT_SIZE_RATIO_THRESHOLD
+    return lambda font_name, font_size: font_size >= size_gate
 
 
 def _is_ocr_page(page: ExtractedPage) -> bool:
@@ -235,7 +369,7 @@ def _ocr_pseudo_lines(page: ExtractedPage) -> list[_Line]:
 
 
 def _text_page_lines(
-    page: ExtractedPage, is_heavy: Callable[[str], bool]
+    page: ExtractedPage, is_heavy: Callable[[str, float], bool]
 ) -> list[_Line]:
     """Group a text-extraction page's spans into position-aware logical lines."""
     grouped: dict[int, list[ExtractedSpan]] = {}
@@ -317,7 +451,7 @@ def _detect_and_reflow_columns(
 
 
 def _ordered_page_lines(
-    page: ExtractedPage, is_heavy: Callable[[str], bool]
+    page: ExtractedPage, is_heavy: Callable[[str, float], bool]
 ) -> tuple[list[_Line], bool]:
     """Return one page's lines in corrected reading order, and whether reflowed."""
     if _is_ocr_page(page):
@@ -398,6 +532,112 @@ def _slugify(text: str) -> str:
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
     return slug or "part"
+
+
+def _is_numbering_start(label: str) -> bool:
+    """True if a numbering label restarts a sequence at "1" (e.g. "1.", "1")."""
+    clean = re.sub(r"[^0-9]", "", label)
+    return clean == "1"
+
+
+def _consume_unnumbered_part_run(
+    lines: list[_Line], start_index: int, page_number: int
+) -> tuple[list[str], int]:
+    """Collect consecutive same-page UNNUMBERED_PART title lines from start_index.
+
+    Pure/side-effect-free title-wrap merge, shared by [consume_title_wrap]
+    (the real segmentation pass) and [_prescan_recurring_unnumbered_titles]
+    (the [M1-04b] noise pre-scan), so both agree on what one candidate
+    title's full text is.
+    """
+    title_parts: list[str] = []
+    lookahead = start_index
+    while lookahead < len(lines):
+        candidate_line = lines[lookahead]
+        if candidate_line.page_number != page_number:
+            break
+        candidate = _detect_heading(
+            candidate_line.text,
+            candidate_line.bold_fraction,
+            ocr=candidate_line.is_ocr,
+        )
+        if (
+            candidate is None
+            or candidate.convention != HeadingConvention.UNNUMBERED_PART
+        ):
+            break
+        title_parts.append(candidate.title)
+        lookahead += 1
+    return title_parts, lookahead
+
+
+def _recurrence_key(title: str) -> str:
+    """Dedup key for cross-document UNNUMBERED_PART title recurrence.
+
+    Reuses [_slugify]'s NFKD/accent-fold/case-fold/punctuation-collapse
+    behavior rather than a second normalizer: real corpus pairs like "NÃO
+    ESTÃO COBERTOS" / "NÃO ESTÃO COBERTOS:" and "ENVIO DE TÁXI" / "ENVIO DE
+    TAXI" (doc 10) are the same noise item with inconsistent trailing
+    punctuation/accents across occurrences, and [_slugify] already collapses
+    both differences by construction.
+    """
+    return _slugify(title)
+
+
+def _next_heading_starts_numbering(lines: list[_Line], start_index: int) -> bool:
+    """True if the next real heading at/after start_index restarts at "1".
+
+    Skips lettered/bulleted list-item lines (mirroring [is_list_item_line]'s
+    role in the main segmentation loop) before looking for the next
+    [_detect_heading] match.
+    """
+    index = start_index
+    while index < len(lines):
+        line = lines[index]
+        if is_list_item_line(line.text):
+            index += 1
+            continue
+        heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+        if heading is not None:
+            return heading.convention in (
+                HeadingConvention.NUMBERED_DECIMAL,
+                HeadingConvention.CLAUSULA_KEYWORD,
+            ) and _is_numbering_start(heading.numbering_label)
+        index += 1
+    return False
+
+
+def _prescan_recurring_unnumbered_titles(lines: list[_Line]) -> set[str]:
+    """Identify UNNUMBERED_PART candidate titles to demote to plain content.
+
+    [M1-04b]: a title is demoted -- all its occurrences, not just the
+    offending ones -- when it recurs more than once in the document AND at
+    least one occurrence is not immediately followed by its own numbering
+    restart at "1". See the module docstring for the doc 10/16/3 corpus
+    evidence this all-or-nothing rule is calibrated against.
+    """
+    occurrence_flags: dict[str, list[bool]] = {}
+    index = 0
+    line_count = len(lines)
+    while index < line_count:
+        line = lines[index]
+        heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+        if heading is None or heading.convention != HeadingConvention.UNNUMBERED_PART:
+            index += 1
+            continue
+        extra_parts, next_index = _consume_unnumbered_part_run(
+            lines, index + 1, line.page_number
+        )
+        merged_title = " ".join([heading.title, *extra_parts])
+        key = _recurrence_key(merged_title)
+        starts_restart = _next_heading_starts_numbering(lines, next_index)
+        occurrence_flags.setdefault(key, []).append(starts_restart)
+        index = next_index
+    return {
+        key
+        for key, flags in occurrence_flags.items()
+        if len(flags) > 1 and not all(flags)
+    }
 
 
 class _ClauseBuilder:
@@ -499,6 +739,8 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             )
         )
 
+    noise_titles = _prescan_recurring_unnumbered_titles(lines)
+
     builders: dict[str, _ClauseBuilder] = {}
     order: list[str] = []
     stack: list[_ClauseBuilder] = []
@@ -573,28 +815,15 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         spurious top-level node, resetting the stack mid-clause.
         """
         nonlocal total_char_count
-        title_parts = [heading.title]
-        lookahead = start_index
-        while lookahead < line_count:
-            candidate_line = lines[lookahead]
-            if candidate_line.page_number != page_number:
-                break
-            candidate = _detect_heading(
-                candidate_line.text,
-                candidate_line.bold_fraction,
-                ocr=candidate_line.is_ocr,
-            )
-            if (
-                candidate is None
-                or candidate.convention != HeadingConvention.UNNUMBERED_PART
-            ):
-                break
-            title_parts.append(candidate.title)
-            total_char_count += len(candidate_line.text)
-            lookahead += 1
-        if len(title_parts) == 1:
+        extra_parts, lookahead = _consume_unnumbered_part_run(
+            lines, start_index, page_number
+        )
+        for consumed_index in range(start_index, lookahead):
+            total_char_count += len(lines[consumed_index].text)
+        if not extra_parts:
             return heading, lookahead
-        return replace(heading, title=" ".join(title_parts)), lookahead
+        merged_title = " ".join([heading.title, *extra_parts])
+        return replace(heading, title=merged_title), lookahead
 
     index = 0
     line_count = len(lines)
@@ -617,6 +846,10 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             merged, next_index = consume_title_wrap(
                 heading, index + 1, line.page_number
             )
+            if _recurrence_key(merged.title) in noise_titles:
+                attach_content(merged.title, line.page_number)
+                index = next_index
+                continue
             open_clause(merged, line.page_number, depth=0)
             index = next_index
             continue
@@ -643,10 +876,15 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             )
         index = next_index
 
-    def is_numbering_start(label: str) -> bool:
-        clean = re.sub(r"[^0-9]", "", label)
-        return clean == "1"
-
+    # [M1-04b]: with recurring noise no longer fragmenting the tree above,
+    # a genuine product root's own numbered content doesn't reliably
+    # restart at label "1" (doc 10's "MOTOCICLETAS" root: its assistance-
+    # list items 1-9 never surface as bold NUMBERED_DECIMAL headings, a
+    # separate corpus quirk, so its first real child is "10."). Any real
+    # numbered/CLÁUSULA child is now enough signal that this part carries
+    # its own content-bearing clause sequence, rather than requiring that
+    # sequence to specifically restart at "1" -- validated this still
+    # correctly excludes zero-numbered-child parts (e.g. "GLOSSÁRIO").
     restarting_roots = []
     root_ids = [cid for cid in order if builders[cid].parent_id is None]
 
@@ -655,7 +893,11 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         if root_builder.depth == 0:
             has_start = any(
                 builders[child_id].depth == 1
-                and is_numbering_start(builders[child_id].numbering_label)
+                and builders[child_id].convention
+                in (
+                    HeadingConvention.NUMBERED_DECIMAL,
+                    HeadingConvention.CLAUSULA_KEYWORD,
+                )
                 for child_id in root_builder.child_ids
             )
             if has_start:
