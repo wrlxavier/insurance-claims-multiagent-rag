@@ -41,6 +41,8 @@ class Clause:
     content_lines: tuple[str, ...]
     page_start: int
     page_end: int
+    bundle_section: str | None = None
+    bundle_confidence: str | None = None
     is_depth_anomaly: bool = False
 
 
