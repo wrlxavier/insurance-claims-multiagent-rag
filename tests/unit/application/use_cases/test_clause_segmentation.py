@@ -795,3 +795,71 @@ def test_ocr_page_detects_headings_by_pattern_only() -> None:
     assert tree.report.extraction_mode == "ocr_required"
     assert any(w.kind == "ocr_relaxed_mode" for w in tree.report.warnings)
     assert tree.report.clause_count >= 2
+
+
+# ---------------------------------------------------------------------------
+# clause_id/path determinism [M1-07]: same input produces the same id, and a
+# structural edit confined to one branch never shifts the id of a clause in
+# an unrelated branch -- see [application.use_cases.clause_segmentation.
+# _slugify] and the sibling-segment-counting scheme in [segment_document].
+# ---------------------------------------------------------------------------
+
+
+def _coverages_document() -> ExtractedDocument:
+    return _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 1, "1. OBJETO DO SEGURO"),
+                    _body_line(1, 2, "Corpo do objeto."),
+                    _heading_line(1, 3, "2. COBERTURAS"),
+                    _heading_line(1, 4, "2.1 Cobertura Basica"),
+                    _body_line(1, 5, "Texto da cobertura basica."),
+                ],
+            )
+        ]
+    )
+
+
+@pytest.mark.unit
+def test_clause_id_deterministic_across_two_runs() -> None:
+    document = _coverages_document()
+
+    first = segment_document(document)
+    second = segment_document(document)
+
+    assert [c.clause_id for c in first.all_clauses] == [
+        c.clause_id for c in second.all_clauses
+    ]
+    assert [c.path for c in first.all_clauses] == [c.path for c in second.all_clauses]
+
+
+@pytest.mark.unit
+def test_clause_id_stable_when_unrelated_clause_inserted() -> None:
+    """Inserting a clause under "1" must not shift the id of "2"/"2.1"."""
+    baseline = segment_document(_coverages_document())
+
+    with_insertion = segment_document(
+        _document(
+            [
+                _page(
+                    1,
+                    [
+                        _heading_line(1, 1, "1. OBJETO DO SEGURO"),
+                        _body_line(1, 2, "Corpo do objeto."),
+                        _heading_line(1, 3, "1.1 Definicoes Extras"),
+                        _body_line(1, 4, "Texto das definicoes extras."),
+                        _heading_line(1, 5, "2. COBERTURAS"),
+                        _heading_line(1, 6, "2.1 Cobertura Basica"),
+                        _body_line(1, 7, "Texto da cobertura basica."),
+                    ],
+                )
+            ]
+        )
+    )
+
+    assert with_insertion.report.clause_count == baseline.report.clause_count + 1
+    assert _find(with_insertion, "2").clause_id == _find(baseline, "2").clause_id
+    assert _find(with_insertion, "2.1").clause_id == _find(baseline, "2.1").clause_id
+    assert _find(with_insertion, "2").path == _find(baseline, "2").path

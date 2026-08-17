@@ -47,6 +47,7 @@ def build_dummy_tree(title: str, text: str = "body") -> ClauseTree:
     clause = Clause(
         document_id="1",
         clause_id="c1",
+        path="1",
         numbering_label="1.",
         title=title,
         # Assuming enum is not strictly checked here if mock
