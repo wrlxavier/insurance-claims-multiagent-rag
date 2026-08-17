@@ -77,6 +77,27 @@ def test_mapfre_2004_legacy_layout_recovers_deepest_nesting() -> None:
 
 
 @pytest.mark.unit
+def test_kovr_27pp_recovers_from_total_failure_via_font_size_signal() -> None:
+    """[M1-04b] doc 5's real case: no bold-named font and, unlike doc 4, no
+    dedicated second font either -- 99.4% of its characters share one font
+    name, so only a font-size delta (12.0pt headings vs 10.66pt body)
+    distinguishes its 34 "N) TÍTULO" headings from body prose. Before the
+    font-size fallback tier, this document recovered zero clauses (orphan
+    ratio 1.000) and failed `scripts/build_clause_tree.py`'s threshold
+    check outright -- a total failure, unlike doc 15's partial noise case
+    below, which is why it gets its own dedicated regression fixture."""
+    tree = _segment_text_mode("15414638282202241.pdf", "5")
+
+    assert tree.report.clause_count > 25
+    assert len(tree.roots) > 25
+    assert tree.report.orphan_ratio < 0.05
+    assert any(
+        clause.convention == HeadingConvention.UNNUMBERED_PART
+        for clause in tree.all_clauses
+    )
+
+
+@pytest.mark.unit
 def test_bradesco_207pp_bundle_is_wide_and_shallow() -> None:
     tree = _segment_text_mode("15414900666201489.pdf", "10")
 

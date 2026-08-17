@@ -186,6 +186,65 @@ def test_subset_font_with_no_bold_in_name_falls_back_to_dominant_font() -> None:
     assert tree.report.orphan_ratio == 0.0
 
 
+@pytest.mark.unit
+def test_single_font_document_falls_back_to_font_size_delta() -> None:
+    """[M1-04b] doc 5 (KOVR) real case: no "bold" font, and unlike doc 4 no
+    dedicated second font either -- headings and body share one font name
+    throughout (99.4% of the real document's characters), differing only
+    by size (12.0pt headings vs 10.66pt body, a 12.6% delta). Before this
+    fallback tier, the real document recovered zero clauses at all."""
+
+    def _size_span(
+        page_number: int, line_id: int, text: str, *, font_size: float
+    ) -> ExtractedSpan:
+        return ExtractedSpan(
+            document_id="d1",
+            page_number=page_number,
+            line_id=line_id,
+            order=line_id,
+            bbox=(
+                50.0,
+                100.0 + line_id * 15.0,
+                50.0 + len(text) * 6.0,
+                110.0 + line_id * 15.0,
+            ),
+            font_size=font_size,
+            font_name="NewJuneRegular",
+            text=text,
+        )
+
+    spans = [
+        _size_span(1, 0, "1) DISPOSIÇÕES INICIAIS", font_size=12.0),
+        _size_span(
+            1,
+            1,
+            "A aceitação da proposta de seguro está sujeita à análise.",
+            font_size=10.66,
+        ),
+        _size_span(1, 2, "2) OBJETIVO DO SEGURO", font_size=12.0),
+        _size_span(
+            1,
+            3,
+            "O objetivo do seguro é garantir o pagamento de indenização.",
+            font_size=10.66,
+        ),
+    ]
+    # Body size dominates by character count, as in the real document.
+    spans.append(
+        _size_span(1, 4, "Corpo adicional em corpo normal " * 5, font_size=10.66)
+    )
+    document = _document([_page(1, spans)])
+
+    tree = segment_document(document)
+
+    assert tree.report.clause_count == 2
+    assert [c.title for c in tree.roots] == [
+        "1) DISPOSIÇÕES INICIAIS",
+        "2) OBJETIVO DO SEGURO",
+    ]
+    assert tree.report.orphan_ratio == 0.0
+
+
 # ---------------------------------------------------------------------------
 # 1. Plain decimal depth changes
 # ---------------------------------------------------------------------------
@@ -770,7 +829,9 @@ def test_justified_text_line_final_word_does_not_trigger_multi_column_reflow() -
 def _ordered_page_lines_for_test(page: ExtractedPage) -> tuple[list[Any], bool]:
     from application.use_cases.clause_segmentation import _ordered_page_lines
 
-    return _ordered_page_lines(page, lambda font_name: "bold" in font_name.lower())
+    return _ordered_page_lines(
+        page, lambda font_name, font_size: "bold" in font_name.lower()
+    )
 
 
 # ---------------------------------------------------------------------------
