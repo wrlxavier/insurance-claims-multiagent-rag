@@ -33,6 +33,38 @@ reading, both evidence-backed:
   lettered items (``a)``, ``b)``...) don't match the numbering regex, so
   they're correctly excluded before bold fraction is even considered.
 
+[M1-04b] adds a third signal on top of the two above, needed because bold
+fraction, the numbering-pattern gate, and font size (see below) are all
+identical between a genuine UNNUMBERED_PART product title and pure
+typographical noise in some documents: doc 10 (Bradesco)'s real product
+intro "RESUMO DE COBERTURAS DA ASSISTÊNCIA À MOTOCICLETAS" and its noise
+"NÃO ESTÃO COBERTOS:" (repeated ~20 times as a benefits-tier template) sit
+at the exact same font (TimesNewRomanPS-BoldMT, 9.0pt), so no font/position
+signal available in this corpus discriminates them; TOC text is discarded
+entirely by [M1-03]'s boilerplate removal, so "is this in the TOC" isn't
+an available signal without new extraction plumbing, out of scope here.
+**A genuine part title is introduced exactly once in a document; repeated
+list-item/table labels are not** -- so an UNNUMBERED_PART candidate whose
+title recurs (per [_recurrence_key], which reuses [_slugify]'s accent/
+punctuation folding to catch corpus inconsistencies like doc 10's "NÃO
+ESTÃO COBERTOS" vs "NÃO ESTÃO COBERTOS:", or "ENVIO DE TÁXI" vs "ENVIO DE
+TAXI") is demoted to plain content instead of opening a new root
+([_prescan_recurring_unnumbered_titles]). This must be all-or-nothing per
+title, not per-occurrence: doc 16 (AKAD RCF-V) reuses "CONDIÇÕES ESPECIAIS"
+3 times for 3 distinct coverage variants, each correctly followed by its
+own "1. Riscos Cobertos" restart, and must be kept; doc 10's "ARGENTINA,
+PARAGUAI, URUGUAI E CHILE." recurs 8 times and only 3 of those occurrences
+happen to precede an unrelated "1." elsewhere, so a per-occurrence rule
+would leave it partially, wrongly promoted. Accepted trade-off: doc 3
+(AKAD)'s "ÂMBITO GEOGRÁFICO" recurs twice for two legitimately separate
+endorsement clauses that have zero numbered children either way (their
+body bold fraction never clears [NUMBERED_BOLD_THRESHOLD], a pre-existing,
+unrelated quirk) -- this rule demotes it, misattributing ~300 chars of
+prose to the preceding clause. No content is lost and no existing test
+covers it; a content-length heuristic doesn't rescue it without also
+un-fixing doc 10, where noise items have larger content spans than doc
+10's own genuine parts.
+
 Font size is not discarded -- it is demoted from a required gate to
 provenance carried on each detected line, available for future tuning, but
 not load-bearing for the current heuristic: numbering-pattern depth is the
@@ -59,7 +91,7 @@ from domain.clause_tree import (
 )
 from domain.extracted_text import ExtractedDocument, ExtractedPage, ExtractedSpan
 
-CLAUSE_SEGMENTATION_VERSION = "v2"
+CLAUSE_SEGMENTATION_VERSION = "v3"
 
 NUMBERED_BOLD_THRESHOLD = 0.5
 PART_BOLD_THRESHOLD = 0.9
@@ -400,6 +432,112 @@ def _slugify(text: str) -> str:
     return slug or "part"
 
 
+def _is_numbering_start(label: str) -> bool:
+    """True if a numbering label restarts a sequence at "1" (e.g. "1.", "1")."""
+    clean = re.sub(r"[^0-9]", "", label)
+    return clean == "1"
+
+
+def _consume_unnumbered_part_run(
+    lines: list[_Line], start_index: int, page_number: int
+) -> tuple[list[str], int]:
+    """Collect consecutive same-page UNNUMBERED_PART title lines from start_index.
+
+    Pure/side-effect-free title-wrap merge, shared by [consume_title_wrap]
+    (the real segmentation pass) and [_prescan_recurring_unnumbered_titles]
+    (the [M1-04b] noise pre-scan), so both agree on what one candidate
+    title's full text is.
+    """
+    title_parts: list[str] = []
+    lookahead = start_index
+    while lookahead < len(lines):
+        candidate_line = lines[lookahead]
+        if candidate_line.page_number != page_number:
+            break
+        candidate = _detect_heading(
+            candidate_line.text,
+            candidate_line.bold_fraction,
+            ocr=candidate_line.is_ocr,
+        )
+        if (
+            candidate is None
+            or candidate.convention != HeadingConvention.UNNUMBERED_PART
+        ):
+            break
+        title_parts.append(candidate.title)
+        lookahead += 1
+    return title_parts, lookahead
+
+
+def _recurrence_key(title: str) -> str:
+    """Dedup key for cross-document UNNUMBERED_PART title recurrence.
+
+    Reuses [_slugify]'s NFKD/accent-fold/case-fold/punctuation-collapse
+    behavior rather than a second normalizer: real corpus pairs like "NÃO
+    ESTÃO COBERTOS" / "NÃO ESTÃO COBERTOS:" and "ENVIO DE TÁXI" / "ENVIO DE
+    TAXI" (doc 10) are the same noise item with inconsistent trailing
+    punctuation/accents across occurrences, and [_slugify] already collapses
+    both differences by construction.
+    """
+    return _slugify(title)
+
+
+def _next_heading_starts_numbering(lines: list[_Line], start_index: int) -> bool:
+    """True if the next real heading at/after start_index restarts at "1".
+
+    Skips lettered/bulleted list-item lines (mirroring [is_list_item_line]'s
+    role in the main segmentation loop) before looking for the next
+    [_detect_heading] match.
+    """
+    index = start_index
+    while index < len(lines):
+        line = lines[index]
+        if is_list_item_line(line.text):
+            index += 1
+            continue
+        heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+        if heading is not None:
+            return heading.convention in (
+                HeadingConvention.NUMBERED_DECIMAL,
+                HeadingConvention.CLAUSULA_KEYWORD,
+            ) and _is_numbering_start(heading.numbering_label)
+        index += 1
+    return False
+
+
+def _prescan_recurring_unnumbered_titles(lines: list[_Line]) -> set[str]:
+    """Identify UNNUMBERED_PART candidate titles to demote to plain content.
+
+    [M1-04b]: a title is demoted -- all its occurrences, not just the
+    offending ones -- when it recurs more than once in the document AND at
+    least one occurrence is not immediately followed by its own numbering
+    restart at "1". See the module docstring for the doc 10/16/3 corpus
+    evidence this all-or-nothing rule is calibrated against.
+    """
+    occurrence_flags: dict[str, list[bool]] = {}
+    index = 0
+    line_count = len(lines)
+    while index < line_count:
+        line = lines[index]
+        heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+        if heading is None or heading.convention != HeadingConvention.UNNUMBERED_PART:
+            index += 1
+            continue
+        extra_parts, next_index = _consume_unnumbered_part_run(
+            lines, index + 1, line.page_number
+        )
+        merged_title = " ".join([heading.title, *extra_parts])
+        key = _recurrence_key(merged_title)
+        starts_restart = _next_heading_starts_numbering(lines, next_index)
+        occurrence_flags.setdefault(key, []).append(starts_restart)
+        index = next_index
+    return {
+        key
+        for key, flags in occurrence_flags.items()
+        if len(flags) > 1 and not all(flags)
+    }
+
+
 class _ClauseBuilder:
     """Mutable accumulator for one clause while the document is being walked."""
 
@@ -499,6 +637,8 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             )
         )
 
+    noise_titles = _prescan_recurring_unnumbered_titles(lines)
+
     builders: dict[str, _ClauseBuilder] = {}
     order: list[str] = []
     stack: list[_ClauseBuilder] = []
@@ -573,28 +713,15 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         spurious top-level node, resetting the stack mid-clause.
         """
         nonlocal total_char_count
-        title_parts = [heading.title]
-        lookahead = start_index
-        while lookahead < line_count:
-            candidate_line = lines[lookahead]
-            if candidate_line.page_number != page_number:
-                break
-            candidate = _detect_heading(
-                candidate_line.text,
-                candidate_line.bold_fraction,
-                ocr=candidate_line.is_ocr,
-            )
-            if (
-                candidate is None
-                or candidate.convention != HeadingConvention.UNNUMBERED_PART
-            ):
-                break
-            title_parts.append(candidate.title)
-            total_char_count += len(candidate_line.text)
-            lookahead += 1
-        if len(title_parts) == 1:
+        extra_parts, lookahead = _consume_unnumbered_part_run(
+            lines, start_index, page_number
+        )
+        for consumed_index in range(start_index, lookahead):
+            total_char_count += len(lines[consumed_index].text)
+        if not extra_parts:
             return heading, lookahead
-        return replace(heading, title=" ".join(title_parts)), lookahead
+        merged_title = " ".join([heading.title, *extra_parts])
+        return replace(heading, title=merged_title), lookahead
 
     index = 0
     line_count = len(lines)
@@ -617,6 +744,10 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             merged, next_index = consume_title_wrap(
                 heading, index + 1, line.page_number
             )
+            if _recurrence_key(merged.title) in noise_titles:
+                attach_content(merged.title, line.page_number)
+                index = next_index
+                continue
             open_clause(merged, line.page_number, depth=0)
             index = next_index
             continue
@@ -643,10 +774,15 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             )
         index = next_index
 
-    def is_numbering_start(label: str) -> bool:
-        clean = re.sub(r"[^0-9]", "", label)
-        return clean == "1"
-
+    # [M1-04b]: with recurring noise no longer fragmenting the tree above,
+    # a genuine product root's own numbered content doesn't reliably
+    # restart at label "1" (doc 10's "MOTOCICLETAS" root: its assistance-
+    # list items 1-9 never surface as bold NUMBERED_DECIMAL headings, a
+    # separate corpus quirk, so its first real child is "10."). Any real
+    # numbered/CLÁUSULA child is now enough signal that this part carries
+    # its own content-bearing clause sequence, rather than requiring that
+    # sequence to specifically restart at "1" -- validated this still
+    # correctly excludes zero-numbered-child parts (e.g. "GLOSSÁRIO").
     restarting_roots = []
     root_ids = [cid for cid in order if builders[cid].parent_id is None]
 
@@ -655,7 +791,11 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         if root_builder.depth == 0:
             has_start = any(
                 builders[child_id].depth == 1
-                and is_numbering_start(builders[child_id].numbering_label)
+                and builders[child_id].convention
+                in (
+                    HeadingConvention.NUMBERED_DECIMAL,
+                    HeadingConvention.CLAUSULA_KEYWORD,
+                )
                 for child_id in root_builder.child_ids
             )
             if has_start:

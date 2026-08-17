@@ -863,3 +863,230 @@ def test_clause_id_stable_when_unrelated_clause_inserted() -> None:
     assert _find(with_insertion, "2").clause_id == _find(baseline, "2").clause_id
     assert _find(with_insertion, "2.1").clause_id == _find(baseline, "2.1").clause_id
     assert _find(with_insertion, "2").path == _find(baseline, "2").path
+
+
+# ---------------------------------------------------------------------------
+# [M1-04b]: recurring UNNUMBERED_PART candidates are demoted to content, not
+# roots -- doc 10's repeated benefits-tier labels (e.g. "NÃO ESTÃO
+# COBERTOS") are structurally identical to a genuine part title otherwise.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_recurring_bold_caps_line_is_demoted_to_content_not_a_root() -> None:
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "1. RISCOS EXCLUÍDOS"),
+                    _body_line(1, 1, "Texto de exclusão."),
+                    _heading_line(1, 2, "NÃO ESTÃO COBERTOS"),
+                ],
+            ),
+            _page(
+                2,
+                [
+                    _heading_line(2, 0, "2. OUTRAS DISPOSIÇÕES"),
+                    _body_line(2, 1, "Mais texto."),
+                    _heading_line(2, 2, "NÃO ESTÃO COBERTOS"),
+                ],
+            ),
+        ]
+    )
+
+    tree = segment_document(document)
+
+    assert [c.title for c in tree.roots] == [
+        "1. RISCOS EXCLUÍDOS",
+        "2. OUTRAS DISPOSIÇÕES",
+    ]
+    assert "NÃO ESTÃO COBERTOS" in tree.roots[0].content_lines
+    assert "NÃO ESTÃO COBERTOS" in tree.roots[1].content_lines
+
+
+@pytest.mark.unit
+def test_recurring_title_with_accent_and_spelling_drift_is_still_grouped() -> None:
+    """doc 10's real extraction inconsistency: the same noise item surfaces
+    once as "ENVIO DE TÁXI" and again as "ENVIO DE TAXI" -- both must be
+    recognized as the same recurring group and demoted together."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "1. SERVIÇOS INCLUSOS"),
+                    _body_line(1, 1, "Texto de serviços."),
+                    _heading_line(1, 2, "ENVIO DE TÁXI"),
+                ],
+            ),
+            _page(
+                2,
+                [
+                    _heading_line(2, 0, "2. OUTROS SERVIÇOS"),
+                    _body_line(2, 1, "Mais texto."),
+                    _heading_line(2, 2, "ENVIO DE TAXI"),
+                ],
+            ),
+        ]
+    )
+
+    tree = segment_document(document)
+
+    assert [c.title for c in tree.roots] == [
+        "1. SERVIÇOS INCLUSOS",
+        "2. OUTROS SERVIÇOS",
+    ]
+    assert "ENVIO DE TÁXI" in tree.roots[0].content_lines
+    assert "ENVIO DE TAXI" in tree.roots[1].content_lines
+
+
+@pytest.mark.unit
+def test_recurring_title_always_followed_by_restart_is_kept_as_bundle_roots() -> None:
+    """doc 16's real case: "CONDIÇÕES ESPECIAIS" is reused for 3 distinct
+    coverage variants, each immediately followed by its own "1." restart --
+    unlike doc 10's noise, every occurrence qualifies, so all must survive
+    as independent, high-confidence bundle roots."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "CONDIÇÕES ESPECIAIS"),
+                    _heading_line(1, 1, "1. RISCOS COBERTOS"),
+                    _body_line(1, 2, "Texto 1."),
+                ],
+            ),
+            _page(
+                2,
+                [
+                    _heading_line(2, 0, "CONDIÇÕES ESPECIAIS"),
+                    _heading_line(2, 1, "1. RISCOS COBERTOS"),
+                    _body_line(2, 2, "Texto 2."),
+                ],
+            ),
+        ]
+    )
+
+    tree = segment_document(document)
+
+    assert len(tree.roots) == 2
+    assert all(c.title == "CONDIÇÕES ESPECIAIS" for c in tree.roots)
+    assert all(c.bundle_confidence == "high" for c in tree.roots)
+
+
+@pytest.mark.unit
+def test_recurring_title_with_partial_restart_is_demoted_in_full() -> None:
+    """doc 10's real case: "ARGENTINA, PARAGUAI, URUGUAI E CHILE." recurs,
+    and only one of its two occurrences happens to precede an unrelated
+    "1." restart -- the all-or-nothing rule must demote it entirely,
+    including the occurrence that individually looked like a real restart."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "ARGENTINA, PARAGUAI, URUGUAI E CHILE."),
+                    _heading_line(1, 1, "1. COBERTURA ESPECIAL"),
+                    _body_line(1, 2, "Texto."),
+                ],
+            ),
+            _page(
+                2,
+                [
+                    _heading_line(2, 0, "2. OUTRA SEÇÃO"),
+                    _body_line(2, 1, "Corpo da seção."),
+                    _heading_line(2, 2, "ARGENTINA, PARAGUAI, URUGUAI E CHILE."),
+                    _body_line(2, 3, "Outro texto."),
+                ],
+            ),
+        ]
+    )
+
+    tree = segment_document(document)
+
+    assert [c.title for c in tree.roots] == [
+        "1. COBERTURA ESPECIAL",
+        "2. OUTRA SEÇÃO",
+    ]
+    assert "ARGENTINA, PARAGUAI, URUGUAI E CHILE." in tree.roots[1].content_lines
+    # The first occurrence was demoted before any clause was open, so it
+    # landed as orphan text rather than being silently dropped or promoted.
+    assert tree.report.orphan_char_count > 0
+
+
+@pytest.mark.unit
+def test_part_root_promoted_when_only_child_restarts_at_non_one_label() -> None:
+    """doc 10's real case: "MOTOCICLETAS"'s own assistance-list items never
+    surface as a "1."-labeled child (the first real child is "10."), so the
+    relaxed [M1-06] check must promote it on the presence of any numbered
+    child, not specifically a restart at "1"."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "ASSISTÊNCIA MOTOCICLETAS"),
+                    _heading_line(1, 1, "10. ITEM DEZ"),
+                    _body_line(1, 2, "Texto item dez."),
+                ],
+            ),
+            _page(
+                2,
+                [
+                    _heading_line(2, 0, "DISPOSIÇÕES GERAIS"),
+                    _heading_line(2, 1, "1. OBJETO"),
+                    _body_line(2, 2, "Texto objeto."),
+                ],
+            ),
+        ]
+    )
+
+    tree = segment_document(document)
+
+    motocicletas = next(c for c in tree.roots if c.title == "ASSISTÊNCIA MOTOCICLETAS")
+    assert motocicletas.bundle_confidence == "high"
+    assert motocicletas.bundle_section == "ASSISTÊNCIA MOTOCICLETAS"
+
+
+@pytest.mark.unit
+def test_part_root_with_zero_numbered_children_is_not_promoted() -> None:
+    """doc 10's real case: "RESUMO DE COBERTURAS DA ASSISTÊNCIA À VEÍCULOS
+    DE CARGA" is a genuine, correctly-recognized root (DoD bullet 3) but is
+    a pure coverage-comparison table with no numbered sub-clauses -- it
+    must stay a root without being promoted to bundle_confidence="high"."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "DISPOSIÇÕES GERAIS"),
+                    _heading_line(1, 1, "1. OBJETO"),
+                    _body_line(1, 2, "Texto objeto."),
+                ],
+            ),
+            _page(
+                2,
+                [
+                    _heading_line(
+                        2, 0, "RESUMO DE COBERTURAS DA ASSISTÊNCIA À VEÍCULOS DE CARGA"
+                    ),
+                    _body_line(2, 1, "Tabela de coberturas."),
+                ],
+            ),
+            _page(
+                3,
+                [
+                    _heading_line(3, 0, "ASSISTÊNCIA MOTOCICLETAS"),
+                    _heading_line(3, 1, "10. ITEM DEZ"),
+                    _body_line(3, 2, "Texto item dez."),
+                ],
+            ),
+        ]
+    )
+
+    tree = segment_document(document)
+
+    carga = next(c for c in tree.roots if "CARGA" in c.title)
+    assert carga.bundle_confidence == "low"
+    assert carga.bundle_section is None
