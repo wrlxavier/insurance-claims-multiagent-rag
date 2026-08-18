@@ -257,6 +257,3 @@ langfuse_data/
 
 # AI context files - for agentic tools and other AI-powered applications, in dev mode.
 .ai_context/
-
-# AI markdown files
-CLAUDE.md
