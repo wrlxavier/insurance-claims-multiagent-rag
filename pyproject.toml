@@ -105,6 +105,7 @@ line-ending = "auto"
 
 [tool.mypy]
 files = ["app/src", "tests", "scripts"]
+mypy_path = "app/src"
 exclude = ["build/", "notebooks/scratch/"]
 strict = true
 warn_unused_configs = true
