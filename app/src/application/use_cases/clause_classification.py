@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 
 from application.ports.clause_classifier import ClauseClassifierPort
 from domain.clause_classification import (
@@ -11,7 +12,7 @@ from domain.clause_classification import (
     TypedClause,
     TypeSource,
 )
-from domain.clause_tree import ClauseTree
+from domain.clause_tree import Clause, ClauseTree
 
 
 def normalize_heading(text: str) -> str:
@@ -41,11 +42,23 @@ def build_provenance(
     raise MissingProvenanceError(document_id)
 
 
+def _classify_with_fallback(
+    clause: Clause, classifier: ClauseClassifierPort
+) -> tuple[ClauseType, float]:
+    """Call the LLM port, falling back to OTHER/0.0 on any failure."""
+    full_text = "\n".join(clause.content_lines)
+    try:
+        return classifier.classify(clause.title, full_text)
+    except Exception:
+        return ClauseType.OTHER, 0.0
+
+
 def classify_and_enrich_clauses(
     tree: ClauseTree,
     manifest_records: list[dict[str, str]],
     rules: list[tuple[re.Pattern[str], ClauseType]],
     classifier: ClauseClassifierPort,
+    max_workers: int = 1,
 ) -> list[TypedClause]:
     """Process the clause tree to classify each clause and attach provenance.
 
@@ -54,42 +67,56 @@ def classify_and_enrich_clauses(
         manifest_records: The parsed manifest.csv rows.
         rules: Ordered list of (compiled_regex, ClauseType) for deterministic pass.
         classifier: The LLM port for fallback classification.
+        max_workers: Thread-pool size for the LLM fallback pass. The rule
+            pass is always sequential (no I/O). ``1`` (the default) runs the
+            LLM pass sequentially too -- callers that pass a classifier
+            backed by a real network call should raise this to shorten the
+            LLM pass's wall-clock time.
 
     Returns:
         List of TypedClause.
     """
     provenance = build_provenance(tree.document_id, manifest_records)
-    typed_clauses = []
 
+    # First pass: deterministic rules -- always sequential, no I/O.
+    rule_matches: dict[str, ClauseType] = {}
+    pending: list[Clause] = []
     for clause in tree.all_clauses:
-        clause_type = None
-        type_source = None
-        confidence = None
-
         normalized_title = normalize_heading(clause.title)
-
-        # First pass: Deterministic rules
         for pattern, mapped_type in rules:
             if pattern.search(normalized_title):
-                clause_type = mapped_type
-                type_source = TypeSource.RULE
-                confidence = 1.0
+                rule_matches[clause.clause_id] = mapped_type
                 break
+        else:
+            pending.append(clause)
 
-        # Second pass: LLM Fallback
-        if clause_type is None:
-            full_text = "\\n".join(clause.content_lines)
-            try:
-                clause_type, confidence = classifier.classify(clause.title, full_text)
-                type_source = TypeSource.LLM
-            except Exception:
-                # Fallback of the fallback
-                clause_type = ClauseType.OTHER
-                type_source = TypeSource.LLM
-                confidence = 0.0
+    # Second pass: LLM fallback for whatever the rules left unmatched.
+    llm_results: dict[str, tuple[ClauseType, float]] = {}
+    if pending:
+        if max_workers > 1:
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                outcomes = list(
+                    pool.map(
+                        lambda clause: _classify_with_fallback(clause, classifier),
+                        pending,
+                    )
+                )
+        else:
+            outcomes = [
+                _classify_with_fallback(clause, classifier) for clause in pending
+            ]
+        for clause, outcome in zip(pending, outcomes, strict=True):
+            llm_results[clause.clause_id] = outcome
 
-        assert clause_type is not None
-        assert type_source is not None
+    typed_clauses = []
+    for clause in tree.all_clauses:
+        if clause.clause_id in rule_matches:
+            clause_type = rule_matches[clause.clause_id]
+            type_source = TypeSource.RULE
+            confidence = 1.0
+        else:
+            clause_type, confidence = llm_results[clause.clause_id]
+            type_source = TypeSource.LLM
 
         typed_clauses.append(
             TypedClause(

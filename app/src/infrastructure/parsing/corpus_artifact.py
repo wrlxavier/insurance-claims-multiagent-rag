@@ -28,9 +28,10 @@ BUILD_MANIFEST_PATH = BUILD_DIR / "manifest.json"
 class BuildManifest(BaseModel):
     """Reproducibility record for one ``make parse`` run.
 
-    ``llm_classification_enabled`` is always ``False`` today -- see
-    [infrastructure.parsing.null_classifier] for why ``scripts/
-    build_corpus.py`` runs a deterministic stub instead of a real LLM.
+    ``llm_classification_enabled`` records whether ``scripts/
+    build_corpus.py`` ran the real LLM fallback pass ([infrastructure.
+    parsing.llm_classifier.LangchainClauseClassifier]) for clauses the
+    deterministic rules leave as ``other``.
     """
 
     schema_version: str
