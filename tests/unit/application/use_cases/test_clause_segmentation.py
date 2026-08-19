@@ -2,7 +2,10 @@ from typing import Any
 
 import pytest
 
-from application.use_cases.clause_segmentation import segment_document
+from application.use_cases.clause_segmentation import (
+    find_oversized_clauses,
+    segment_document,
+)
 from domain.clause_tree import (
     Clause,
     ClauseTree,
@@ -195,43 +198,47 @@ def test_single_font_document_falls_back_to_font_size_delta() -> None:
     fallback tier, the real document recovered zero clauses at all."""
 
     def _size_span(
-        page_number: int, line_id: int, text: str, *, font_size: float
+        page_number: int, line_id: int, text: str, *, font_size: float, y0: float
     ) -> ExtractedSpan:
         return ExtractedSpan(
             document_id="d1",
             page_number=page_number,
             line_id=line_id,
             order=line_id,
-            bbox=(
-                50.0,
-                100.0 + line_id * 15.0,
-                50.0 + len(text) * 6.0,
-                110.0 + line_id * 15.0,
-            ),
+            bbox=(50.0, y0, 50.0 + len(text) * 6.0, y0 + 10.0),
             font_size=font_size,
             font_name="NewJuneRegular",
             text=text,
         )
 
+    # Realistic paragraph spacing: 15pt between ordinary body lines, a wider
+    # 30pt gap before each section heading -- matching real PDF layout, and
+    # clearing [MIN_HEADING_GAP_RATIO] against the 15pt baseline (unlike a
+    # wrap-continuation line, which stays at the tight baseline gap; see
+    # [_has_heading_position_signal]).
     spans = [
-        _size_span(1, 0, "1) DISPOSIÇÕES INICIAIS", font_size=12.0),
+        _size_span(1, 0, "1) DISPOSIÇÕES INICIAIS", font_size=12.0, y0=100.0),
         _size_span(
             1,
             1,
             "A aceitação da proposta de seguro está sujeita à análise.",
             font_size=10.66,
+            y0=115.0,
         ),
-        _size_span(1, 2, "2) OBJETIVO DO SEGURO", font_size=12.0),
+        _size_span(1, 2, "2) OBJETIVO DO SEGURO", font_size=12.0, y0=145.0),
         _size_span(
             1,
             3,
             "O objetivo do seguro é garantir o pagamento de indenização.",
             font_size=10.66,
+            y0=160.0,
         ),
     ]
     # Body size dominates by character count, as in the real document.
     spans.append(
-        _size_span(1, 4, "Corpo adicional em corpo normal " * 5, font_size=10.66)
+        _size_span(
+            1, 4, "Corpo adicional em corpo normal " * 5, font_size=10.66, y0=175.0
+        )
     )
     document = _document([_page(1, spans)])
 
@@ -313,6 +320,69 @@ def test_numbered_heading_title_wrap_does_not_open_a_spurious_part() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 1b. Bare numeral and its title split across two separate logical lines
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_bare_numeral_and_title_on_separate_lines_join_into_one_heading() -> None:
+    """doc 15 (Mapfre) real case: a top-level clause's numeral and its bold
+    title render as two separate logical lines -- a bare "1." alone, then
+    "COBERTURA BÁSICA COMPREENSIVA..." on the next line. Neither
+    [_NUMBERED_DECIMAL_TOP] nor [_NUMBERED_DECIMAL_DEEP] can match a bare
+    numeral (both require title text on the same matched line), so without
+    [_try_join_bare_numeral_title] the numeral falls through as content and
+    the title independently opens as a spurious UNNUMBERED_PART root
+    instead of becoming that numeral's own numbered heading."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "1."),
+                    _heading_line(
+                        1, 1, "COBERTURA BÁSICA COMPREENSIVA COLISÃO, INCÊNDIO"
+                    ),
+                    _heading_line(1, 2, "2. COBERTURAS ADICIONAIS"),
+                ],
+            )
+        ]
+    )
+
+    tree = segment_document(document)
+
+    assert len(tree.roots) == 2
+    node_1 = _find(tree, "1")
+    assert node_1.convention == HeadingConvention.NUMBERED_DECIMAL
+    assert node_1.title == "1. COBERTURA BÁSICA COMPREENSIVA COLISÃO, INCÊNDIO"
+    assert [c.numbering_label for c in tree.roots] == ["1", "2"]
+
+
+@pytest.mark.unit
+def test_bare_numeral_without_a_following_title_line_stays_as_content() -> None:
+    """Negative case for [_try_join_bare_numeral_title]: a bare numeral with
+    nothing after it on the page must not crash and must not join anything
+    -- it just falls through as ordinary content, same as before this fix,
+    since neither numbered-decimal regex matches a numeral alone."""
+    document = _document(
+        [
+            _page(
+                1,
+                [
+                    _heading_line(1, 0, "1. OBJETO DO SEGURO"),
+                    _heading_line(1, 1, "2."),
+                ],
+            )
+        ]
+    )
+
+    tree = segment_document(document)
+
+    assert len(tree.roots) == 1
+    assert _find(tree, "1").content_lines == ("2.",)
+
+
+# ---------------------------------------------------------------------------
 # 2. CLÁUSULA N form with sub-items reusing the clause's own number
 # ---------------------------------------------------------------------------
 
@@ -372,6 +442,165 @@ def test_unnumbered_part_header_becomes_parent_of_following_numbered_heading() -
     numbered = _find(tree, "1")
     assert numbered.parent_id == part.clause_id
     assert numbered.depth == 1
+
+
+# ---------------------------------------------------------------------------
+# 3b. Position-gap gate on UNNUMBERED_PART detection
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_all_caps_body_sentence_wrap_is_not_detected_as_new_heading() -> None:
+    """doc 15 (Mapfre) p59, samples #21/#22: in a whole-document-bold legacy
+    template, bold fraction is saturated on nearly every line, leaving
+    "<=10 words, all-uppercase" as the only UNNUMBERED_PART gate -- a
+    wrapped continuation line of an ALL-CAPS sentence independently clears
+    it and gets misdetected as a new heading, truncating the clause that
+    should have captured it. [_has_heading_position_signal] adds a
+    line-to-line vertical-spacing gate: these continuation lines sit at the
+    document's ordinary (tight) line pitch, while the genuine heading's own
+    gap is far wider."""
+    lines_spec = [
+        (_heading_line(1, 0, "1. OBJETO DO SEGURO"), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum um."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum dois."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum tres."), 145.0),
+        (_body_line(1, 4, "Texto de corpo comum quatro."), 160.0),
+        # 30pt gap: genuine heading.
+        (_heading_line(1, 5, "COBERTURAS BÁSICAS"), 190.0),
+        # A real body line intervenes here (matching the real corpus shape --
+        # the false-positive lines below are mid-clause, not adjacent to the
+        # heading), so [consume_title_wrap]'s title-wrap absorption -- a
+        # different, unrelated mechanism for a heading's OWN wrapped title --
+        # never runs; this exercises the main loop's own position gate.
+        (_body_line(1, 6, "A contratação de qualquer cobertura básica."), 205.0),
+        (
+            _heading_line(1, 7, "SEM PREJUÍZO DAS DEMAIS CLÁUSULAS DESTE"),
+            220.0,
+        ),  # 15pt: wrap continuation, must not open a new root.
+        (
+            _heading_line(1, 8, "CONTRATO CELEBRADO ENTRE AS PARTES."),
+            235.0,
+        ),  # 15pt: wrap continuation, must not open a new root.
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+    document = _document([_page(1, spans)])
+
+    tree = segment_document(document)
+
+    titles = {c.title for c in tree.all_clauses}
+    assert "SEM PREJUÍZO DAS DEMAIS CLÁUSULAS DESTE" not in titles
+    assert "CONTRATO CELEBRADO ENTRE AS PARTES." not in titles
+    cobertura = next(c for c in tree.all_clauses if c.title == "COBERTURAS BÁSICAS")
+    assert "SEM PREJUÍZO DAS DEMAIS CLÁUSULAS DESTE" in cobertura.content_lines
+    assert "CONTRATO CELEBRADO ENTRE AS PARTES." in cobertura.content_lines
+
+
+@pytest.mark.unit
+def test_lettered_list_item_wrap_continuation_is_not_detected_as_new_heading() -> None:
+    """doc 15 p141 sample #24: a line break inside item "V)" of a lettered
+    exclusion list was falsely detected as a new UNNUMBERED_PART heading,
+    fragmenting the enclosing clause. The list item's own first line is
+    already recognized as content via [is_list_item_line] before heading
+    detection even runs; its wrapped continuation line has no such prefix
+    and must instead be caught by the same position-gap gate as an
+    ALL-CAPS body-sentence wrap."""
+    lines_spec = [
+        (_heading_line(1, 0, "34. RISCOS EXCLUÍDOS"), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum um."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum dois."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum tres."), 145.0),
+        (_heading_line(1, 4, "V) DOS RISCOS COBERTOS"), 175.0),  # 30pt gap.
+        (_heading_line(1, 5, "OS EXCLUÍDOS PELA APÓLICE;"), 190.0),  # 15pt: wrap.
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+    document = _document([_page(1, spans)])
+
+    tree = segment_document(document)
+
+    titles = {c.title for c in tree.all_clauses}
+    assert "OS EXCLUÍDOS PELA APÓLICE;" not in titles
+    parent = _find(tree, "34")
+    assert "V) DOS RISCOS COBERTOS" in parent.content_lines
+    assert "OS EXCLUÍDOS PELA APÓLICE;" in parent.content_lines
+
+
+@pytest.mark.unit
+def test_genuine_unnumbered_part_after_paragraph_break_is_still_detected() -> None:
+    """Regression guard for [_has_heading_position_signal]: a genuine
+    UNNUMBERED_PART title that follows a real paragraph break (a wide
+    vertical gap, not a tight wrap) must still open its own root --
+    protects real corpus cases like doc 10's "RESUMO DE COBERTURAS DA
+    ASSISTÊNCIA À MOTOCICLETAS" and doc 28's wrapped part title from being
+    swallowed by the new gate."""
+    lines_spec = [
+        (_body_line(1, 0, "Texto de corpo comum um."), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum dois."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum tres."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum quatro."), 145.0),
+        (_heading_line(1, 4, "RESUMO DE COBERTURAS"), 180.0),  # 35pt gap.
+        (_heading_line(1, 5, "1. OBJETO DO SEGURO"), 195.0),
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+    document = _document([_page(1, spans)])
+
+    tree = segment_document(document)
+
+    assert len(tree.roots) == 1
+    part = tree.roots[0]
+    assert part.title == "RESUMO DE COBERTURAS"
+    assert part.convention == HeadingConvention.UNNUMBERED_PART
+
+
+@pytest.mark.unit
+def test_page_top_unnumbered_part_heading_is_detected_without_a_preceding_gap() -> None:
+    """Regression guard: the first line of a page has no previous same-page
+    line to compare a gap against -- [_has_heading_position_signal] must
+    still detect it (page-top headings are the corpus norm), not silently
+    reject every part title that happens to start a page."""
+    lines_spec = [
+        (_body_line(1, 0, "Texto de corpo comum um."), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum dois."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum tres."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum quatro."), 145.0),
+        (_body_line(1, 4, "Texto de corpo comum cinco."), 160.0),
+        (_body_line(1, 5, "Texto de corpo comum seis."), 175.0),
+    ]
+    page1_spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+    page2_spans = [_heading_line(2, 0, "DISPOSIÇÕES GERAIS")]
+    document = _document([_page(1, page1_spans), _page(2, page2_spans)])
+
+    tree = segment_document(document)
+
+    assert len(tree.roots) == 1
+    assert tree.roots[0].title == "DISPOSIÇÕES GERAIS"
+
+
+@pytest.mark.unit
+def test_ordinal_no_abbreviation_does_not_block_unnumbered_part_detection() -> None:
+    """doc 13 (Zurich) sample #16: "COBERTURA No 41 - CARROCERIAS" etc. --
+    PDF extraction renders the ordinal-indicator glyph "º" (as in "nº") as
+    a bare lowercase "o", so the raw text reads "COBERTURA No 41", failing
+    the all-uppercase UNNUMBERED_PART check on that single letter and
+    silently merging 20 pages / 40,000+ characters into the preceding open
+    clause. [_ORDINAL_NO_ABBREVIATION] normalizes just that token before
+    the uppercase check."""
+    lines_spec = [
+        (_heading_line(1, 0, "RISCOS EXCLUÍDOS"), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum um."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum dois."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum tres."), 145.0),
+        (_body_line(1, 4, "Texto de corpo comum quatro."), 160.0),
+        (_heading_line(1, 5, "COBERTURA No 41 - CARROCERIAS"), 195.0),  # 35pt gap.
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+    document = _document([_page(1, spans)])
+
+    tree = segment_document(document)
+
+    assert len(tree.roots) == 2
+    assert tree.roots[1].title == "COBERTURA No 41 - CARROCERIAS"
+    assert tree.roots[1].convention == HeadingConvention.UNNUMBERED_PART
 
 
 # ---------------------------------------------------------------------------
@@ -660,6 +889,46 @@ def test_depth_skip_anomaly_is_clamped_and_warned() -> None:
     assert skipped.is_depth_anomaly is True
     assert skipped.parent_id == tree.roots[0].clause_id
     assert any(w.kind == "depth_anomaly" for w in tree.report.warnings)
+
+
+@pytest.mark.unit
+def test_depth_anomaly_does_not_become_false_floor_for_later_siblings() -> None:
+    """[M1-04c] doc 20 samples #26/#27 (also confirmed reachable in 24/28
+    text-mode corpus documents during investigation, not OCR-specific --
+    this fixture is deliberately text-mode, answering the DoD's ask to
+    confirm that). A bracket-numbered UNNUMBERED_PART section ("2)
+    DEFINIÇÕES", depth 0) followed directly by its decimal children ("2.1"
+    onward, natural depth 2) triggers a depth-skip anomaly on "2.1" alone
+    (an intermediate "2." level was never a heading of its own). The bug:
+    the clamped depth used to become "2.1"'s permanent depth, and later
+    siblings ("2.2" .. "2.11") popped the stack by comparing against that
+    same clamped value, nesting under "2.1" instead of popping past it.
+    Tracking natural_depth (unclamped) separately from depth (tree
+    position) fixes this -- every "2.x" must be a direct child of the
+    root, not nested under "2.1", and only one depth_anomaly warning
+    should fire (for "2.1" itself, not cascading to every sibling)."""
+    labels = [f"2.{n}" for n in range(1, 12)]  # 2.1 .. 2.11 -- >= 10 per the DoD.
+    document = _document(
+        [
+            _page(
+                1,
+                [_heading_line(1, 0, "2) DEFINIÇÕES")]
+                + [
+                    _heading_line(1, index + 1, f"{label} Termo {index}")
+                    for index, label in enumerate(labels)
+                ],
+            )
+        ]
+    )
+
+    tree = segment_document(document)
+
+    root = tree.roots[0]
+    assert root.title == "2) DEFINIÇÕES"
+    children = [c for c in tree.all_clauses if c.parent_id == root.clause_id]
+    assert [c.numbering_label for c in children] == labels
+    depth_anomalies = [w for w in tree.report.warnings if w.kind == "depth_anomaly"]
+    assert len(depth_anomalies) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1151,3 +1420,53 @@ def test_part_root_with_zero_numbered_children_is_not_promoted() -> None:
     carga = next(c for c in tree.roots if "CARGA" in c.title)
     assert carga.bundle_confidence == "low"
     assert carga.bundle_section is None
+
+
+# ---------------------------------------------------------------------------
+# 16. Oversized-clause safeguard
+# ---------------------------------------------------------------------------
+
+
+def _sized_clause(
+    clause_id: str, *, page_start: int, page_end: int, content_lines: tuple[str, ...]
+) -> Clause:
+    return Clause(
+        document_id="d1",
+        clause_id=clause_id,
+        path=clause_id,
+        numbering_label="1",
+        title="Title",
+        convention=HeadingConvention.NUMBERED_DECIMAL,
+        depth=1,
+        parent_id=None,
+        child_ids=(),
+        content_lines=content_lines,
+        page_start=page_start,
+        page_end=page_end,
+    )
+
+
+@pytest.mark.unit
+def test_find_oversized_clauses_flags_page_span_and_char_count_outliers() -> None:
+    """doc 13 sample #16: a page-span or char-count ceiling is the
+    loud-failure safeguard for an undetected-heading merge like "RISCOS
+    EXCLUÍDOS" absorbing 20 pages / 41,000+ characters. Isolated fixture
+    per the DoD -- directly constructs [Clause] objects, no PDF or
+    [segment_document] call needed to exercise this pure helper."""
+    in_bounds = _sized_clause(
+        "d1:1", page_start=1, page_end=2, content_lines=("short text",)
+    )
+    oversized_by_pages = _sized_clause(
+        "d1:2", page_start=1, page_end=21, content_lines=("short text",)
+    )
+    oversized_by_chars = _sized_clause(
+        "d1:3", page_start=1, page_end=1, content_lines=("x" * 20000,)
+    )
+
+    oversized = find_oversized_clauses(
+        [in_bounds, oversized_by_pages, oversized_by_chars],
+        max_page_span=10,
+        max_char_count=15000,
+    )
+
+    assert {c.clause_id for c in oversized} == {"d1:2", "d1:3"}

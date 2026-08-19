@@ -186,6 +186,10 @@ class ParsingSettings(BaseSettings):
     clause_tree_orphan_ratio_threshold: float = Field(
         alias="CLAUSE_TREE_ORPHAN_RATIO_THRESHOLD", default=0.15
     )
+    clause_max_page_span: int = Field(alias="CLAUSE_TREE_MAX_PAGE_SPAN", default=10)
+    clause_max_char_count: int = Field(
+        alias="CLAUSE_TREE_MAX_CHAR_COUNT", default=15000
+    )
 
 
 class Settings(DatabaseSettings, LlmSettings):
