@@ -102,12 +102,15 @@ def test_bradesco_207pp_bundle_is_wide_and_shallow() -> None:
     tree = _segment_text_mode("15414900666201489.pdf", "10")
 
     assert tree.report.clause_count > 100
-    # Numbering restarts (~19 embedded coverage products) must produce many
+    # Numbering restarts (~19 embedded coverage products, plus [M1-04c]'s
+    # ordinal-glyph fix correctly splitting out ~20 more branded "No NNN"
+    # add-on products that used to merge into whatever section preceded
+    # them, the same "No" glyph bug found in doc 13) must produce many
     # independent top-level siblings, not one runaway-deep subtree. Upper
     # bound guards against [M1-04b]'s noise-title regression -- before that
     # fix, repeated benefits-tier item labels (e.g. "NÃO ESTÃO COBERTOS")
     # inflated this to 118 spurious roots.
-    assert 15 <= len(tree.roots) <= 30
+    assert 15 <= len(tree.roots) <= 45
     assert 2 <= tree.report.max_depth <= 5
 
 
@@ -125,11 +128,15 @@ def test_bradesco_207pp_motocicletas_and_carga_are_distinct_roots_without_noise(
         clause for clause in tree.roots if "MOTOCICLETAS" in clause.title
     )
     assert any("VEÍCULOS DE CARGA" in title for title in root_titles)
-    # Motocicletas' own assistance-list items never restart their numbered
-    # children at "1" (first real child is "10." -- see the module
-    # docstring), so recognizing it as bundle_confidence="high" exercises
-    # [M1-04b]'s relaxed M1-06 restart check, not just the noise-title fix.
-    assert motocicletas.bundle_confidence == "high"
+    # [M1-04c]: with the "No NNN" ordinal-glyph heading-detection fix (the
+    # same bug found in doc 13) correctly splitting out the branded product
+    # sections ("AUTO ASSISTÊNCIA TOTAL - No 118", ...) that used to merge
+    # into whichever heading preceded them, Motocicletas is now correctly
+    # recovered as what it actually is in the source PDF -- a bare
+    # TOC-style summary page (its content is literally a coverage-name
+    # list, not clause text) with no numbered children of its own.
+    assert motocicletas.child_ids == ()
+    assert motocicletas.bundle_confidence == "low"
 
     noise_labels = {
         "NÃO ESTÃO COBERTOS",

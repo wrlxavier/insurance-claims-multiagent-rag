@@ -13,10 +13,15 @@ per-document report to ``docs/CLAUSE_TREE_REPORT.md``.
 
 Documents whose orphan-text ratio exceeds
 ``CLAUSE_TREE_ORPHAN_RATIO_THRESHOLD`` raise
-[domain.clause_tree.OrphanTextExceedsThresholdError] rather than silently
-emitting a broken tree -- pass ``--continue-on-orphan-failure`` to keep
-processing the rest of the corpus and raise a single aggregate error at the
-end instead of failing fast on the first offending document.
+[domain.clause_tree.OrphanTextExceedsThresholdError], and any clause whose
+page span or character count exceeds ``CLAUSE_TREE_MAX_PAGE_SPAN``/
+``CLAUSE_TREE_MAX_CHAR_COUNT`` raises
+[domain.clause_tree.ClauseSizeExceedsThresholdError] -- a loud safeguard
+against an undetected-heading merge like [M1-08] sample #16 -- rather than
+silently emitting a broken tree. Pass ``--continue-on-orphan-failure`` to
+keep processing the rest of the corpus and raise a single aggregate error
+at the end instead of failing fast on the first offending document (this
+flag covers both failure kinds).
 
 Use ``--checkpoint-docs`` to run a small subset and write only their
 human-reviewable outlines under ``docs/clause_tree_checkpoints/``, without
@@ -29,9 +34,14 @@ from pathlib import Path
 from application.use_cases.boilerplate_removal import BOILERPLATE_REMOVAL_VERSION
 from application.use_cases.clause_segmentation import (
     CLAUSE_SEGMENTATION_VERSION,
+    find_oversized_clauses,
     segment_document,
 )
-from domain.clause_tree import ClauseTree, OrphanTextExceedsThresholdError
+from domain.clause_tree import (
+    ClauseSizeExceedsThresholdError,
+    ClauseTree,
+    OrphanTextExceedsThresholdError,
+)
 from domain.extracted_text import ExtractedDocument
 from infrastructure.config.settings import get_parsing_settings
 from infrastructure.parsing.boilerplate_caching import (
@@ -51,6 +61,8 @@ from infrastructure.parsing.manifest import read_manifest
 MANIFEST_PATH = Path("data/policies/manifest.csv")
 REPORT_PATH = Path("docs/CLAUSE_TREE_REPORT.md")
 CHECKPOINT_DIR = Path("docs/clause_tree_checkpoints")
+
+SegmentationFailure = OrphanTextExceedsThresholdError | ClauseSizeExceedsThresholdError
 
 
 def load_boilerplate_removed_document(
@@ -89,13 +101,20 @@ def _build_report_row(
     page_count: int,
     tree: ClauseTree,
     threshold: float,
+    *,
+    oversized_count: int,
 ) -> ClauseTreeReportRow:
     report = tree.report
     exceeds = report.orphan_ratio > threshold
+    tag = ""
+    if exceeds:
+        tag += " [EXCEEDS THRESHOLD]"
+    if oversized_count:
+        tag += " [OVERSIZED CLAUSE]"
     print(
         f"{filename}: clauses={report.clause_count} max_depth={report.max_depth} "
         f"orphan_ratio={report.orphan_ratio:.3f} mode={report.extraction_mode} "
-        f"warnings={len(report.warnings)}" + (" [EXCEEDS THRESHOLD]" if exceeds else "")
+        f"warnings={len(report.warnings)}" + tag
     )
     return ClauseTreeReportRow(
         document_id=document_id,
@@ -111,26 +130,41 @@ def _build_report_row(
 
 
 def run_clause_segmentation(
-    *, threshold: float, continue_on_orphan_failure: bool
-) -> tuple[list[ClauseTreeReportRow], list[OrphanTextExceedsThresholdError]]:
+    *,
+    threshold: float,
+    max_page_span: int,
+    max_char_count: int,
+    continue_on_orphan_failure: bool,
+) -> tuple[list[ClauseTreeReportRow], list[SegmentationFailure]]:
     """Process every manifest row. Returns (rows, failures).
 
     ``failures`` is only ever non-empty when ``continue_on_orphan_failure``
-    is set -- otherwise the first threshold breach raises immediately. The
-    caller is responsible for writing the report before acting on
-    ``failures``, so a persisted run always reflects every document that
-    was actually processed, not just the ones before the first failure.
+    is set -- otherwise the first threshold breach (orphan ratio or an
+    oversized clause) raises immediately. The caller is responsible for
+    writing the report before acting on ``failures``, so a persisted run
+    always reflects every document that was actually processed, not just
+    the ones before the first failure.
     """
     rows: list[ClauseTreeReportRow] = []
-    failures: list[OrphanTextExceedsThresholdError] = []
+    failures: list[SegmentationFailure] = []
     for entry in read_manifest(MANIFEST_PATH):
         document_id = entry["id"]
         filename = entry["filename"]
         document = load_boilerplate_removed_document(document_id, filename)
         tree, _was_cached = segment_and_cache(document)
+        oversized = find_oversized_clauses(
+            tree.all_clauses,
+            max_page_span=max_page_span,
+            max_char_count=max_char_count,
+        )
         rows.append(
             _build_report_row(
-                document_id, filename, int(entry["page_count"]), tree, threshold
+                document_id,
+                filename,
+                int(entry["page_count"]),
+                tree,
+                threshold,
+                oversized_count=len(oversized),
             )
         )
         if tree.report.orphan_ratio > threshold:
@@ -145,6 +179,18 @@ def run_clause_segmentation(
                 failures.append(error)
             else:
                 raise error
+        if oversized:
+            size_error = ClauseSizeExceedsThresholdError(
+                document_id=document_id,
+                filename=filename,
+                oversized_clause_ids=tuple(c.clause_id for c in oversized),
+                max_page_span=max_page_span,
+                max_char_count=max_char_count,
+            )
+            if continue_on_orphan_failure:
+                failures.append(size_error)
+            else:
+                raise size_error
 
     return rows, failures
 
@@ -210,6 +256,8 @@ def main() -> None:
 
     rows, failures = run_clause_segmentation(
         threshold=settings.clause_tree_orphan_ratio_threshold,
+        max_page_span=settings.clause_max_page_span,
+        max_char_count=settings.clause_max_char_count,
         continue_on_orphan_failure=args.continue_on_orphan_failure,
     )
     REPORT_PATH.write_text(

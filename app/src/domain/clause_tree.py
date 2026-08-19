@@ -113,3 +113,36 @@ class OrphanTextExceedsThresholdError(Exception):
             f"{orphan_ratio:.3f} exceeds threshold {threshold:.3f} "
             f"({clause_count} clauses recovered)."
         )
+
+
+class ClauseSizeExceedsThresholdError(Exception):
+    """Raised when a clause exceeds the configured page-span/char-count ceiling.
+
+    A loud-failure safeguard for an undetected-heading merge like doc 13's
+    20-page "RISCOS EXCLUÍDOS" absorbing 41,000+ characters ([M1-08] sample
+    #16), mirroring [OrphanTextExceedsThresholdError]. Only ever raised by
+    ``scripts/build_clause_tree.py`` -- [application.use_cases.
+    clause_segmentation.find_oversized_clauses] itself never raises.
+    """
+
+    def __init__(
+        self,
+        *,
+        document_id: str,
+        filename: str,
+        oversized_clause_ids: tuple[str, ...],
+        max_page_span: int,
+        max_char_count: int,
+    ) -> None:
+        """Build the message from the document's oversized clause ids."""
+        self.document_id = document_id
+        self.filename = filename
+        self.oversized_clause_ids = oversized_clause_ids
+        self.max_page_span = max_page_span
+        self.max_char_count = max_char_count
+        super().__init__(
+            f"{filename} (document {document_id}): "
+            f"{len(oversized_clause_ids)} clause(s) exceed the configured "
+            f"page-span ({max_page_span}) or char-count ({max_char_count}) "
+            f"ceiling: {', '.join(oversized_clause_ids)}."
+        )

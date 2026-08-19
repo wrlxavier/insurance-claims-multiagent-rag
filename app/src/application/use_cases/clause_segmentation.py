@@ -109,6 +109,54 @@ per the DoD's own framing ("respecting the document's own structure") --
 but it *is* load-bearing as the tier-3 UNNUMBERED_PART fallback above, for
 the narrow case where no font-weight signal survives at all.
 
+[M1-04c] fixes four boundary/heading bugs found by [M1-08]'s 50-clause
+hand validation (60% boundary accuracy), all reproduced live against the
+real corpus rather than assumed from the sample notes alone:
+
+- **Depth-anomaly clamp cascade** (doc 20 samples #26/#27): the main
+  segmentation loop used to store an anomaly-clamped depth as the node's
+  permanent depth, so a wrongly-demoted node became a false floor its own
+  true siblings nested under instead of popping past. Fixed by tracking
+  ``natural_depth`` (from numbering, never clamped) separately from
+  ``depth`` (always ``parent.depth + 1``, resolved after parent lookup) on
+  [_ClauseBuilder]. Confirmed reachable in text-mode documents too (doc 5),
+  not OCR-specific.
+- **Bare numeral + title split across lines** (doc 15): a numeral isolated
+  on its own logical line, immediately followed by its bold title on the
+  next, never matched the numbered-decimal regexes (both require title
+  text on the same line) and fell through to the UNNUMBERED_PART gate.
+  [_try_join_bare_numeral_title] recognizes and joins this split before
+  heading detection runs.
+- **ALL-CAPS wrap-continuation false positives** (doc 15 samples #21-#24):
+  in whole-document-bold legacy templates, bold fraction is saturated on
+  nearly every line, leaving "<=10 words, all-uppercase" as the only
+  UNNUMBERED_PART gate -- a wrapped continuation line of an ALL-CAPS
+  sentence or lettered list item independently clears it and gets
+  misdetected as a new heading. [_has_heading_position_signal] adds a
+  line-to-line vertical-spacing gate: font size is flat in these
+  documents, but a genuine heading's gap from the previous line is
+  reliably >= [MIN_HEADING_GAP_RATIO] times the document-wide modal
+  line-gap ([_document_modal_line_gap]) -- the "ordinary paragraph
+  spacing" baseline -- while a wrap continuation sits at that baseline. A
+  *local* per-candidate baseline was tried first and rejected: closely
+  spaced headings (doc 5's short sections) pollute a local window with
+  another heading's own large gap. Fails open (no gate) for OCR lines,
+  page-top lines, and whenever no document-wide baseline exists --
+  including every synthetic unit-test fixture, which by
+  construction shares one y0.
+- **Ordinal-abbreviation glyph breaking the uppercase gate** (doc 13
+  sample #16): "COBERTURA No 41" etc. extract with a lowercase "o" in
+  place of the ordinal glyph "º", failing the all-uppercase check and
+  silently merging 20 pages / 40,000+ characters into the preceding open
+  clause. [_ORDINAL_NO_ABBREVIATION] normalizes just that token before the
+  uppercase check.
+
+``CLAUSE_SEGMENTATION_VERSION`` bumped ``v4`` -> ``v5`` for these four
+fixes. A new pure helper, [find_oversized_clauses], gives
+``scripts/build_clause_tree.py`` a loud-failure safeguard for any future
+merge of this kind, mirroring [domain.clause_tree.
+OrphanTextExceedsThresholdError]'s existing pattern.
+
 ``CLAUSE_SEGMENTATION_VERSION`` feeds the downstream cache key (see
 [infrastructure.parsing.clause_tree_caching]): bump it whenever any
 detection rule here changes, so stale cached output is invalidated.
@@ -117,7 +165,7 @@ detection rule here changes, so stale cached output is invalidated.
 import re
 import statistics
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 
 from domain.clause_tree import (
@@ -129,7 +177,7 @@ from domain.clause_tree import (
 )
 from domain.extracted_text import ExtractedDocument, ExtractedPage, ExtractedSpan
 
-CLAUSE_SEGMENTATION_VERSION = "v4"
+CLAUSE_SEGMENTATION_VERSION = "v5"
 
 NUMBERED_BOLD_THRESHOLD = 0.5
 PART_BOLD_THRESHOLD = 0.9
@@ -142,6 +190,19 @@ MIN_PART_ALPHA_CHARS = 4
 # without this cap those sentences flood the tree with spurious part nodes
 # that reset the stack mid-document.
 MAX_PART_WORD_COUNT = 10
+
+# Real headings on doc 13 p73 sit at a ~26-28pt gap from the previous line vs.
+# a ~15.5-16pt normal single-line baseline; on doc 15 p59 the genuine
+# "COBERTURAS BÁSICAS" heading sits at 41.3pt vs. the same ~13.8pt baseline
+# its false-positive wrap-continuations sit at -- confirmed by direct
+# reproduction against data/policies/raw. font_size is flat (12.0pt) on
+# every one of these lines in both documents, so line-to-line vertical
+# spacing is the only discriminating signal available once bold fraction is
+# saturated (whole-document-bold legacy templates -- see module docstring).
+# Without this gate, a wrapped ALL-CAPS sentence or list-item continuation
+# line independently clears the UNNUMBERED_PART pattern gates and is
+# misdetected as a brand-new heading, fragmenting the enclosing clause.
+MIN_HEADING_GAP_RATIO = 1.6
 
 # Multi-column detection: thresholds calibrated against the corpus (see
 # module docstring) to isolate only genuine sustained parallel-column prose
@@ -196,6 +257,22 @@ _ROMAN_PART_PREFIX = re.compile(r"^[IVXLCDM]+\s*[-–.]\s*")
 # dozens of spurious top-level nodes.
 _LETTERED_ITEM = re.compile(r"^[A-Za-z]{1,2}\)\s+\S")
 _BULLET_ITEM = re.compile(r"^[•\-–]\s+\S")
+
+# Doc 15 (Mapfre) renders a top-level clause's numeral and its bold title as
+# two separate logical lines -- a bare "1." on its own line, then its title
+# on the next -- which the numbered-decimal regexes above never match (both
+# require title text on the same matched line). See
+# [_try_join_bare_numeral_title].
+_BARE_NUMBERING = re.compile(r"^(\d+(?:\.\d+)*)\.?$")
+
+# Confirmed real corpus artifact (doc 13, "COBERTURA No 41 - CARROCERIAS",
+# "COBERTURA No 42", ...): PDF extraction renders the ordinal-indicator
+# glyph "º" (as in "nº"/"n.º") as a bare lowercase "o", so "COBERTURA No 41"
+# fails the all-uppercase UNNUMBERED_PART check on that single letter and
+# 20 pages / 40,000+ characters silently merge into the preceding open
+# clause. Narrowly scoped to "No" immediately before a digit run so it
+# can't broaden the uppercase gate elsewhere.
+_ORDINAL_NO_ABBREVIATION = re.compile(r"\bNo(?=\s*\d)")
 
 
 def is_list_item_line(text: str) -> bool:
@@ -464,6 +541,58 @@ def _ordered_page_lines(
     return _detect_and_reflow_columns(lines, page_width)
 
 
+_MIN_MEASURABLE_GAPS = 5
+
+
+def _document_modal_line_gap(lines: list[_Line]) -> float | None:
+    """Document-wide modal same-page consecutive-line y0 gap.
+
+    The "ordinary paragraph/line spacing" baseline, in the same spirit as
+    [_document_modal_font_size]: rounded to 0.1pt to absorb PDF-extraction
+    floating-point noise between otherwise-identical gaps, then the single
+    most frequent value is taken as the baseline, since ordinary
+    body-line-to-body-line gaps vastly outnumber the rarer heading/
+    paragraph-break gaps in any real document. A *local* window around each
+    candidate was tried first and rejected: closely-spaced headings (real
+    corpus case: doc 5's short sections) pollute a local baseline with
+    another heading's own large gap, wrongly raising the bar for the next
+    candidate. None when too few measurable gaps exist to be meaningful
+    (e.g. OCR documents, whose pseudo-lines carry no real position signal,
+    or every synthetic unit-test fixture, which by construction shares one
+    constant y0 -- keeps existing tests green with no special-casing).
+    """
+    counts: dict[float, int] = {}
+    for index in range(1, len(lines)):
+        if lines[index - 1].page_number != lines[index].page_number:
+            continue
+        gap = round(lines[index].y0 - lines[index - 1].y0, 1)
+        if gap > 0:
+            counts[gap] = counts.get(gap, 0) + 1
+    if sum(counts.values()) < _MIN_MEASURABLE_GAPS:
+        return None
+    return max(counts, key=lambda gap: counts[gap])
+
+
+def _has_heading_position_signal(
+    lines: list[_Line], index: int, modal_gap: float | None
+) -> bool:
+    """True unless line[index] sits at ordinary same-paragraph line spacing.
+
+    A tight gap from the previous same-page line looks like a wrap
+    continuation, not a new heading/paragraph break. Fails open (True)
+    for: OCR pseudo-lines (no position signal exists
+    there at all -- unchanged pattern-only mode), the first line of a page
+    (page-top headings are the corpus norm), and whenever no document-wide
+    baseline exists (see [_document_modal_line_gap]).
+    """
+    line = lines[index]
+    if line.is_ocr or index == 0 or lines[index - 1].page_number != line.page_number:
+        return True
+    if modal_gap is None or modal_gap <= 0:
+        return True
+    return (line.y0 - lines[index - 1].y0) >= MIN_HEADING_GAP_RATIO * modal_gap
+
+
 def _detect_heading(
     text: str, bold_fraction: float, *, ocr: bool
 ) -> _HeadingMatch | None:
@@ -509,13 +638,74 @@ def _detect_heading(
         return None
     if len(candidate.split()) > MAX_PART_WORD_COUNT:
         return None
-    if not all(char.isupper() for char in alpha_chars):
+    case_check_text = _ORDINAL_NO_ABBREVIATION.sub("NO", candidate)
+    if not all(char.isupper() for char in case_check_text if char.isalpha()):
         return None
     return _HeadingMatch(
         convention=HeadingConvention.UNNUMBERED_PART,
         numbering_label="",
         depth=0,
         title=text,
+    )
+
+
+def _try_join_bare_numeral_title(
+    lines: list[_Line], index: int
+) -> tuple[_HeadingMatch, int] | None:
+    """Recognize a numbering token isolated on its own logical line.
+
+    Immediately followed by its title -- doc 15's numeral separated from
+    its bold title (e.g. a bare "1." then "COBERTURA BÁSICA..." on the next
+    line), a real corpus split [_NUMBERED_DECIMAL_DEEP]/[_NUMBERED_DECIMAL_TOP]
+    can't match since both require title text on the same matched line.
+    Refuses to join when the next line is itself a real independently
+    numbered heading (two adjacent headings, not a split) or a list-item
+    line.
+
+    OCR-only: never joins. OCR pseudo-lines carry no bold/font signal (see
+    [_ocr_pseudo_lines]), so a bare digit line there could be almost
+    anything -- a stray page number, a bracket-numbered UNNUMBERED_PART
+    section header that lost its closing paren to an OCR misread ("N)"
+    read as "N"), etc. Confirmed as a real regression on doc 20 during
+    [M1-04c]: joining unconditionally there misread several of its
+    bracket-numbered "N) TÍTULO" section headers as NUMBERED_DECIMAL
+    sub-headings, nesting them under whatever section preceded them
+    instead of opening their own root. The text-mode bold gate below is
+    exactly the signal that makes this join safe for doc 15 in the first
+    place; with no such signal on OCR pages, it isn't.
+    """
+    line = lines[index]
+    if line.is_ocr:
+        return None
+    match = _BARE_NUMBERING.fullmatch(line.text)
+    if match is None:
+        return None
+    if line.bold_fraction < NUMBERED_BOLD_THRESHOLD:
+        return None
+    if index + 1 >= len(lines):
+        return None
+    title_line = lines[index + 1]
+    if title_line.page_number != line.page_number or title_line.is_ocr:
+        return None
+    if is_list_item_line(title_line.text):
+        return None
+    if title_line.bold_fraction < NUMBERED_BOLD_THRESHOLD:
+        return None
+    if (
+        _NUMBERED_DECIMAL_DEEP.match(title_line.text)
+        or _NUMBERED_DECIMAL_TOP.match(title_line.text)
+        or _CLAUSULA_KEYWORD.match(title_line.text)
+    ):
+        return None
+    token = match.group(1)
+    return (
+        _HeadingMatch(
+            convention=HeadingConvention.NUMBERED_DECIMAL,
+            numbering_label=token,
+            depth=token.count(".") + 1,
+            title=f"{token}. {title_line.text}",
+        ),
+        index + 2,
     )
 
 
@@ -615,6 +805,18 @@ def _prescan_recurring_unnumbered_titles(lines: list[_Line]) -> set[str]:
     least one occurrence is not immediately followed by its own numbering
     restart at "1". See the module docstring for the doc 10/16/3 corpus
     evidence this all-or-nothing rule is calibrated against.
+
+    Deliberately not gated by [_has_heading_position_signal]: this scan
+    exists to count how many times a *candidate* title recurs, and a
+    position-based filter here would under-count occurrences whose gap
+    happens to vary (e.g. one instance sits right after a page break, the
+    next doesn't), silently un-demoting a real noise title once the gate
+    starts hiding some of its occurrences from the count -- confirmed as a
+    real regression on doc 10 during [M1-04c]. The position gate is applied
+    only where a node actually gets opened, in the main segmentation loop
+    below; a candidate this prescan over-includes into ``noise_titles``
+    never reaches that point anyway if it fails the gate there too, so
+    over-inclusion here is harmless.
     """
     occurrence_flags: dict[str, list[bool]] = {}
     index = 0
@@ -653,6 +855,7 @@ class _ClauseBuilder:
         title: str,
         convention: HeadingConvention,
         depth: int,
+        natural_depth: int,
         parent_id: str | None,
         is_depth_anomaly: bool,
     ) -> None:
@@ -663,6 +866,7 @@ class _ClauseBuilder:
         self.title = title
         self.convention = convention
         self.depth = depth
+        self.natural_depth = natural_depth
         self.parent_id = parent_id
         self.is_depth_anomaly = is_depth_anomaly
         self.child_ids: list[str] = []
@@ -739,6 +943,7 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             )
         )
 
+    modal_line_gap = _document_modal_line_gap(lines)
     noise_titles = _prescan_recurring_unnumbered_titles(lines)
 
     builders: dict[str, _ClauseBuilder] = {}
@@ -759,15 +964,25 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         occurrence = counts[base]
         return base if occurrence == 1 else f"{base}-{occurrence}"
 
-    def open_clause(match: _HeadingMatch, page_number: int, depth: int) -> None:
+    def open_clause(match: _HeadingMatch, page_number: int, natural_depth: int) -> None:
         if match.convention == HeadingConvention.UNNUMBERED_PART:
             stack.clear()
+            natural_depth = 0
         else:
-            while stack and stack[-1].depth >= depth:
+            while stack and stack[-1].natural_depth >= natural_depth:
                 stack.pop()
         parent = stack[-1] if stack else None
         parent_id = parent.clause_id if parent else None
         parent_path = parent.path if parent else None
+        if parent is not None:
+            depth = parent.depth + 1
+        else:
+            # No parent means either a genuine UNNUMBERED_PART root
+            # (natural_depth forced to 0 above) or a numbered/CLAUSULA
+            # heading with no surviving ancestor on the stack -- both cases
+            # match the tree-depth [open_clause] has always assigned a
+            # rootless node.
+            depth = 1 if natural_depth else 0
 
         # numbering_label is empty only for UNNUMBERED_PART, whose segment
         # is anchored to the title's own text instead -- see [_slugify].
@@ -784,6 +999,7 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             title=match.title,
             convention=match.convention,
             depth=depth,
+            natural_depth=natural_depth,
             parent_id=parent_id,
             is_depth_anomaly=False,
         )
@@ -836,31 +1052,40 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             index += 1
             continue
 
-        heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+        joined = _try_join_bare_numeral_title(lines, index)
+        heading: _HeadingMatch | None
+        if joined is not None:
+            heading, wrap_start = joined
+            total_char_count += len(lines[index + 1].text)
+        else:
+            heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+            wrap_start = index + 1
         if heading is None:
             attach_content(line.text, line.page_number)
             index += 1
             continue
 
         if heading.convention == HeadingConvention.UNNUMBERED_PART:
+            if not _has_heading_position_signal(lines, index, modal_line_gap):
+                attach_content(line.text, line.page_number)
+                index += 1
+                continue
             merged, next_index = consume_title_wrap(
-                heading, index + 1, line.page_number
+                heading, wrap_start, line.page_number
             )
             if _recurrence_key(merged.title) in noise_titles:
                 attach_content(merged.title, line.page_number)
                 index = next_index
                 continue
-            open_clause(merged, line.page_number, depth=0)
+            open_clause(merged, line.page_number, natural_depth=0)
             index = next_index
             continue
 
-        depth = heading.depth
-        expected_max_depth = stack[-1].depth + 1 if stack else 1
-        is_anomaly = depth > expected_max_depth
-        if is_anomaly:
-            depth = expected_max_depth
-        merged, next_index = consume_title_wrap(heading, index + 1, line.page_number)
-        open_clause(merged, line.page_number, depth=depth)
+        natural_depth = heading.depth
+        expected_max_depth = stack[-1].natural_depth + 1 if stack else 1
+        is_anomaly = natural_depth > expected_max_depth
+        merged, next_index = consume_title_wrap(heading, wrap_start, line.page_number)
+        open_clause(merged, line.page_number, natural_depth=natural_depth)
         if is_anomaly:
             builders[order[-1]].is_depth_anomaly = True
             warnings.append(
@@ -869,22 +1094,24 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
                     page_number=line.page_number,
                     kind="depth_anomaly",
                     detail=(
-                        f'"{heading.numbering_label}" attached at depth {depth} '
-                        "(an intermediate level was expected but missing)."
+                        f'"{heading.numbering_label}" attached at depth '
+                        f"{builders[order[-1]].depth} (an intermediate level "
+                        "was expected but missing)."
                     ),
                 )
             )
         index = next_index
 
     # [M1-04b]: with recurring noise no longer fragmenting the tree above,
-    # a genuine product root's own numbered content doesn't reliably
-    # restart at label "1" (doc 10's "MOTOCICLETAS" root: its assistance-
-    # list items 1-9 never surface as bold NUMBERED_DECIMAL headings, a
-    # separate corpus quirk, so its first real child is "10."). Any real
-    # numbered/CLÁUSULA child is now enough signal that this part carries
-    # its own content-bearing clause sequence, rather than requiring that
-    # sequence to specifically restart at "1" -- validated this still
-    # correctly excludes zero-numbered-child parts (e.g. "GLOSSÁRIO").
+    # a genuine product root's own numbered content doesn't always reliably
+    # restart at label "1" in this corpus. Any real numbered/CLÁUSULA child
+    # is now enough signal that this part carries its own content-bearing
+    # clause sequence, rather than requiring that sequence to specifically
+    # restart at "1" -- validated this still correctly excludes
+    # zero-numbered-child parts (e.g. "GLOSSÁRIO", and, since [M1-04c]'s
+    # heading-detection fixes correctly split doc 10's branded-product
+    # sections that used to be merged into it, "MOTOCICLETAS" itself -- a
+    # pure TOC-style summary heading with no numbered children of its own).
     restarting_roots = []
     root_ids = [cid for cid in order if builders[cid].parent_id is None]
 
@@ -947,3 +1174,23 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         all_clauses=clauses,
         report=report,
     )
+
+
+def find_oversized_clauses(
+    clauses: Sequence[Clause], *, max_page_span: int, max_char_count: int
+) -> tuple[Clause, ...]:
+    """Clauses whose page span or character count exceeds a configured ceiling.
+
+    A loud safeguard for undetected-heading merges like doc 13's 20-page
+    "RISCOS EXCLUÍDOS" absorbing 41,000+ characters (M1-08 sample #16),
+    mirroring the orphan-ratio check already applied document-wide in
+    ``scripts/build_clause_tree.py``. Pure, like [segment_document] itself
+    -- the caller decides what "too large" means.
+    """
+    oversized = []
+    for clause in clauses:
+        page_span = clause.page_end - clause.page_start + 1
+        char_count = sum(len(line) for line in clause.content_lines)
+        if page_span > max_page_span or char_count > max_char_count:
+            oversized.append(clause)
+    return tuple(oversized)
