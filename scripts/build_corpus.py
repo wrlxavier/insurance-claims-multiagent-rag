@@ -6,10 +6,18 @@ clause tree from ``data/cache/clause_trees/`` (this script never
 re-segments -- a missing cache means ``scripts/build_clause_tree.py`` has
 not been run yet, and silently re-deriving it here would hide that instead
 of failing loudly), classifies each clause ([M1-05]'s deterministic rules,
-with a stub LLM fallback -- see [infrastructure.parsing.null_classifier]
-for why), flattens the result against [infrastructure.parsing.
+falling back to a real LLM pass -- see [infrastructure.parsing.
+llm_classifier.LangchainClauseClassifier] -- for whatever the rules leave
+as ``other``), flattens the result against [infrastructure.parsing.
 clause_schema.ParsedClauseRecord], and writes the combined corpus plus a
 build manifest recording exactly what produced it.
+
+The LLM pass is the slow, non-free part: it runs
+LLM_CLASSIFICATION_MAX_WORKERS clauses concurrently per document, and every
+result is cached to disk by [infrastructure.parsing.
+llm_classification_cache.CachingClauseClassifier] keyed by (model, title,
+text) -- a kill/crash mid-run loses at most the in-flight batch, since a
+rerun skips whatever is already cached.
 
 Run via ``make parse``, which chains this after ``extract-text``,
 ``remove-boilerplate`` and ``build-clause-tree`` -- the whole pipeline,
@@ -23,6 +31,8 @@ from application.use_cases.boilerplate_removal import BOILERPLATE_REMOVAL_VERSIO
 from application.use_cases.clause_classification import classify_and_enrich_clauses
 from application.use_cases.clause_segmentation import CLAUSE_SEGMENTATION_VERSION
 from domain.clause_tree import ClauseTree
+from infrastructure.config.llm_client_factory import build_chat_model
+from infrastructure.config.settings import get_llm_settings
 from infrastructure.parsing.clause_schema import (
     SCHEMA_VERSION,
     ParsedClauseRecord,
@@ -43,12 +53,19 @@ from infrastructure.parsing.corpus_artifact import (
     write_parsed_clauses_jsonl,
     write_parsed_clauses_parquet,
 )
+from infrastructure.parsing.llm_classification_cache import CachingClauseClassifier
+from infrastructure.parsing.llm_classifier import LangchainClauseClassifier
 from infrastructure.parsing.manifest import read_manifest
-from infrastructure.parsing.null_classifier import NullClauseClassifier
 from infrastructure.parsing.rules_loader import load_classification_rules
 
 MANIFEST_PATH = Path("data/policies/manifest.csv")
 RULES_PATH = Path("data/parsing/clause_type_mapping.csv")
+LLM_CLASSIFICATION_CACHE_PATH = Path("data/cache/llm_classification/cache.jsonl")
+
+# Empirically: concurrency past ~5-10 workers gave diminishing/negative
+# returns (higher structured-output failure rate under load) -- see the
+# M1-05b PR discussion.
+LLM_CLASSIFICATION_MAX_WORKERS = 5
 
 
 def load_clause_tree(document_id: str, filename: str) -> ClauseTree:
@@ -81,7 +98,13 @@ def run_build_corpus() -> tuple[list[ParsedClauseRecord], dict[str, int]]:
     """Classify and flatten every document's clause tree. Returns (records, counts)."""
     manifest_records = read_manifest(MANIFEST_PATH)
     rules = load_classification_rules(RULES_PATH)
-    classifier = NullClauseClassifier()
+    llm_settings = get_llm_settings()
+    llm = build_chat_model(llm_settings, llm_settings.llm_model_fast)
+    classifier = CachingClauseClassifier(
+        LangchainClauseClassifier(llm),
+        model=llm_settings.llm_model_fast,
+        cache_path=LLM_CLASSIFICATION_CACHE_PATH,
+    )
 
     records: list[ParsedClauseRecord] = []
     counts: dict[str, int] = {}
@@ -90,7 +113,11 @@ def run_build_corpus() -> tuple[list[ParsedClauseRecord], dict[str, int]]:
         filename = entry["filename"]
         tree = load_clause_tree(document_id, filename)
         typed_clauses = classify_and_enrich_clauses(
-            tree, manifest_records, rules, classifier
+            tree,
+            manifest_records,
+            rules,
+            classifier,
+            max_workers=LLM_CLASSIFICATION_MAX_WORKERS,
         )
         source = resolve_source(entry["extraction_mode"])
         document_records = [
@@ -113,7 +140,7 @@ def main() -> None:
         schema_version=SCHEMA_VERSION,
         clause_segmentation_version=CLAUSE_SEGMENTATION_VERSION,
         boilerplate_removal_version=BOILERPLATE_REMOVAL_VERSION,
-        llm_classification_enabled=False,
+        llm_classification_enabled=True,
         built_at_utc=utc_now(),
         clause_counts_by_document=counts,
         total_clause_count=len(records),

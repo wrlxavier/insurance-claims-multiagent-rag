@@ -133,3 +133,93 @@ def test_classify_and_enrich_llm_failure_fallback() -> None:
     assert results[0].type_source == TypeSource.LLM
     assert results[0].confidence == 0.0
     assert classifier.called
+
+
+class MappingClassifier:
+    """Mock returning a distinct type per title -- catches mixups under concurrency."""
+
+    def __init__(
+        self, mapping: dict[str, ClauseType], fail_titles: frozenset[str] = frozenset()
+    ):
+        self.mapping = mapping
+        self.fail_titles = fail_titles
+
+    def classify(self, clause_title: str, clause_text: str) -> tuple[ClauseType, float]:
+        if clause_title in self.fail_titles:
+            raise RuntimeError(f"boom on {clause_title}")
+        return self.mapping[clause_title], 0.77
+
+
+def build_multi_clause_tree(titles: list[str]) -> ClauseTree:
+    clauses = tuple(
+        Clause(
+            document_id="1",
+            clause_id=f"c{i}",
+            path=str(i),
+            numbering_label=f"{i}.",
+            title=title,
+            convention=HeadingConvention.NUMBERED_DECIMAL,
+            depth=1,
+            parent_id=None,
+            child_ids=(),
+            content_lines=("body",),
+            page_start=1,
+            page_end=1,
+        )
+        for i, title in enumerate(titles)
+    )
+    return ClauseTree(
+        document_id="1",
+        filename="test.pdf",
+        roots=clauses,
+        all_clauses=clauses,
+        report=ClauseTreeReport(
+            "1", "test.pdf", len(clauses), 1, 0, 10, 0.0, "text", ()
+        ),
+    )
+
+
+def test_classify_and_enrich_parallel_matches_sequential_results() -> None:
+    titles = [f"Clause {i}" for i in range(20)]
+    types = [ClauseType.COVERAGE, ClauseType.EXCLUSION, ClauseType.CONDITION]
+    mapping = {title: types[i % len(types)] for i, title in enumerate(titles)}
+    tree = build_multi_clause_tree(titles)
+    records = [{"id": "1", "susep_process": "123", "cnpj": "456"}]
+    rules: list[tuple[re.Pattern[str], ClauseType]] = []
+
+    sequential = classify_and_enrich_clauses(
+        tree, records, rules, MappingClassifier(mapping), max_workers=1
+    )
+    parallel = classify_and_enrich_clauses(
+        tree, records, rules, MappingClassifier(mapping), max_workers=5
+    )
+
+    assert [(t.clause.clause_id, t.clause_type) for t in sequential] == [
+        (t.clause.clause_id, t.clause_type) for t in parallel
+    ]
+    for typed in parallel:
+        assert typed.clause_type == mapping[typed.clause.title]
+        assert typed.type_source == TypeSource.LLM
+        assert typed.confidence == 0.77
+
+
+def test_classify_and_enrich_parallel_keeps_exception_fallback() -> None:
+    titles = [f"Clause {i}" for i in range(10)]
+    mapping = dict.fromkeys(titles, ClauseType.COVERAGE)
+    fail_titles = frozenset({"Clause 2", "Clause 7"})
+    tree = build_multi_clause_tree(titles)
+    records = [{"id": "1", "susep_process": "123", "cnpj": "456"}]
+    rules: list[tuple[re.Pattern[str], ClauseType]] = []
+
+    results = classify_and_enrich_clauses(
+        tree, records, rules, MappingClassifier(mapping, fail_titles), max_workers=4
+    )
+
+    for typed in results:
+        if typed.clause.title in fail_titles:
+            assert typed.clause_type == ClauseType.OTHER
+            assert typed.confidence == 0.0
+        else:
+            assert typed.clause_type == ClauseType.COVERAGE
+            assert typed.confidence == 0.77
+        assert typed.type_source == TypeSource.LLM
