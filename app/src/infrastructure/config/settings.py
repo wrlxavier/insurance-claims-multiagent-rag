@@ -163,6 +163,7 @@ class LlmSettings(BaseSettings):
     llm_api_key: SecretStr = Field(alias="LLM_API_KEY")
     llm_model_fast: str = Field(alias="LLM_MODEL_FAST")
     llm_model_reasoning: str = Field(alias="LLM_MODEL_REASONING")
+    llm_model_vision: str | None = Field(alias="LLM_MODEL_VISION", default=None)
 
     # RAG settings
     embedding_model: str = Field(alias="EMBEDDING_MODEL")

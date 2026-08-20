@@ -902,6 +902,7 @@ class _ClauseBuilder:
         self.is_depth_anomaly = is_depth_anomaly
         self.child_ids: list[str] = []
         self.content_lines: list[str] = []
+        self.content_line_pages: list[int] = []
         self.page_start: int | None = None
         self.page_end: int | None = None
         self.bundle_section: str | None = None
@@ -929,6 +930,7 @@ class _ClauseBuilder:
             bundle_section=self.bundle_section,
             bundle_confidence=self.bundle_confidence,
             is_depth_anomaly=self.is_depth_anomaly,
+            content_line_pages=tuple(self.content_line_pages),
         )
 
 
@@ -1045,6 +1047,7 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
         nonlocal orphan_char_count
         if stack:
             stack[-1].content_lines.append(text)
+            stack[-1].content_line_pages.append(page_number)
             stack[-1].touch_page(page_number)
         else:
             orphan_char_count += len(text)

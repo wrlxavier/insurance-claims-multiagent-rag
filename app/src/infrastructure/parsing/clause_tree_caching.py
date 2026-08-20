@@ -18,6 +18,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from domain.clause_tree import (
+    BoundarySource,
     Clause,
     ClauseTree,
     ClauseTreeReport,
@@ -43,6 +44,8 @@ _ROW_SCHEMA = pa.schema(
         ("bundle_section", pa.string()),
         ("bundle_confidence", pa.string()),
         ("is_depth_anomaly", pa.bool_()),
+        ("content_line_pages", pa.string()),
+        ("boundary_source", pa.string()),
     ]
 )
 
@@ -76,6 +79,8 @@ def write_clause_tree_cache(tree: ClauseTree, path: Path) -> None:
             "bundle_section": clause.bundle_section or "",
             "bundle_confidence": clause.bundle_confidence or "",
             "is_depth_anomaly": clause.is_depth_anomaly,
+            "content_line_pages": ",".join(str(p) for p in clause.content_line_pages),
+            "boundary_source": clause.boundary_source.value,
         }
         for clause in tree.all_clauses
     ]
@@ -143,6 +148,18 @@ def read_clause_tree_cache(path: Path) -> ClauseTree:
             bundle_section=row["bundle_section"] or None,
             bundle_confidence=row["bundle_confidence"] or None,
             is_depth_anomaly=row["is_depth_anomaly"],
+            # .get(): pre-[M1-04d] cached Parquet files carry neither column
+            # -- an honest "unknown"/"deterministic" default, not a guess.
+            content_line_pages=(
+                tuple(int(p) for p in row["content_line_pages"].split(","))
+                if row.get("content_line_pages")
+                else ()
+            ),
+            boundary_source=(
+                BoundarySource(row["boundary_source"])
+                if row.get("boundary_source")
+                else BoundarySource.DETERMINISTIC
+            ),
         )
         for row in table.to_pylist()
     )

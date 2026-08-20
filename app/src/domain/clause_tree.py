@@ -26,6 +26,19 @@ class HeadingConvention(Enum):
     UNNUMBERED_PART = "unnumbered_part"
 
 
+class BoundarySource(Enum):
+    """Which pass produced a given [Clause]'s final page boundary.
+
+    Mirrors [domain.clause_classification.TypeSource]'s rule/llm split, so
+    [M1-04d]'s vision-escalated boundaries stay measurable separately from
+    the deterministic pass downstream, the same way rule- vs LLM-assigned
+    clause types already are.
+    """
+
+    DETERMINISTIC = "deterministic"
+    VISION_ESCALATED = "vision_escalated"
+
+
 @dataclass(frozen=True)
 class Clause:
     """One node in a document's clause tree."""
@@ -45,6 +58,14 @@ class Clause:
     bundle_section: str | None = None
     bundle_confidence: str | None = None
     is_depth_anomaly: bool = False
+    # Parallel to content_lines: the page each line was extracted from.
+    # Empty for any clause built before [M1-04d] (hand-built fixtures, or a
+    # tree cached before this field existed) -- an honest "unknown" default,
+    # not a guess. See [application.use_cases.boundary_escalation] for why
+    # this per-line attribution is needed to apply a vision-proposed
+    # boundary correction without re-running heading detection.
+    content_line_pages: tuple[int, ...] = ()
+    boundary_source: BoundarySource = BoundarySource.DETERMINISTIC
 
 
 @dataclass(frozen=True)

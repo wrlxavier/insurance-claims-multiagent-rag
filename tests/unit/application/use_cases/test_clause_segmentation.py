@@ -1502,3 +1502,33 @@ def test_find_oversized_clauses_flags_page_span_and_char_count_outliers() -> Non
     )
 
     assert {c.clause_id for c in oversized} == {"d1:2", "d1:3"}
+
+
+# ---------------------------------------------------------------------------
+# 17. Per-line page attribution (M1-04d)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_content_line_pages_parallels_content_lines_across_a_page_break() -> None:
+    """[M1-04d] needs to know which page each content line came from, to
+    apply a vision-proposed boundary correction without re-running heading
+    detection -- see [application.use_cases.boundary_escalation]."""
+    spans = [
+        _heading_line(1, 0, "1. Riscos Cobertos"),
+        _body_line(1, 1, "Primeira linha de corpo na pagina 1."),
+        _body_line(2, 0, "Segunda linha de corpo na pagina 2."),
+        _body_line(2, 1, "Terceira linha de corpo na pagina 2."),
+    ]
+    document = _document([_page(1, spans[0:2]), _page(2, spans[2:4])])
+
+    tree = segment_document(document)
+
+    clause = _find(tree, "1")
+    assert clause.content_lines == (
+        "Primeira linha de corpo na pagina 1.",
+        "Segunda linha de corpo na pagina 2.",
+        "Terceira linha de corpo na pagina 2.",
+    )
+    assert clause.content_line_pages == (1, 2, 2)
+    assert len(clause.content_line_pages) == len(clause.content_lines)
