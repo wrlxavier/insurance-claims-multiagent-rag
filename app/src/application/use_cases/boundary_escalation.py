@@ -31,6 +31,12 @@ from pathlib import Path
 from application.ports.boundary_vision_reviewer import BoundaryVisionReviewerPort
 from application.ports.page_rasterizer import PageRasterizerPort
 from application.use_cases.clause_segmentation import find_oversized_clauses
+from application.use_cases.llm_retry_defaults import (
+    DEFAULT_LLM_RETRY_DELAY_SECONDS as BOUNDARY_ESCALATION_RETRY_DELAY_SECONDS,
+)
+from application.use_cases.llm_retry_defaults import (
+    DEFAULT_LLM_RETRY_MAX_ATTEMPTS as BOUNDARY_ESCALATION_MAX_ATTEMPTS,
+)
 from domain.boundary_escalation import (
     BoundaryEscalationOutcome,
     BoundaryReview,
@@ -38,8 +44,6 @@ from domain.boundary_escalation import (
 )
 from domain.clause_tree import BoundarySource, Clause, ClauseTree, HeadingConvention
 
-BOUNDARY_ESCALATION_MAX_ATTEMPTS = 3
-BOUNDARY_ESCALATION_RETRY_DELAY_SECONDS = 5.0
 # The same +/-1-page margin already validated in [M1-08b]'s
 # scripts/validate_parsing_quality_sample.py.
 BOUNDARY_ESCALATION_PAGE_MARGIN = 1

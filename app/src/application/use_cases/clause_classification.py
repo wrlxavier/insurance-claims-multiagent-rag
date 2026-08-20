@@ -11,6 +11,12 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 from application.ports.clause_classifier import ClauseClassifierPort
+from application.use_cases.llm_retry_defaults import (
+    DEFAULT_LLM_RETRY_DELAY_SECONDS as CLASSIFICATION_RETRY_DELAY_SECONDS,
+)
+from application.use_cases.llm_retry_defaults import (
+    DEFAULT_LLM_RETRY_MAX_ATTEMPTS as CLASSIFICATION_MAX_ATTEMPTS,
+)
 from domain.clause_classification import (
     ClauseProvenance,
     ClauseType,
@@ -19,9 +25,6 @@ from domain.clause_classification import (
     TypeSource,
 )
 from domain.clause_tree import Clause, ClauseTree
-
-CLASSIFICATION_MAX_ATTEMPTS = 3
-CLASSIFICATION_RETRY_DELAY_SECONDS = 5.0
 
 
 def normalize_heading(text: str) -> str:

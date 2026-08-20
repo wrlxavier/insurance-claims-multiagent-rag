@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Draw the [M1-08] stratified 50-clause sample for manual quality review.
+"""Draw the [M1-08] stratified 50-clause sample for parsing-quality review.
 
-Session 1 of a two-session task. This script draws a stratified,
-reproducible 50-clause sample from the built corpus
-(``build/parsed_clauses.jsonl``) and writes it to
-``eval/parsing_quality_sample.csv`` with the judgment columns left empty. A
-human then manually validates each row against its source PDF -- using
-``document_id``/``filename``/``page_start``/``page_end`` to locate it -- and
-fills in the judgment columns by hand. Only once that annotation is
-complete should ``scripts/score_parsing_quality.py`` be run against the
-file; running it against an unannotated file is a user error this script
-cannot detect for you.
+This script draws a stratified, reproducible 50-clause sample from the
+built corpus (``build/parsed_clauses.jsonl``) and writes it to
+``eval/parsing_quality_sample.csv`` with the judgment columns left empty.
+Run ``scripts/validate_parsing_quality_sample.py``
+(``make validate-parsing-quality-sample``) next to fill those columns via
+automated LLM judgment -- using
+``document_id``/``filename``/``page_start``/``page_end`` to locate each
+clause's source PDF -- then ``scripts/score_parsing_quality.py``
+(``make score-parsing-quality``) to score the result; running the scorer
+against a file whose judgment columns are still empty is a user error this
+script cannot detect for you.
 
 Sampling design: rule-assigned clauses (``type_source=rule``) are taken as
 a full census rather than sampled -- every rule-assigned clause is
@@ -284,7 +285,7 @@ def summarize(rows: list[dict[str, object]]) -> None:
 
 
 def main() -> None:
-    """Draw the M1-08 stratified sample and write it for manual annotation."""
+    """Draw the M1-08 stratified sample and write it to OUTPUT_PATH."""
     records = load_corpus()
     filenames = load_filename_lookup(MANIFEST_PATH)
 
@@ -321,7 +322,7 @@ def main() -> None:
     rows = build_annotation_rows(sample, filenames)
     write_annotation_csv(rows, OUTPUT_PATH)
     summarize(rows)
-    print(f"Wrote {len(rows)} clauses to {OUTPUT_PATH} for manual annotation.")
+    print(f"Wrote {len(rows)} clauses to {OUTPUT_PATH}.")
 
 
 if __name__ == "__main__":

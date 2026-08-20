@@ -1,4 +1,4 @@
-"""Tests for the [M1-08b] LLM validation script."""
+"""Tests for the LLM validation script."""
 
 import pytest
 from scripts.validate_parsing_quality_sample import (

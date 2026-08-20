@@ -12,9 +12,9 @@ as ``other``), flattens the result against [infrastructure.parsing.
 clause_schema.ParsedClauseRecord], and writes the combined corpus plus a
 build manifest recording exactly what produced it.
 
-The LLM pass is the slow, non-free part: it runs
-LLM_CLASSIFICATION_MAX_WORKERS clauses concurrently per document, and every
-result is cached to disk by [infrastructure.parsing.
+The LLM pass is the slow, non-free part: it runs a configurable number of
+clauses concurrently per document (``LLM_CLASSIFICATION_MAX_WORKERS`` in
+``.env``, default 10), and every result is cached to disk by [infrastructure.parsing.
 llm_classification_cache.CachingClauseClassifier] keyed by (model, title,
 text) -- a kill/crash mid-run loses at most the in-flight batch, since a
 rerun skips whatever is already cached.
@@ -64,22 +64,6 @@ MANIFEST_PATH = Path("data/policies/manifest.csv")
 RULES_PATH = Path("data/parsing/clause_type_mapping.csv")
 LLM_CLASSIFICATION_CACHE_PATH = Path("data/cache/llm_classification/cache.jsonl")
 
-# Empirically: concurrency past ~5-10 workers gave diminishing/negative
-# returns (higher structured-output failure rate under load) -- see the
-# M1-05b PR discussion. Raised to the top of that range for M1-08b now that
-# classify_and_enrich_clauses retries a transient failure (3 attempts, 5s
-# apart) instead of eating it silently -- the retry absorbs the risk that
-# kept concurrency capped before.
-LLM_CLASSIFICATION_MAX_WORKERS = 10
-
-# Pinned per M1-08b: baidu/fp8 is the required OpenRouter route for
-# deepseek/deepseek-v4-flash-0731 for this corpus rebuild; fallback is
-# disabled so a transient provider outage surfaces as a classifier
-# exception (caught and retried by classify_and_enrich_clauses) instead of
-# silently rerouting to a different, unvalidated upstream.
-LLM_CLASSIFICATION_PROVIDER_ORDER = ["baidu/fp8"]
-LLM_CLASSIFICATION_ALLOW_FALLBACKS = False
-
 
 def load_clause_tree(document_id: str, filename: str) -> ClauseTree:
     """Load a document's clause tree from its upstream [M1-04] cache.
@@ -115,8 +99,8 @@ def run_build_corpus() -> tuple[list[ParsedClauseRecord], dict[str, int]]:
     llm = build_chat_model(
         llm_settings,
         llm_settings.llm_model_fast,
-        provider_order=LLM_CLASSIFICATION_PROVIDER_ORDER,
-        allow_fallbacks=LLM_CLASSIFICATION_ALLOW_FALLBACKS,
+        provider_order=llm_settings.llm_classification_provider_order,
+        allow_fallbacks=llm_settings.llm_classification_allow_fallbacks,
     )
     classifier = CachingClauseClassifier(
         LangchainClauseClassifier(llm),
@@ -135,7 +119,7 @@ def run_build_corpus() -> tuple[list[ParsedClauseRecord], dict[str, int]]:
             manifest_records,
             rules,
             classifier,
-            max_workers=LLM_CLASSIFICATION_MAX_WORKERS,
+            max_workers=llm_settings.llm_classification_max_workers,
         )
         source = resolve_source(entry["extraction_mode"])
         document_records = [

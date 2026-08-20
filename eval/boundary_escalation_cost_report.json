@@ -9,5 +9,5 @@
   "total_output_tokens": 0,
   "wall_clock_seconds": 0.0,
   "estimated_cost_usd": 0.0,
-  "pricing_note": "estimated_cost_usd uses hardcoded per-1M-token price constants in this script -- check against the provider's current pricing before treating it as authoritative."
+  "pricing_note": "estimated_cost_usd uses the LLM_VISION_INPUT_COST_PER_1M_TOKENS_USD/LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD settings (see .env) -- check against the provider's current pricing before treating it as authoritative."
 }

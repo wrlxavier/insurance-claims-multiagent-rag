@@ -1,4 +1,4 @@
-"""Port for the vision-LLM boundary review ([M1-04d])."""
+"""Port for the vision-LLM boundary review."""
 
 from typing import Protocol
 
