@@ -43,6 +43,20 @@ discussion).
 Known corpus gap, not a sampling artifact: no rule-assigned clause is
 OCR-derived (``source=ocr``) anywhere in the corpus, so an "OCR intersected
 with rule-assigned" accuracy split cannot be measured from this sample.
+
+**[M1-08c]: `boundary_source` column added, SAMPLE_SIZE/SEED/QUOTAS
+unchanged.** The [M1-04d] vision-LLM boundary-escalation pass corrects some
+clauses' page ranges in place -- it does not add, remove or reclassify any
+clause, so this script's sampling design carries over from [M1-08b]
+unmodified. The new ``boundary_source`` system column (``deterministic`` or
+``vision_escalated``, from [domain.clause_tree.BoundarySource]) lets
+[M1-08c] split accuracy by whether a clause's boundary was touched by that
+pass, isolating its effect from ordinary sampling noise. Because escalation
+only ever reassigns lines between existing sibling clauses -- never splits
+or restructures the tree -- ``clause_id``s are expected to be far more
+stable against [M1-08b]'s sample than [M1-08b]'s were against [M1-08]'s;
+see ``docs/PARSING.md``'s third-measurement section for the confirmed
+overlap count.
 """
 
 from __future__ import annotations
@@ -110,6 +124,7 @@ SYSTEM_COLUMNS = (
     "page_start",
     "page_end",
     "source",
+    "boundary_source",
     "type_source",
     "predicted_clause_type",
     "confidence",
@@ -234,6 +249,7 @@ def build_annotation_rows(
             "page_start": record.page_start,
             "page_end": record.page_end,
             "source": record.source,
+            "boundary_source": record.boundary_source or "",
             "type_source": record.type_source.value,
             "predicted_clause_type": record.clause_type.value,
             "confidence": record.confidence,

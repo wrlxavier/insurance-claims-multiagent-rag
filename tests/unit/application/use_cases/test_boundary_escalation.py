@@ -450,6 +450,120 @@ def test_escalate_boundaries_neighbor_without_page_attribution_not_applied() -> 
 
 
 @pytest.mark.unit
+def test_escalate_boundaries_shared_page_correction_not_applied() -> None:
+    """[M1-08c] regression: a page carrying a third clause is never swept up.
+
+    The vision model reasons at page granularity, but a page routinely
+    carries several clauses. Reassigning a whole page's lines between two
+    neighbours would drag any third clause sharing that page along with it
+    -- the dominant cause of the boundary regressions [M1-08c] measured.
+    """
+    a = _clause(
+        "d1:a",
+        content_lines=("a1", "a2"),
+        content_line_pages=(1, 2),
+        page_start=1,
+        page_end=2,
+    )
+    b = _clause(
+        "d1:b",
+        content_lines=("b1", "b2", "b3"),
+        content_line_pages=(3, 4, 5),
+        page_start=3,
+        page_end=5,
+    )
+    c = _clause(
+        "d1:c",
+        content_lines=("c1", "c2"),
+        content_line_pages=(5, 6),
+        page_start=5,
+        page_end=6,
+    )
+    # A third clause also holding content on page 5 -- the page the
+    # correction below would move between b and c.
+    e = _clause(
+        "d1:e",
+        content_lines=("e1", "e2"),
+        content_line_pages=(5, 7),
+        page_start=5,
+        page_end=7,
+    )
+    tree = _tree((a, b, c, e))
+    review = BoundaryReview(
+        confirmed=False,
+        corrected_page_start=3,
+        corrected_page_end=4,
+        split_suggested=False,
+        split_notes="",
+        reasoning="ends a page earlier than claimed",
+    )
+
+    revised_tree, outcomes = escalate_boundaries(
+        tree,
+        Path("doc.pdf"),
+        reviewer=ScriptedReviewer(review),
+        rasterizer=FakeRasterizer(),
+        page_count=10,
+        max_page_span=2,
+        max_char_count=1000,
+    )
+
+    flagged = next(o for o in outcomes if o.clause_id == "d1:b")
+    assert flagged.applied is False
+    assert "also carry other clauses' content" in flagged.note
+
+    revised = {clause.clause_id: clause for clause in revised_tree.all_clauses}
+    assert revised["d1:b"].content_lines == b.content_lines
+    assert revised["d1:b"].page_end == b.page_end
+    assert revised["d1:c"].content_lines == c.content_lines
+    assert revised["d1:e"].content_lines == e.content_lines
+    assert revised["d1:b"].boundary_source == BoundarySource.VISION_ESCALATED
+
+
+@pytest.mark.unit
+def test_escalate_boundaries_correction_emptying_the_clause_not_applied() -> None:
+    """[M1-08c] regression: a whole-range translation is never applied.
+
+    Correcting both edges in the same direction expresses "this clause
+    lives on different pages entirely", which line reassignment can only
+    carry out by swapping the clause's content with its neighbours'. One
+    such case replaced a clause's 36 correct lines with 32 belonging to its
+    neighbour, so a correction retaining none of the clause's own lines is
+    refused outright.
+    """
+    tree, a, b, c = _three_clause_tree()
+    review = BoundaryReview(
+        confirmed=False,
+        corrected_page_start=2,
+        corrected_page_end=2,
+        split_suggested=False,
+        split_notes="",
+        reasoning="this clause is really on page 2",
+    )
+
+    revised_tree, outcomes = escalate_boundaries(
+        tree,
+        Path("doc.pdf"),
+        reviewer=ScriptedReviewer(review),
+        rasterizer=FakeRasterizer(),
+        page_count=10,
+        max_page_span=2,
+        max_char_count=1000,
+    )
+
+    assert outcomes[0].applied is False
+    assert "entire content elsewhere" in outcomes[0].note
+
+    revised = {clause.clause_id: clause for clause in revised_tree.all_clauses}
+    assert revised["d1:b"].content_lines == b.content_lines
+    assert revised["d1:b"].page_start == b.page_start
+    assert revised["d1:b"].page_end == b.page_end
+    assert revised["d1:a"].content_lines == a.content_lines
+    assert revised["d1:c"].content_lines == c.content_lines
+    assert revised["d1:b"].boundary_source == BoundarySource.VISION_ESCALATED
+
+
+@pytest.mark.unit
 def test_escalate_boundaries_split_suggestion_is_recorded_not_applied() -> None:
     tree, _a, b, _c = _three_clause_tree()
     review = BoundaryReview(

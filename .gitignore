@@ -238,6 +238,12 @@ data/cache/clause_trees/
 # LLM classification cache, keyed by a hash of (model, clause title, text)
 data/cache/llm_classification/
 
+# Boundary-escalation review cache, keyed by a hash of (model, clause, page image)
+data/cache/boundary_escalation/
+
+# Boundary-escalation rasterized-page cache (idempotent PyMuPDF page images)
+data/cache/boundary_escalation_pages/
+
 # Embeddings and vector index artifacts — rebuilt via `make build-index`
 data/index/
 *.faiss

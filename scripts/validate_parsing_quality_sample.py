@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import base64
 import csv
+import hashlib
 import json
 import sys
 import time
@@ -206,10 +207,22 @@ def build_validation_message(
         f"- Predicted clause type: {sample_row['predicted_clause_type']}\n"
         f"- Recorded page range: {sample_row['page_start']}-{sample_row['page_end']}\n"
         f"- Text excerpt captured by the parser:\n{sample_row['text_excerpt']}\n\n"
+        "IMPORTANT -- the parser produces a clause TREE, not a flat list. "
+        "A clause's own numbered sub-clauses (e.g. 3.4, 3.4.1 under clause "
+        "3) are captured as SEPARATE records with their own page ranges, "
+        "not as part of this record. So if the content continuing past the "
+        "recorded page range is itself a numbered sub-clause of this "
+        "clause, that content is NOT missing -- it lives in its own record "
+        "-- and this record is NOT truncated. Judge only whether THIS "
+        "record's own captured text (the section's own heading and any "
+        "prose, lettered items or lists belonging directly to it, before "
+        "its first numbered sub-clause) starts and ends where it should.\n\n"
         "Judge, independently of the parser's claim:\n"
-        "1. Boundary correctness -- does the clause actually start and end "
-        "on the recorded pages, or is it truncated, merged with a "
-        "neighbor, or misattributed to the wrong pages?\n"
+        "1. Boundary correctness -- does this record's own content actually "
+        "start and end on the recorded pages, or is it truncated "
+        "(cutting off prose or lettered items that belong directly to it), "
+        "merged with a neighboring clause's content, or misattributed to "
+        "the wrong pages?\n"
         "2. The clause's true type (coverage / exclusion / condition / "
         "definition / procedure / other), from what the pages actually "
         "show.\n"
@@ -268,19 +281,49 @@ def call_llm_with_retry(
     raise last_exc
 
 
+CLAIM_FINGERPRINT_FIELDS = (
+    "clause_id",
+    "document_id",
+    "page_start",
+    "page_end",
+    "predicted_clause_type",
+    "title",
+    "text_excerpt",
+)
+
+
+def claim_fingerprint(sample_row: dict[str, str]) -> str:
+    """Content hash of everything the model is shown about one clause.
+
+    [M1-08c]: resumability used to key only on ``sample_id`` -- the row's
+    position in the CSV -- so re-running against a corpus whose clause
+    boundaries had changed silently reused the *previous* measurement's
+    judgments instead of re-validating. It surfaced only because the run
+    "validated" all 50 samples in under a second instead of ~8 minutes.
+    Keying on the claim itself turns a stale file into a cache miss, the
+    same content-addressed pattern
+    [infrastructure.parsing.boundary_escalation_cache] already uses.
+    """
+    payload = "|".join(sample_row[field] for field in CLAIM_FINGERPRINT_FIELDS)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def validate_sample(
     sample_row: dict[str, str],
     page_counts: dict[str, int],
     filenames: dict[str, str],
     chain: Runnable[list[HumanMessage], LLMValidationOutput],
 ) -> dict[str, object]:
-    """Validate one sample, resuming from disk if already validated."""
+    """Validate one sample, resuming from disk only for the identical claim."""
     sample_id = int(sample_row["sample_id"])
     validation_path = VALIDATION_OUTPUT_DIR / f"validation_sample_{sample_id:03d}.json"
+    fingerprint = claim_fingerprint(sample_row)
     if validation_path.exists():
-        return cast(
+        cached = cast(
             dict[str, object], json.loads(validation_path.read_text(encoding="utf-8"))
         )
+        if cached.get("claim_fingerprint") == fingerprint:
+            return cached
 
     document_id = sample_row["document_id"]
     page_start = int(sample_row["page_start"])
@@ -299,6 +342,7 @@ def validate_sample(
         "sample_id": sample_id,
         "clause_id": sample_row["clause_id"],
         "document_id": document_id,
+        "claim_fingerprint": fingerprint,
         **output.model_dump(mode="json"),
     }
     VALIDATION_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

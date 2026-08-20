@@ -6,12 +6,14 @@ for session 1 (drawing the stratified sample) and its module docstring for
 the sampling design. This script reads the now-annotated
 ``eval/parsing_quality_sample.csv`` (every judgment column filled in by
 hand against the source PDFs), computes boundary accuracy, type accuracy, a
-confusion matrix, accuracy split by ``type_source`` (rule vs LLM-stub) and
-by ``source`` (text vs OCR), provenance accuracy, and a failure-mode
-frequency table, then writes ``eval/parsing_quality_results.md``. That file
--- together with the annotated CSV -- is the evaluation data the [M1-08]
-DoD asks to be committed; ``docs/PARSING.md`` copies its tables rather than
-recomputing them by hand.
+confusion matrix, accuracy split by ``type_source`` (rule vs LLM-stub), by
+``source`` (text vs OCR) and by ``boundary_source`` (deterministic vs
+[M1-04d]'s vision-escalated pass, added for [M1-08c]), provenance accuracy,
+and a failure-mode frequency table, then writes
+``eval/parsing_quality_results.md``. That file -- together with the
+annotated CSV -- is the evaluation data the [M1-08] DoD asks to be
+committed; ``docs/PARSING.md`` copies its tables rather than recomputing
+them by hand.
 
 ``type_correct`` is not a column in the CSV -- it is derived here as
 ``predicted_clause_type == reference_clause_type``, since the reviewer only
@@ -136,6 +138,20 @@ def compute_accuracy_by_type_source(
     return result
 
 
+def compute_accuracy_by_boundary_source(
+    rows: list[dict[str, str]],
+) -> dict[str, dict[str, tuple[float, int]]]:
+    """Boundary/type accuracy split by boundary_source (deterministic vs escalated)."""
+    result: dict[str, dict[str, tuple[float, int]]] = {}
+    for boundary_source in ("deterministic", "vision_escalated"):
+        subset = [row for row in rows if row["boundary_source"] == boundary_source]
+        result[boundary_source] = {
+            "boundary": compute_boundary_accuracy(subset),
+            "type": compute_type_accuracy(subset),
+        }
+    return result
+
+
 def compute_accuracy_by_extraction_mode(
     rows: list[dict[str, str]],
 ) -> dict[str, dict[str, tuple[float, int]]]:
@@ -183,6 +199,7 @@ def render_markdown_report(
     provenance: tuple[float, int],
     confusion: dict[str, dict[str, int]],
     by_type_source: dict[str, dict[str, tuple[float, int]]],
+    by_boundary_source: dict[str, dict[str, tuple[float, int]]],
     by_extraction_mode: dict[str, dict[str, tuple[float, int]]],
     failures: list[dict[str, str]],
     failure_tags: Counter[str],
@@ -229,6 +246,20 @@ def render_markdown_report(
         n = metrics["boundary"][1]
         lines.append(
             f"| {type_source} | {n} | {_fmt_pct(*metrics['boundary'])} | "
+            f"{_fmt_pct(*metrics['type'])} |"
+        )
+
+    lines += [
+        "",
+        "## Accuracy by boundary_source",
+        "",
+        "| boundary_source | n | boundary accuracy | type accuracy |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for boundary_source, metrics in by_boundary_source.items():
+        n = metrics["boundary"][1]
+        lines.append(
+            f"| {boundary_source} | {n} | {_fmt_pct(*metrics['boundary'])} | "
             f"{_fmt_pct(*metrics['type'])} |"
         )
 
@@ -309,6 +340,7 @@ def main() -> None:
     provenance = compute_provenance_accuracy(rows)
     confusion = compute_confusion_matrix(rows)
     by_type_source = compute_accuracy_by_type_source(rows)
+    by_boundary_source = compute_accuracy_by_boundary_source(rows)
     by_extraction_mode = compute_accuracy_by_extraction_mode(rows)
     failures = collect_failure_examples(rows)
     failure_tags = failure_mode_frequency(failures)
@@ -320,6 +352,7 @@ def main() -> None:
         provenance,
         confusion,
         by_type_source,
+        by_boundary_source,
         by_extraction_mode,
         failures,
         failure_tags,
