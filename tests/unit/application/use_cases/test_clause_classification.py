@@ -127,12 +127,72 @@ def test_classify_and_enrich_llm_failure_fallback() -> None:
     rules: list[tuple[re.Pattern[str], ClauseType]] = []
     classifier = DummyClassifier(ClauseType.CONDITION, 0.95, should_fail=True)
 
-    results = classify_and_enrich_clauses(tree, records, rules, classifier)
+    results = classify_and_enrich_clauses(
+        tree, records, rules, classifier, sleep=lambda seconds: None
+    )
     assert len(results) == 1
     assert results[0].clause_type == ClauseType.OTHER
     assert results[0].type_source == TypeSource.LLM
     assert results[0].confidence == 0.0
     assert classifier.called
+
+
+class CountingClassifier:
+    """Mock recording how many times it was called -- for retry tests."""
+
+    def __init__(
+        self, calls_to_fail: int, expected_type: ClauseType, confidence: float
+    ):
+        self.calls_to_fail = calls_to_fail
+        self.expected_type = expected_type
+        self.confidence = confidence
+        self.call_count = 0
+
+    def classify(self, clause_title: str, clause_text: str) -> tuple[ClauseType, float]:
+        self.call_count += 1
+        if self.call_count <= self.calls_to_fail:
+            raise RuntimeError("transient failure")
+        return self.expected_type, self.confidence
+
+
+def test_classify_and_enrich_retries_then_succeeds() -> None:
+    tree = build_dummy_tree("Condições Especiais")
+    records = [{"id": "1", "susep_process": "123", "cnpj": "456"}]
+    rules: list[tuple[re.Pattern[str], ClauseType]] = []
+    classifier = CountingClassifier(
+        calls_to_fail=1, expected_type=ClauseType.COVERAGE, confidence=0.8
+    )
+    sleeps: list[float] = []
+
+    results = classify_and_enrich_clauses(
+        tree, records, rules, classifier, sleep=sleeps.append
+    )
+
+    assert len(results) == 1
+    assert results[0].clause_type == ClauseType.COVERAGE
+    assert results[0].confidence == 0.8
+    assert classifier.call_count == 2
+    assert sleeps == [5.0]
+
+
+def test_classify_and_enrich_exhausts_retries_then_falls_back_to_other() -> None:
+    tree = build_dummy_tree("Condições Especiais")
+    records = [{"id": "1", "susep_process": "123", "cnpj": "456"}]
+    rules: list[tuple[re.Pattern[str], ClauseType]] = []
+    classifier = CountingClassifier(
+        calls_to_fail=99, expected_type=ClauseType.COVERAGE, confidence=0.8
+    )
+    sleeps: list[float] = []
+
+    results = classify_and_enrich_clauses(
+        tree, records, rules, classifier, sleep=sleeps.append
+    )
+
+    assert len(results) == 1
+    assert results[0].clause_type == ClauseType.OTHER
+    assert results[0].confidence == 0.0
+    assert classifier.call_count == 3
+    assert sleeps == [5.0, 5.0]
 
 
 class MappingClassifier:
@@ -212,7 +272,12 @@ def test_classify_and_enrich_parallel_keeps_exception_fallback() -> None:
     rules: list[tuple[re.Pattern[str], ClauseType]] = []
 
     results = classify_and_enrich_clauses(
-        tree, records, rules, MappingClassifier(mapping, fail_titles), max_workers=4
+        tree,
+        records,
+        rules,
+        MappingClassifier(mapping, fail_titles),
+        max_workers=4,
+        sleep=lambda seconds: None,
     )
 
     for typed in results:

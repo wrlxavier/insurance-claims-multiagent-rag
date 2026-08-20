@@ -247,6 +247,10 @@ data/index/
 # reference reports in docs/, but not every local re-run
 eval/runs/
 
+# M1-08b LLM-assisted pre-validation cache (rasterized page PNGs + per-sample
+# LLM judgment JSON) — regenerable via `make validate-parsing-quality-sample`
+eval/temp/
+
 # Model weights/caches if downloaded locally (reranker, embedding model)
 .cache/
 models/*.bin

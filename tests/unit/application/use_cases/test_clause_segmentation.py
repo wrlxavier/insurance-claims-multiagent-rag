@@ -577,6 +577,38 @@ def test_page_top_unnumbered_part_heading_is_detected_without_a_preceding_gap() 
 
 
 @pytest.mark.unit
+def test_narrow_gap_unnumbered_part_is_still_detected() -> None:
+    """[M1-08b] doc 11 (AKAD) real case: the genuine home-insurance-rider
+    heading "CONDIÇÕES ESPECIAIS - COBERTURAS PARA A RESIDÊNCIA - PROTEÇÃO
+    COMBINADA" sits at a 20.76pt gap from the previous line vs. a 13.8pt
+    baseline (ratio 1.504) -- short of the old MIN_HEADING_GAP_RATIO=1.6
+    gate, silently merging the whole rider section into the preceding
+    clause (`make parse`'s oversized-clause safeguard caught it as
+    `11:membros-inferiores/7-7`, 19,032 chars). 1.45 admits this ratio
+    while a wrap continuation at the ~13.8pt baseline (ratio ~1.0) still
+    fails it."""
+    lines_spec = [
+        (_body_line(1, 0, "Texto de corpo comum um."), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum dois."), 113.8),
+        (_body_line(1, 2, "Texto de corpo comum tres."), 127.6),
+        (_body_line(1, 3, "Texto de corpo comum quatro."), 141.4),
+        # 20.76pt gap (ratio 1.504 against the 13.8pt baseline above).
+        (_heading_line(1, 4, "CONDIÇÕES ESPECIAIS COBERTURAS"), 162.16),
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+    document = _document([_page(1, spans)])
+
+    tree = segment_document(document)
+
+    titles = {c.title for c in tree.all_clauses}
+    assert "CONDIÇÕES ESPECIAIS COBERTURAS" in titles
+    part = next(
+        c for c in tree.all_clauses if c.title == "CONDIÇÕES ESPECIAIS COBERTURAS"
+    )
+    assert part.convention == HeadingConvention.UNNUMBERED_PART
+
+
+@pytest.mark.unit
 def test_ordinal_no_abbreviation_does_not_block_unnumbered_part_detection() -> None:
     """doc 13 (Zurich) sample #16: "COBERTURA No 41 - CARROCERIAS" etc. --
     PDF extraction renders the ordinal-indicator glyph "º" (as in "nº") as

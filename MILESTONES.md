@@ -18,7 +18,7 @@ unacceptable outcome.
 | Milestone | Name                       | Status      |
 | --------- | -------------------------- | ----------- |
 | M0        | Foundations                | in progress |
-| M1        | Policy parsing              | todo        |
+| M1        | Policy parsing              | in progress |
 | M2        | Ground truth                | todo        |
 | M3        | Retrieval                   | todo        |
 | M4        | Agent graph                 | todo        |
@@ -59,6 +59,39 @@ modes described rather than hidden.
   insurer CNPJ, product line, page range).
 - `docs/PARSING.md` published with method, per-document results and known
   failures.
+
+**[M1-08b] re-measurement (2026-08-19).** After [M1-04c] (boundary/heading
+fixes) and [M1-05b] (real LLM classifier) landed, the corpus was rebuilt
+(`clause_segmentation_version=v6`) and a fresh 50-clause stratified sample
+was drawn and validated (automated LLM judgment against source-PDF page
+images, replacing [M1-08]'s manual review by explicit project-owner
+decision — see `docs/PARSING.md`'s opening note). Result: **boundary
+accuracy 82.0% (41/50) — below the ≥90% bar; type accuracy 78.0% (39/50)
+— below the ≥85% bar.** Both improved sharply from [M1-08]'s baseline
+(60.0%/40.0%), and provenance accuracy stayed at 100.0% (50/50), but
+neither bar is met.
+
+**Explicit call: a follow-up is scoped, not closed as known debt.** The
+remaining gap is concentrated in two diagnosed failure-mode clusters (both
+documented in `docs/PARSING.md`'s second-measurement failure modes):
+adjacent numbered sub-clauses merging at depth 3-4, and clause content
+truncating at a page boundary. Both are cases the deterministic
+text/font-based heading detector structurally cannot see, since it never
+looks at the rendered page. [M1-04d] scopes a targeted, last-resort
+vision-LLM boundary-detection pass limited to clauses the deterministic
+pass already flags as suspicious (not a wholesale replacement of the
+segmentation pipeline); [M1-08c] re-measures after it lands and makes the
+close/known-debt call this entry defers. M1 stays **in progress**, not
+closed, until that follow-up resolves.
+
+30/30 documents produce a clause tree with no unhandled exceptions
+(verified as part of [M1-08b], after fixing two newly-discovered
+segmentation bugs — see `app/src/application/use_cases/
+clause_segmentation.py`'s module docstring for the doc 11 heading-gap fix,
+and `scripts/build_clause_tree.py`'s `KNOWN_LARGE_CLAUSE_IDS`/
+`KNOWN_HIGH_ORPHAN_DOCUMENT_IDS` for the documented, evidence-backed
+exemptions covering the rest). Provenance accuracy (100.0%, 50/50) and
+`docs/PARSING.md` publication are both satisfied.
 
 ## M2 — Ground truth
 

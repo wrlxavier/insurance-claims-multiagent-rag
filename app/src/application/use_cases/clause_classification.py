@@ -1,8 +1,14 @@
 """Use case for classifying clauses and attaching provenance."""
 
 import re
+import time
 import unicodedata
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+
+# tqdm is a pragmatic UI concern in an otherwise UI-agnostic use case --
+# accepted per M1-08b for build_corpus.py's long-running CLI progress needs.
+from tqdm import tqdm
 
 from application.ports.clause_classifier import ClauseClassifierPort
 from domain.clause_classification import (
@@ -13,6 +19,9 @@ from domain.clause_classification import (
     TypeSource,
 )
 from domain.clause_tree import Clause, ClauseTree
+
+CLASSIFICATION_MAX_ATTEMPTS = 3
+CLASSIFICATION_RETRY_DELAY_SECONDS = 5.0
 
 
 def normalize_heading(text: str) -> str:
@@ -43,14 +52,27 @@ def build_provenance(
 
 
 def _classify_with_fallback(
-    clause: Clause, classifier: ClauseClassifierPort
+    clause: Clause,
+    classifier: ClauseClassifierPort,
+    *,
+    max_attempts: int = CLASSIFICATION_MAX_ATTEMPTS,
+    retry_delay_seconds: float = CLASSIFICATION_RETRY_DELAY_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> tuple[ClauseType, float]:
-    """Call the LLM port, falling back to OTHER/0.0 on any failure."""
+    """Call the LLM port, retrying transient failures before falling back.
+
+    Retries up to ``max_attempts`` times, sleeping ``retry_delay_seconds``
+    between attempts, before falling back to OTHER/0.0 -- no exception ever
+    propagates out of this function.
+    """
     full_text = "\n".join(clause.content_lines)
-    try:
-        return classifier.classify(clause.title, full_text)
-    except Exception:
-        return ClauseType.OTHER, 0.0
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return classifier.classify(clause.title, full_text)
+        except Exception:
+            if attempt < max_attempts:
+                sleep(retry_delay_seconds)
+    return ClauseType.OTHER, 0.0
 
 
 def classify_and_enrich_clauses(
@@ -59,6 +81,8 @@ def classify_and_enrich_clauses(
     rules: list[tuple[re.Pattern[str], ClauseType]],
     classifier: ClauseClassifierPort,
     max_workers: int = 1,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[TypedClause]:
     """Process the clause tree to classify each clause and attach provenance.
 
@@ -72,6 +96,8 @@ def classify_and_enrich_clauses(
             LLM pass sequentially too -- callers that pass a classifier
             backed by a real network call should raise this to shorten the
             LLM pass's wall-clock time.
+        sleep: Sleep function used between retry attempts in the LLM pass --
+            overridable in tests to avoid real delays.
 
     Returns:
         List of TypedClause.
@@ -96,14 +122,25 @@ def classify_and_enrich_clauses(
         if max_workers > 1:
             with ThreadPoolExecutor(max_workers=max_workers) as pool:
                 outcomes = list(
-                    pool.map(
-                        lambda clause: _classify_with_fallback(clause, classifier),
-                        pending,
+                    tqdm(
+                        pool.map(
+                            lambda clause: _classify_with_fallback(
+                                clause, classifier, sleep=sleep
+                            ),
+                            pending,
+                        ),
+                        total=len(pending),
+                        desc="Clauses (LLM)",
+                        unit="clause",
+                        leave=False,
                     )
                 )
         else:
             outcomes = [
-                _classify_with_fallback(clause, classifier) for clause in pending
+                _classify_with_fallback(clause, classifier, sleep=sleep)
+                for clause in tqdm(
+                    pending, desc="Clauses (LLM)", unit="clause", leave=False
+                )
             ]
         for clause, outcome in zip(pending, outcomes, strict=True):
             llm_results[clause.clause_id] = outcome
