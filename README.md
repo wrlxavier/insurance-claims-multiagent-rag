@@ -12,6 +12,19 @@ cannot say whether a real claim is covered or denied. See
 
 ## Development Commands
 
+### System dependencies
+
+Two policy PDFs have no extractable text layer and are OCR'd via
+[Tesseract](https://github.com/tesseract-ocr/tesseract) (see [M1-02]).
+Install it locally before running `make extract-text`:
+
+```bash
+sudo apt update && sudo apt install tesseract-ocr tesseract-ocr-por
+```
+
+Verify with `tesseract --version`, and confirm the Portuguese language pack
+is present with `tesseract --list-langs`.
+
 ### Environment variables
 
 Copy the example file and fill in the values for your environment:
@@ -38,4 +51,22 @@ uv run pre-commit install
 
 ```bash
 uv run pre-commit run --all-files
+```
+
+### Jupyter kernel for notebooks
+
+Notebooks under `notebooks/` should run against this project's virtual
+environment rather than a globally installed kernel. Register a
+project-bound kernel with:
+
+```bash
+./scripts/setup_dev_kernel.sh
+```
+
+This adds `ipykernel` as a dev dependency (via `uv`) and registers a Jupyter
+kernel named "Insurance Claims (uv)". Select it in Jupyter/VS Code, or launch
+directly with:
+
+```bash
+uv run jupyter lab
 ```

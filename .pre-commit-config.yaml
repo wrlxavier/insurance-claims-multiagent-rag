@@ -16,3 +16,10 @@ repos:
           - pydantic-settings>=2.12.0
           - pytest>=9.1.1
           - pypdf>=6.14.2
+          - pillow>=12.3.0
+          - langchain-core>=1.5.5
+          - langchain-openai>=1.5.1
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout

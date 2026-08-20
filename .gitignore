@@ -229,6 +229,21 @@ data/cache/extraction/
 # OCR output cache, keyed by document id + DPI
 data/cache/ocr/
 
+# Boilerplate-removed cache, keyed by document id + removal algorithm version
+data/cache/boilerplate_removed/
+
+# Clause-tree cache, keyed by document id + segmentation algorithm version
+data/cache/clause_trees/
+
+# LLM classification cache, keyed by a hash of (model, clause title, text)
+data/cache/llm_classification/
+
+# Boundary-escalation review cache, keyed by a hash of (model, clause, page image)
+data/cache/boundary_escalation/
+
+# Boundary-escalation rasterized-page cache (idempotent PyMuPDF page images)
+data/cache/boundary_escalation_pages/
+
 # Embeddings and vector index artifacts — rebuilt via `make build-index`
 data/index/
 *.faiss
@@ -237,6 +252,10 @@ data/index/
 # Evaluation run outputs (Markdown/JSON reports) — keep the committed
 # reference reports in docs/, but not every local re-run
 eval/runs/
+
+# M1-08b LLM-assisted pre-validation cache (rasterized page PNGs + per-sample
+# LLM judgment JSON) — regenerable via `make validate-parsing-quality-sample`
+eval/temp/
 
 # Model weights/caches if downloaded locally (reranker, embedding model)
 .cache/
@@ -251,6 +270,3 @@ langfuse_data/
 
 # AI context files - for agentic tools and other AI-powered applications, in dev mode.
 .ai_context/
-
-# AI markdown files
-CLAUDE.md

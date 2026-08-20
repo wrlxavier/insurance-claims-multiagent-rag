@@ -7,12 +7,22 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
+    "pyarrow>=14",
+    "pymupdf>=1.24",
     "pypdf>=6.14.2",
+    "pytesseract>=0.3.13",
+    "pillow>=12.3.0",
+    "langchain-core>=1.5.5",
+    "langchain-openai>=1.5.1",
+    "python-dotenv>=1.2.2",
+    "tqdm>=4.67",
 ]
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.3.0",
     "mypy>=2.3.0",
+    "nbstripout>=0.9.1",
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "ruff>=0.16.0",
@@ -43,6 +53,7 @@ exclude = [
     ".mypy_cache",
     ".tox",
     ".ai_context",
+    "notebooks/scratch/",
     # "__init__.py",  # it will be excluded via per-file-ignores
 ]
 
@@ -95,7 +106,18 @@ line-ending = "auto"
 
 [tool.mypy]
 files = ["app/src", "tests", "scripts"]
-exclude = ["build/"]
+mypy_path = "app/src"
+exclude = ["build/", "notebooks/scratch/"]
 strict = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "fitz.*",
+    "pyarrow.*",
+    "pytesseract.*",
+    "langchain_core.*",
+    "tqdm.*",
+]
+ignore_missing_imports = true

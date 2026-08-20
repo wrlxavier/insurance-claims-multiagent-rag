@@ -23,6 +23,12 @@ corpus are recorded in
 [`data/policies/NOTICE.md`](data/policies/NOTICE.md). Per-document
 provenance is recorded in `data/policies/manifest.csv`.
 
+## Third-party dependency licenses
+
+Licensing terms for this project's third-party dependencies, including the
+AGPLv3/commercial dual-licensed PyMuPDF, are recorded in
+[`docs/LICENSING.md`](docs/LICENSING.md).
+
 ## No personal data
 
 This repository contains no claim, customer, or policyholder data. All

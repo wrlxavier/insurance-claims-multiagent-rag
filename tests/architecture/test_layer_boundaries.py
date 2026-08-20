@@ -30,6 +30,10 @@ FORBIDDEN_ROOTS = frozenset(
         "pydantic",
         "langgraph",
         "langchain",
+        "fitz",
+        "pyarrow",
+        "pytesseract",
+        "PIL",
     }
 )
 
