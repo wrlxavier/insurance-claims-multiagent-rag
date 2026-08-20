@@ -1,4 +1,4 @@
-"""Tests for the [M1-08] parsing-quality sampling script."""
+"""Tests for the parsing-quality sampling script."""
 
 import pytest
 from scripts.sample_parsing_quality import allocate_era_quota

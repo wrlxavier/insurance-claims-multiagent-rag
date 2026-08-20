@@ -1,4 +1,4 @@
-"""Tests for [M1-04d]'s vision-LLM boundary-escalation use case."""
+"""Tests for the vision-LLM boundary-escalation use case."""
 
 from pathlib import Path
 
