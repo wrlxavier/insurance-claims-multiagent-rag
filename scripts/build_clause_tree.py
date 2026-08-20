@@ -23,6 +23,13 @@ keep processing the rest of the corpus and raise a single aggregate error
 at the end instead of failing fast on the first offending document (this
 flag covers both failure kinds).
 
+``KNOWN_LARGE_CLAUSE_IDS``/``KNOWN_HIGH_ORPHAN_DOCUMENT_IDS`` [M1-08b] are
+explicit, evidence-backed exemptions for specific clauses/documents
+manually confirmed against the source PDF to be legitimately large/short
+rather than an undetected-heading merge -- the safeguard still fails
+loudly on anything not in these lists, so a genuinely new merge bug is
+still caught.
+
 Use ``--checkpoint-docs`` to run a small subset and write only their
 human-reviewable outlines under ``docs/clause_tree_checkpoints/``, without
 touching the aggregate report or requiring the full corpus.
@@ -63,6 +70,43 @@ REPORT_PATH = Path("docs/CLAUSE_TREE_REPORT.md")
 CHECKPOINT_DIR = Path("docs/clause_tree_checkpoints")
 
 SegmentationFailure = OrphanTextExceedsThresholdError | ClauseSizeExceedsThresholdError
+
+# [M1-08b]: clauses manually confirmed against the source PDF (`data/
+# policies/raw/`) to be legitimately large content, not an undetected-
+# heading merge -- unsplit GLOSSÁRIO/DEFINIÇÕES sections with no internal
+# heading structure across four distinct, low-signal entry formats (bare-
+# numeral-then-unbold-title, "Termo: definição" inline, bare term on its
+# own line, "TERMO: definição" partial-caps), one genuinely long
+# assistance-benefit clause (doc 14), doc 9's nested benefits listing, and
+# doc 11's home-insurance-rider part (its 24 numbered sub-clauses split
+# correctly; the part's own preamble carries an unsplit embedded glossary,
+# same pattern as docs 5/12/15, only surfacing once [M1-08b]'s
+# MIN_HEADING_GAP_RATIO fix correctly split the rider out as its own part).
+# Exempted here, by exact clause_id, from the oversized-clause safeguard so
+# it keeps failing loudly on any *new*, undiagnosed merge of this kind --
+# see docs/PARSING.md's Known limitations for the per-clause page-span/
+# char-count evidence.
+KNOWN_LARGE_CLAUSE_IDS = frozenset(
+    {
+        "5:4-glossario-de-termos-tecnicos",
+        "7:condicoes-gerais-seguro-automovel-individual-mensal/4",
+        "9:4",
+        "9:24-2/24.16.7",
+        "11:condicoes-especiais-coberturas-para-a-residencia-protecao-combinada",
+        "12:glossario",
+        "13:secao-i-condicoes-gerais-da-apolice-casco/2",
+        "14:disposicoes-iniciais/13/13.8",
+        "15:glossario",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/2",
+    }
+)
+
+# [M1-08b]: doc 30 is a genuine 9-page short document whose orphaned text
+# (portal/contact front matter before its first numbered clause) is
+# legitimately proportionally larger than in a typical corpus document --
+# confirmed against the source PDF, not a heading-detection gap. 16.2% vs.
+# the 15% threshold.
+KNOWN_HIGH_ORPHAN_DOCUMENT_IDS = frozenset({"30"})
 
 
 def load_boilerplate_removed_document(
@@ -167,7 +211,10 @@ def run_clause_segmentation(
                 oversized_count=len(oversized),
             )
         )
-        if tree.report.orphan_ratio > threshold:
+        if (
+            tree.report.orphan_ratio > threshold
+            and document_id not in KNOWN_HIGH_ORPHAN_DOCUMENT_IDS
+        ):
             error = OrphanTextExceedsThresholdError(
                 document_id=document_id,
                 filename=filename,
@@ -179,11 +226,12 @@ def run_clause_segmentation(
                 failures.append(error)
             else:
                 raise error
-        if oversized:
+        unexempted = [c for c in oversized if c.clause_id not in KNOWN_LARGE_CLAUSE_IDS]
+        if unexempted:
             size_error = ClauseSizeExceedsThresholdError(
                 document_id=document_id,
                 filename=filename,
-                oversized_clause_ids=tuple(c.clause_id for c in oversized),
+                oversized_clause_ids=tuple(c.clause_id for c in unexempted),
                 max_page_span=max_page_span,
                 max_char_count=max_char_count,
             )

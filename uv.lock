@@ -541,6 +541,7 @@ dependencies = [
     { name = "pypdf" },
     { name = "pytesseract" },
     { name = "python-dotenv" },
+    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -565,6 +566,7 @@ requires-dist = [
     { name = "pypdf", specifier = ">=6.14.2" },
     { name = "pytesseract", specifier = ">=0.3.13" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "tqdm", specifier = ">=4.67" },
 ]
 
 [package.metadata.requires-dev]

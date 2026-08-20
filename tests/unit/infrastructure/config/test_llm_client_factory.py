@@ -72,3 +72,30 @@ def test_build_chat_model_no_provider_order_by_default() -> None:
 
     assert isinstance(model, ChatOpenAI)
     assert model.extra_body is None
+
+
+@pytest.mark.unit
+def test_build_chat_model_disables_fallbacks_when_given() -> None:
+    settings = build_settings(LlmProvider.OPENAI)
+
+    model = build_chat_model(
+        settings,
+        settings.llm_model_fast,
+        provider_order=["baidu/fp8"],
+        allow_fallbacks=False,
+    )
+
+    assert isinstance(model, ChatOpenAI)
+    assert model.extra_body == {
+        "provider": {"order": ["baidu/fp8"], "allow_fallbacks": False}
+    }
+
+
+@pytest.mark.unit
+def test_build_chat_model_allow_fallbacks_without_provider_order() -> None:
+    settings = build_settings(LlmProvider.OPENAI)
+
+    model = build_chat_model(settings, settings.llm_model_fast, allow_fallbacks=True)
+
+    assert isinstance(model, ChatOpenAI)
+    assert model.extra_body == {"provider": {"allow_fallbacks": True}}

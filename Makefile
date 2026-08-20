@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality score-parsing-quality
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality
 
 help:
 	@echo "Available targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  build-clause-tree - Recover the clause tree from the cleaned corpus"
 	@echo "  parse             - Rebuild the parsed-clause corpus under build/"
 	@echo "  sample-parsing-quality - Draw the M1-08 stratified 50-clause sample for manual review"
+	@echo "  validate-parsing-quality-sample - Automated LLM validation of the M1-08b sample (fills judgment columns)"
 	@echo "  score-parsing-quality  - Score the annotated M1-08 sample and write eval/parsing_quality_results.md"
 
 install:
@@ -56,6 +57,9 @@ parse: extract-text remove-boilerplate build-clause-tree
 
 sample-parsing-quality:
 	PYTHONPATH=app/src uv run python scripts/sample_parsing_quality.py
+
+validate-parsing-quality-sample:
+	PYTHONPATH=app/src uv run python scripts/validate_parsing_quality_sample.py
 
 score-parsing-quality:
 	PYTHONPATH=app/src uv run python scripts/score_parsing_quality.py

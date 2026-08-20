@@ -157,6 +157,24 @@ fixes. A new pure helper, [find_oversized_clauses], gives
 merge of this kind, mirroring [domain.clause_tree.
 OrphanTextExceedsThresholdError]'s existing pattern.
 
+**[M1-08b] (applied 2026-08-19), found when [find_oversized_clauses]'s
+safeguard finally ran against a real full corpus rebuild.** Of the 10
+documents it flagged, 9 turned out to be legitimately large/short content
+(unsplit GLOSSÁRIO/DEFINIÇÕES sections with no internal heading structure,
+one genuinely long assistance-benefit clause, one short document with
+proportionally larger front matter) -- exempted explicitly in
+``scripts/build_clause_tree.py`` rather than by loosening detection here,
+since inventing heading rules for glossary term-entry formats (four
+distinct, low-signal formats observed: bare-numeral-then-unbold-title,
+"Termo: definição" inline, bare term on its own line, "TERMO: definição"
+partial-caps) would trade a known, bounded gap for a new false-positive
+risk with no corpus evidence behind it -- against this module's own
+evidence-driven calibration philosophy. The 10th, doc 11, was a genuine
+missed heading: see [MIN_HEADING_GAP_RATIO]'s own comment (1.6 -> 1.45).
+
+``CLAUSE_SEGMENTATION_VERSION`` bumped ``v5`` -> ``v6`` for the gap-ratio
+change.
+
 ``CLAUSE_SEGMENTATION_VERSION`` feeds the downstream cache key (see
 [infrastructure.parsing.clause_tree_caching]): bump it whenever any
 detection rule here changes, so stale cached output is invalidated.
@@ -177,7 +195,7 @@ from domain.clause_tree import (
 )
 from domain.extracted_text import ExtractedDocument, ExtractedPage, ExtractedSpan
 
-CLAUSE_SEGMENTATION_VERSION = "v5"
+CLAUSE_SEGMENTATION_VERSION = "v6"
 
 NUMBERED_BOLD_THRESHOLD = 0.5
 PART_BOLD_THRESHOLD = 0.9
@@ -192,17 +210,30 @@ MIN_PART_ALPHA_CHARS = 4
 MAX_PART_WORD_COUNT = 10
 
 # Real headings on doc 13 p73 sit at a ~26-28pt gap from the previous line vs.
-# a ~15.5-16pt normal single-line baseline; on doc 15 p59 the genuine
-# "COBERTURAS BÁSICAS" heading sits at 41.3pt vs. the same ~13.8pt baseline
-# its false-positive wrap-continuations sit at -- confirmed by direct
-# reproduction against data/policies/raw. font_size is flat (12.0pt) on
-# every one of these lines in both documents, so line-to-line vertical
-# spacing is the only discriminating signal available once bold fraction is
-# saturated (whole-document-bold legacy templates -- see module docstring).
-# Without this gate, a wrapped ALL-CAPS sentence or list-item continuation
-# line independently clears the UNNUMBERED_PART pattern gates and is
-# misdetected as a brand-new heading, fragmenting the enclosing clause.
-MIN_HEADING_GAP_RATIO = 1.6
+# a ~15.5-16pt normal single-line baseline (ratio ~1.68-1.75); on doc 15 p59
+# the genuine "COBERTURAS BÁSICAS" heading sits at 41.3pt vs. the same
+# ~13.8pt baseline its false-positive wrap-continuations sit at (ratio ~3.0)
+# -- confirmed by direct reproduction against data/policies/raw. font_size
+# is flat (12.0pt) on every one of these lines in both documents, so
+# line-to-line vertical spacing is the only discriminating signal available
+# once bold fraction is saturated (whole-document-bold legacy templates --
+# see module docstring). Without this gate, a wrapped ALL-CAPS sentence or
+# list-item continuation line independently clears the UNNUMBERED_PART
+# pattern gates and is misdetected as a brand-new heading, fragmenting the
+# enclosing clause.
+#
+# [M1-08b] lowered 1.6 -> 1.45 after this gate produced a false NEGATIVE on
+# doc 11 (AKAD): the genuine home-insurance-rider heading "CONDIÇÕES
+# ESPECIAIS - COBERTURAS PARA A RESIDÊNCIA - PROTEÇÃO COMBINADA" sits at a
+# 20.76pt gap vs. a 13.8pt baseline (ratio 1.504), just short of the old
+# 1.6 gate, silently merging the whole rider section into the preceding
+# auto-insurance clause (confirmed against the source PDF; this is what
+# `make parse`'s oversized-clause safeguard, added by [M1-04c], caught as
+# clause `11:membros-inferiores/7-7` exceeding the char-count ceiling).
+# 1.45 stays well clear of the false-positive wrap-continuation baseline
+# (~1.0-1.09 in the corpus evidence above) while admitting doc 11's real
+# heading, with margin below doc 13's real headings (~1.68) too.
+MIN_HEADING_GAP_RATIO = 1.45
 
 # Multi-column detection: thresholds calibrated against the corpus (see
 # module docstring) to isolate only genuine sustained parallel-column prose

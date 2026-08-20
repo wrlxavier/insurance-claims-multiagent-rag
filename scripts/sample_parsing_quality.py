@@ -12,17 +12,33 @@ complete should ``scripts/score_parsing_quality.py`` be run against the
 file; running it against an unannotated file is a user error this script
 cannot detect for you.
 
-Sampling design: the corpus has only 19 rule-assigned clauses in total
-(``type_source=rule``), so those are taken as a full census rather than
-sampled -- every rule-assigned clause is included, which measures that
-statistic at full population coverage instead of an arbitrary subset. The
-remaining 31 slots are drawn from the (all LLM-stub-assigned, see
-[infrastructure.parsing.null_classifier]) population via a stratified quota
-over (product_line, source) -- see ``QUOTAS`` below for the exact numbers
-and rationale. Each multi-era cell's quota is split across the four
-filing-year "heading era" buckets (2004-2009, 2010-2016, 2017-2021,
-2022-2025) by the largest-remainder method, then drawn with a fixed seed
-for reproducibility.
+Sampling design: rule-assigned clauses (``type_source=rule``) are taken as
+a full census rather than sampled -- every rule-assigned clause is
+included, which measures that statistic at full population coverage
+instead of an arbitrary subset. The remaining slots are drawn from the
+LLM-assigned population via a stratified quota over (product_line, source)
+-- see ``QUOTAS`` below for the exact numbers and rationale. Each
+multi-era cell's quota is split across the four filing-year "heading era"
+buckets (2004-2009, 2010-2016, 2017-2021, 2022-2025) by the
+largest-remainder method, then drawn with a fixed seed for reproducibility.
+
+**[M1-08b] (2026-08-19): QUOTAS retuned, 19 -> 14 rule census.** The
+[M1-04c]/[M1-08b] boundary and heading-detection fixes (clause
+segmentation ``v4`` -> ``v6``) changed which clauses exist and which
+titles the deterministic rule pass matches -- the corpus's rule-assigned
+population shrank from 19 to 14. ``SAMPLE_SIZE``/``SEED`` are unchanged
+per the [M1-08b] DoD ("same seed and stratification design where
+possible"), so the Stage-2 top-up grew from 31 to 36 slots to keep the
+total at 50: +1 to each of the five non-CASCO/non-CARTA-VERDE cells
+(``RCF-A``/text, ``RCF-A``/ocr, ``ASSIST``/text, ``ASSIST``/ocr,
+``GAR.EST``/text), leaving CASCO's already-largest quota and CARTA
+VERDE's already-thin quota unchanged and preserving both OCR cells'
+deliberate oversampling. Because clause boundaries shifted with the
+segmentation-version bump, ``clause_id``s in this sample are NOT expected
+to match [M1-08]'s original 50-clause sample row-for-row -- this is an
+independently-drawn sample under the same design, not a matched-pair
+rerun (see ``docs/PARSING.md``'s second-measurement section for the full
+discussion).
 
 Known corpus gap, not a sampling artifact: no rule-assigned clause is
 OCR-derived (``source=ocr``) anywhere in the corpus, so an "OCR intersected
@@ -56,14 +72,16 @@ ERA_BUCKETS: tuple[tuple[str, int, int], ...] = (
 )
 
 # (product_line, source) -> quota for the Stage-2 stratified top-up. Stage 1
-# (all 19 rule-assigned clauses) is a census, not drawn from a quota.
+# (all rule-assigned clauses -- 14 as of [M1-08b], was 19 at [M1-08]) is a
+# census, not drawn from a quota. See the module docstring's [M1-08b] note
+# for why these numbers grew from the original 31-total quota.
 QUOTAS: dict[tuple[str, str], int] = {
     ("CASCO", "text"): 9,
-    ("RCF-A", "text"): 3,
-    ("RCF-A", "ocr"): 5,
-    ("ASSIST", "text"): 3,
-    ("ASSIST", "ocr"): 5,
-    ("GAR.EST", "text"): 3,
+    ("RCF-A", "text"): 4,
+    ("RCF-A", "ocr"): 6,
+    ("ASSIST", "text"): 4,
+    ("ASSIST", "ocr"): 6,
+    ("GAR.EST", "text"): 4,
     ("CARTA VERDE", "text"): 3,
 }
 

@@ -27,6 +27,8 @@ from ``data/policies/raw/`` to ``build/``, in one command.
 from pathlib import Path
 from typing import Literal
 
+from tqdm import tqdm
+
 from application.use_cases.boilerplate_removal import BOILERPLATE_REMOVAL_VERSION
 from application.use_cases.clause_classification import classify_and_enrich_clauses
 from application.use_cases.clause_segmentation import CLAUSE_SEGMENTATION_VERSION
@@ -64,8 +66,19 @@ LLM_CLASSIFICATION_CACHE_PATH = Path("data/cache/llm_classification/cache.jsonl"
 
 # Empirically: concurrency past ~5-10 workers gave diminishing/negative
 # returns (higher structured-output failure rate under load) -- see the
-# M1-05b PR discussion.
-LLM_CLASSIFICATION_MAX_WORKERS = 5
+# M1-05b PR discussion. Raised to the top of that range for M1-08b now that
+# classify_and_enrich_clauses retries a transient failure (3 attempts, 5s
+# apart) instead of eating it silently -- the retry absorbs the risk that
+# kept concurrency capped before.
+LLM_CLASSIFICATION_MAX_WORKERS = 10
+
+# Pinned per M1-08b: baidu/fp8 is the required OpenRouter route for
+# deepseek/deepseek-v4-flash-0731 for this corpus rebuild; fallback is
+# disabled so a transient provider outage surfaces as a classifier
+# exception (caught and retried by classify_and_enrich_clauses) instead of
+# silently rerouting to a different, unvalidated upstream.
+LLM_CLASSIFICATION_PROVIDER_ORDER = ["baidu/fp8"]
+LLM_CLASSIFICATION_ALLOW_FALLBACKS = False
 
 
 def load_clause_tree(document_id: str, filename: str) -> ClauseTree:
@@ -99,7 +112,12 @@ def run_build_corpus() -> tuple[list[ParsedClauseRecord], dict[str, int]]:
     manifest_records = read_manifest(MANIFEST_PATH)
     rules = load_classification_rules(RULES_PATH)
     llm_settings = get_llm_settings()
-    llm = build_chat_model(llm_settings, llm_settings.llm_model_fast)
+    llm = build_chat_model(
+        llm_settings,
+        llm_settings.llm_model_fast,
+        provider_order=LLM_CLASSIFICATION_PROVIDER_ORDER,
+        allow_fallbacks=LLM_CLASSIFICATION_ALLOW_FALLBACKS,
+    )
     classifier = CachingClauseClassifier(
         LangchainClauseClassifier(llm),
         model=llm_settings.llm_model_fast,
@@ -108,7 +126,7 @@ def run_build_corpus() -> tuple[list[ParsedClauseRecord], dict[str, int]]:
 
     records: list[ParsedClauseRecord] = []
     counts: dict[str, int] = {}
-    for entry in manifest_records:
+    for entry in tqdm(manifest_records, desc="Documents", unit="doc"):
         document_id = entry["id"]
         filename = entry["filename"]
         tree = load_clause_tree(document_id, filename)
