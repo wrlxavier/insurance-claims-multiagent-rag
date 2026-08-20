@@ -72,9 +72,19 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
+from application.use_cases.llm_retry_defaults import (
+    DEFAULT_LLM_RETRY_DELAY_SECONDS as VALIDATION_RETRY_DELAY_SECONDS,
+)
+from application.use_cases.llm_retry_defaults import (
+    DEFAULT_LLM_RETRY_MAX_ATTEMPTS as VALIDATION_MAX_ATTEMPTS,
+)
 from domain.clause_classification import ClauseType
 from infrastructure.config.llm_client_factory import build_chat_model
-from infrastructure.config.settings import LlmSettings, get_llm_settings
+from infrastructure.config.settings import (
+    LlmSettings,
+    get_llm_settings,
+    get_parsing_settings,
+)
 from infrastructure.parsing.manifest import read_manifest
 
 SAMPLE_CSV_PATH = Path("eval/parsing_quality_sample.csv")
@@ -82,14 +92,6 @@ MANIFEST_PATH = Path("data/policies/manifest.csv")
 RAW_DIR = Path("data/policies/raw")
 IMAGE_CACHE_DIR = Path("eval/temp/sample_imgs")
 VALIDATION_OUTPUT_DIR = Path("eval/temp/sample_validations")
-
-RASTER_DPI = 150
-
-VALIDATION_MODEL = "google/gemini-3.7-flash"
-VALIDATION_PROVIDER_ORDER = ["google-vertex"]
-VALIDATION_ALLOW_FALLBACKS = False
-VALIDATION_MAX_ATTEMPTS = 3
-VALIDATION_RETRY_DELAY_SECONDS = 5.0
 
 
 class LLMValidationOutput(BaseModel):
@@ -155,7 +157,7 @@ def rasterize_pages(
     sample_id: int,
     first_page: int,
     last_page: int,
-    dpi: int = RASTER_DPI,
+    dpi: int,
 ) -> list[Path]:
     """Rasterize ``pdf_path``'s pages in ``[first_page, last_page]`` to PNG.
 
@@ -246,11 +248,16 @@ def build_validation_chain(
     llm_settings: LlmSettings,
 ) -> Runnable[list[HumanMessage], LLMValidationOutput]:
     """Build the structured-output chain for the image-validation model."""
+    if llm_settings.llm_model_vision is None:
+        raise ValueError(
+            "LLM_MODEL_VISION is not set. Set it in .env before running "
+            "`make validate-parsing-quality-sample`."
+        )
     llm = build_chat_model(
         llm_settings,
-        VALIDATION_MODEL,
-        provider_order=VALIDATION_PROVIDER_ORDER,
-        allow_fallbacks=VALIDATION_ALLOW_FALLBACKS,
+        llm_settings.llm_model_vision,
+        provider_order=llm_settings.llm_vision_provider_order,
+        allow_fallbacks=llm_settings.llm_vision_allow_fallbacks,
     )
     return cast(
         Runnable[list[HumanMessage], LLMValidationOutput],
@@ -313,6 +320,7 @@ def validate_sample(
     page_counts: dict[str, int],
     filenames: dict[str, str],
     chain: Runnable[list[HumanMessage], LLMValidationOutput],
+    dpi: int,
 ) -> dict[str, object]:
     """Validate one sample, resuming from disk only for the identical claim."""
     sample_id = int(sample_row["sample_id"])
@@ -333,7 +341,7 @@ def validate_sample(
     )
 
     pdf_path = RAW_DIR / filenames[document_id]
-    image_paths = rasterize_pages(pdf_path, sample_id, first_page, last_page)
+    image_paths = rasterize_pages(pdf_path, sample_id, first_page, last_page, dpi=dpi)
 
     content = build_validation_message(sample_row, image_paths)
     output = call_llm_with_retry(chain, content)
@@ -421,11 +429,14 @@ def main() -> None:
 
     llm_settings = get_llm_settings()
     chain = build_validation_chain(llm_settings)
+    parsing_settings = get_parsing_settings()
 
     updated_rows: list[dict[str, str]] = []
     for row in tqdm(rows, desc="Validating samples", unit="sample"):
         try:
-            validation = validate_sample(row, page_counts, filenames, chain)
+            validation = validate_sample(
+                row, page_counts, filenames, chain, dpi=parsing_settings.ocr_dpi
+            )
         except Exception:
             print(f"FAILED on sample_id={row['sample_id']}", file=sys.stderr)
             raise

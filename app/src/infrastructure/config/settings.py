@@ -165,6 +165,53 @@ class LlmSettings(BaseSettings):
     llm_model_reasoning: str = Field(alias="LLM_MODEL_REASONING")
     llm_model_vision: str | None = Field(alias="LLM_MODEL_VISION", default=None)
 
+    # Matches the vision model's required OpenRouter route -- reused by both
+    # scripts/validate_parsing_quality_sample.py and
+    # scripts/escalate_vision_boundaries.py rather than reinvented per
+    # script. Fallback disabled so a transient provider outage surfaces as
+    # an exception (caught and retried by each caller) instead of silently
+    # rerouting to a different, unvalidated upstream.
+    llm_vision_provider_order: list[str] = Field(
+        alias="LLM_VISION_PROVIDER_ORDER", default_factory=lambda: ["google-vertex"]
+    )
+    llm_vision_allow_fallbacks: bool = Field(
+        alias="LLM_VISION_ALLOW_FALLBACKS", default=False
+    )
+
+    # Rough, provider-published per-1M-token prices at time of writing --
+    # check against the provider's current pricing before treating
+    # estimated_cost_usd (scripts/escalate_vision_boundaries.py) as
+    # authoritative for a real budgeting decision.
+    llm_vision_input_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_VISION_INPUT_COST_PER_1M_TOKENS_USD", default=0.30
+    )
+    llm_vision_output_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD", default=2.50
+    )
+
+    # Pinned per M1-08b: baidu/fp8 is the required OpenRouter route for
+    # deepseek/deepseek-v4-flash-0731 for corpus classification; fallback is
+    # disabled so a transient provider outage surfaces as a classifier
+    # exception (caught and retried by classify_and_enrich_clauses) instead
+    # of silently rerouting to a different, unvalidated upstream.
+    llm_classification_provider_order: list[str] = Field(
+        alias="LLM_CLASSIFICATION_PROVIDER_ORDER",
+        default_factory=lambda: ["baidu/fp8"],
+    )
+    llm_classification_allow_fallbacks: bool = Field(
+        alias="LLM_CLASSIFICATION_ALLOW_FALLBACKS", default=False
+    )
+
+    # Empirically: concurrency past ~5-10 workers gave diminishing/negative
+    # returns (higher structured-output failure rate under load) -- see the
+    # M1-05b PR discussion. Raised to the top of that range for M1-08b now
+    # that classify_and_enrich_clauses retries a transient failure (3
+    # attempts, 5s apart) instead of eating it silently -- the retry
+    # absorbs the risk that kept concurrency capped before.
+    llm_classification_max_workers: int = Field(
+        alias="LLM_CLASSIFICATION_MAX_WORKERS", default=10
+    )
+
     # RAG settings
     embedding_model: str = Field(alias="EMBEDDING_MODEL")
     reranker_model: str = Field(alias="RERANKER_MODEL")

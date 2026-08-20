@@ -52,20 +52,6 @@ RAW_DIR = Path("data/policies/raw")
 BOUNDARY_ESCALATION_CACHE_PATH = Path("data/cache/boundary_escalation/cache.jsonl")
 COST_REPORT_PATH = Path("eval/boundary_escalation_cost_report.json")
 
-# Matches scripts/validate_parsing_quality_sample.py's existing pin for the
-# same model -- reused rather than reinvented, per the DoD's "no new LLM
-# client integration" ask. Fallback disabled so a transient provider outage
-# surfaces as an exception (caught and retried by _review_with_retry)
-# instead of silently rerouting to a different, unvalidated upstream.
-VISION_MODEL_PROVIDER_ORDER = ["google-vertex"]
-VISION_ALLOW_FALLBACKS = False
-
-# Rough, provider-published per-1M-token prices at time of writing -- check
-# against the provider's current pricing before treating estimated_cost_usd
-# as authoritative for a real budgeting decision.
-VISION_INPUT_COST_PER_1M_TOKENS_USD = 0.30
-VISION_OUTPUT_COST_PER_1M_TOKENS_USD = 2.50
-
 
 def load_clause_tree(document_id: str, filename: str) -> tuple[Path, ClauseTree]:
     """Load a document's clause tree from its [M1-04] cache, plus its cache path.
@@ -118,8 +104,8 @@ def main() -> None:
     llm = build_chat_model(
         settings,
         settings.llm_model_vision,
-        provider_order=VISION_MODEL_PROVIDER_ORDER,
-        allow_fallbacks=VISION_ALLOW_FALLBACKS,
+        provider_order=settings.llm_vision_provider_order,
+        allow_fallbacks=settings.llm_vision_allow_fallbacks,
     )
     inner_reviewer = LangchainBoundaryVisionReviewer(llm)
     reviewer = CachingBoundaryVisionReviewer(
@@ -181,8 +167,12 @@ def main() -> None:
 
     stats = inner_reviewer.stats
     estimated_cost_usd = (
-        stats.total_input_tokens / 1_000_000 * VISION_INPUT_COST_PER_1M_TOKENS_USD
-        + stats.total_output_tokens / 1_000_000 * VISION_OUTPUT_COST_PER_1M_TOKENS_USD
+        stats.total_input_tokens
+        / 1_000_000
+        * settings.llm_vision_input_cost_per_1m_tokens_usd
+        + stats.total_output_tokens
+        / 1_000_000
+        * settings.llm_vision_output_cost_per_1m_tokens_usd
     )
     report = {
         "documents_processed": documents_processed,
@@ -196,9 +186,10 @@ def main() -> None:
         "wall_clock_seconds": stats.total_seconds,
         "estimated_cost_usd": round(estimated_cost_usd, 4),
         "pricing_note": (
-            "estimated_cost_usd uses hardcoded per-1M-token price constants "
-            "in this script -- check against the provider's current pricing "
-            "before treating it as authoritative."
+            "estimated_cost_usd uses the LLM_VISION_INPUT_COST_PER_1M_TOKENS_USD"
+            "/LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD settings (see .env) -- "
+            "check against the provider's current pricing before treating it "
+            "as authoritative."
         ),
     }
     COST_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)

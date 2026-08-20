@@ -16,7 +16,7 @@ help:
 	@echo "  remove-boilerplate - Remove boilerplate from the cached extraction"
 	@echo "  build-clause-tree - Recover the clause tree from the cleaned corpus"
 	@echo "  parse             - Rebuild the parsed-clause corpus under build/"
-	@echo "  sample-parsing-quality - Draw the M1-08 stratified 50-clause sample for manual review"
+	@echo "  sample-parsing-quality - Draw the M1-08 stratified 50-clause sample"
 	@echo "  validate-parsing-quality-sample - Automated LLM validation of the M1-08b sample (fills judgment columns)"
 	@echo "  score-parsing-quality  - Score the annotated M1-08 sample and write eval/parsing_quality_results.md"
 	@echo "  escalate-vision-boundaries - M1-04d: vision-LLM boundary review of suspicious clauses (opt-in, not part of parse)"
