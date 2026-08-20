@@ -1,0 +1,413 @@
+sample_id,clause_id,document_id,filename,product_line,insurer,cnpj,indemnity_regime,susep_process,filing_year,era_bucket,page_start,page_end,source,boundary_source,type_source,predicted_clause_type,confidence,path,bundle_section,title,text_excerpt,text_char_count,boundary_correct,boundary_notes,reference_clause_type,provenance_correct,provenance_notes,failure_mode_tag,reviewer_notes
+1,1:glossario,1,15414610650202459.pdf,CASCO,PORTO SEGURO COMPANHIA DE SEGUROS GERAIS,61198164000160,VD,15414.610650/2024-59,2024,2022-2025,4,7,text,deterministic,rule,definition,1.0,glossario,,GLOSSÁRIO," Aceitação: É a aprovação da proposta apresentada pelo Segurado para a contratação do
+seguro, que serve de base para a emissão do bilhete de seguro.
+ Acessórios: rádio, conjugados ou não; amplificador; equalizador; CD player; televisor; aparelho transmissor e/ou receptor de rádio, bem como de telefone móvel, desde que fixados
+em caráter permanente no veículo segurado - originais de fábrica ou não.
+ Acidente de Trânsito: Colisão, abalroamento ou capotagem acidental, involuntária e externa, envolvendo direta ou indiretamente o veículo segurado, durante o deslocamento ou lo-
+comoção por seus meios próprios, desde que esteja trafegando por via normalmente aberta
+para o tráfego de veículos em geral.
+ Apropriação Indébita - Ato ilegal — sem ameaça — que se caracteriza quando uma pessoa, sem consentimento do segurado, apropria-se do veículo como se fosse dona e não ti-
+vesse a intenção de devolvê-lo. Trata-se de prejuízo não indenizável.
+ Avaria: É o dano ocorrido no veículo segurado durante a colisão.
+ Avaria Prévia: É o dano existente no veículo segurado antes da contratação do seguro,
+e que não está por este coberto, exceto em caso de indenização integral do veículo
+segurado.
+ Aviso de Sinistro: Comunicação da ocorrência de um Sinistro que o Segurado/beneficiário é obrigado a fazer à Seguradora, assim que dele tenha conhecimento.
+ Beneficiário: Pessoa física ou jurídica à qual é devida a indenização em caso de sinistro.
+ Bilhete de seguro: É o documento que discrimina o ... [truncated, 10579 chars total]",10579,TRUE,"The Glossário section starts at the top of page 4 and concludes at the bottom of page 7, precisely matching the recorded page range 4-7.",definition,TRUE,"The footer confirms the policy is 'Seguro Auto Por Assinatura' issued by Porto Seguro Companhia de Seguros Gerais, matching CASCO product line and insurer.",,The clause represents the full glossary/definitions section spanning pages 4 to 7 cleanly before the 'Procedimentos em Caso de Sinistro' section on page 8.
+2,1:procedimentos-em-caso-de-sinistro,1,15414610650202459.pdf,CASCO,PORTO SEGURO COMPANHIA DE SEGUROS GERAIS,61198164000160,VD,15414.610650/2024-59,2024,2022-2025,8,8,text,deterministic,rule,procedure,1.0,procedimentos-em-caso-de-sinistro,,PROCEDIMENTOS EM CASO DE SINISTRO,"Se o seu veículo for furtado ou roubado, você deverá registrar ocorrência na delegacia
+mais próxima. Se você sofrer um acidente de trânsito com vítimas, também é necessário
+acionar a polícia para registro da ocorrência.
+Em caso de colisão, você deve sempre anotar os dados pessoais dos condutores envolvidos.
+NÃO ASSUMA QUALQUER RESPONSABILIDADE PELO ACIDENTE OU FAÇA ACORDOS
+SEM O ACOMPANHAMENTO DA SEGURADORA.
+Acione a Central de atendimento específica do produto pelo WhatsApp (11) 96425-5000
+ou, site do produto. Caso seu veículo esteja sem condições de trafegar, se possível, procure não obstruir o trânsito, o que poderia causar outros acidentes.
+Não se esqueça de procurar uma delegacia ou posto de controle do trânsito para preencher o
+boletim de ocorrência (B.O.).
+Uma vez aprovado orçamento e realizada a compra das peças, se solicitada a troca da
+oficina, será aplicada uma taxa de 5% sobre o valor do orçamento aprovado, limitado a R$
+300,00 para cobertura das despesas operacionais (guincho para remoção do veículo, devolução das peças, realização de nova vistoria de sinistro) geradas por esta ação.
+Em caso de dúvidas entre em contato com seu corretor de seguros.
+Adote os seguintes procedimentos:
+1. Comunique o Sinistro - roubo, furto, colisão, atropelamento, incêndio, alagamento ou
+enchentes - à Seguradora, mesmo que não tenha havido danos em seu veículo e que o
+terceiro não faça reclamações no momento, pois ele poderá fazê-lo posteriormente.
+2. Anote as informações sobre as ou... [truncated, 2361 chars total]",2361,TRUE,The section 'PROCEDIMENTOS EM CASO DE SINISTRO' starts and finishes completely on page 8 without truncation or merging.,procedure,TRUE,The footer confirms Porto Seguro Companhia de Seguros Gerais and Seguro Auto Por Assinatura (Casco).,,"The entire clause is contained on page 8 and outlines the steps to take in the event of a claim, accurately categorized as a procedure."
+3,1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/19/19.1/19.1.1,1,15414610650202459.pdf,CASCO,PORTO SEGURO COMPANHIA DE SEGUROS GERAIS,61198164000160,VD,15414.610650/2024-59,2024,2022-2025,23,23,text,deterministic,llm,procedure,0.8,condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/19/19.1/19.1.1,CONDIÇÕES CONTRATUAIS GERAIS PARA AS COBERTURAS DE AUTOMÓVEL/RCFV DISPOSIÇÕES PRELIMINARES,19.1.1 Formas de Pagamento da Indenização,"Caso se trate de danos ou avarias sofridas pelo veículo segurado, a Porto Seguro poderá,
+mediante acordo com o Segurado, optar por uma das seguintes formas de pagamento da
+indenização:
+a) Reparo do veículo. O Segurado poderá optar por alguma das oficinas referenciadas
+indicada
+pela
+seguradora
+e
+disponíveis
+no
+site
+www.portoseguro.com.br/sinistros/veiculos. Neste caso, os serviços serão diretamente
+faturados em nome da oficina, desde que respeitadas as condições do orçamento préaprovado.
+b) Reposição do bem. Se a reposição não for possível dentro do prazo de liquidação, a
+indenização será paga em moeda corrente por meio de cartão de crédito, cheque, transferência bancária ou depósito.
+19.1.1.1 Correrão obrigatoriamente por conta da sociedade seguradora, até o limite máximo da garantia fixado no contrato, os valores referentes aos danos materiais comprova-
+damente causados pelo segurado e/ou por terceiros na tentativa de evitar o sinistro, minorar o dano ou salvar a coisa.",985,TRUE,"The clause begins and ends completely on page 23, capturing the full introductory prose and lettered items (a and b).",procedure,TRUE,The footer confirms the document is from Porto Seguro Companhia de Seguros Gerais for Auto (Casco).,,"Clause 19.1.1 details the procedures and options for claim indemnity payments (vehicle repair or replacement/cash settlement), located entirely on page 23 with correct boundaries and matching provenance."
+4,2:clausulas-adicionais/1/1.1/1.1.8,2,15414603040202237.pdf,CASCO,AZUL COMPANHIA DE SEGUROS GERAIS,33448150000111,VD,15414.603040/2022-37,2022,2022-2025,31,31,text,deterministic,llm,other,0.7,clausulas-adicionais/1/1.1/1.1.8,CLÁUSULAS ADICIONAIS,"1.1.8 Em decorrência do ano de fabricação, poderão ser notadas algumas diferenças no que diz","respeito à cor, pelo desgaste natural entre as peças (antiga e nova).",69,TRUE,The clause 1.1.8 starts and completes in full on page 31 without truncation or merging.,condition,TRUE,"The footer identifies Azul Seguro Auto por Assinatura, consistent with Azul Seguros and CASCO/auto lines.",type_mismatch_llm,Clause 1.1.8 is fully contained on page 31. It outlines a condition/stipulation regarding color variations in replacement parts due to vehicle age.
+5,3:bens-nao-compreendidos-no-seguro,3,15414630997201951.pdf,CASCO,AKAD SEGUROS S.A.,14868712000131,VD,15414.630997/2019-51,2019,2017-2021,8,8,text,deterministic,rule,exclusion,1.0,bens-nao-compreendidos-no-seguro,BENS NÃO COMPREENDIDOS NO SEGURO,BENS NÃO COMPREENDIDOS NO SEGURO,,0,TRUE,The clause 'BENS NÃO COMPREENDIDOS NO SEGURO' and its content are fully contained on page 8.,exclusion,TRUE,The document displays Argo Seguros (now AKAD Seguros) branding and covers vehicle hull/auto insurance ('casco do veículo').,,The clause defines items and property excluded from coverage ('BENS NÃO COMPREENDIDOS NO SEGURO') and is accurately bounded within page 8.
+6,3:procedimentos-em-caso-de-sinistro,3,15414630997201951.pdf,CASCO,AKAD SEGUROS S.A.,14868712000131,VD,15414.630997/2019-51,2019,2017-2021,14,15,text,deterministic,rule,procedure,1.0,procedimentos-em-caso-de-sinistro,PROCEDIMENTOS EM CASO DE SINISTRO,PROCEDIMENTOS EM CASO DE SINISTRO,"1. Em caso de sinistro:
+a)
+avisar imediatamente ao corretor de seguros e/ou à Seguradora, informando os
+detalhes do acidente, a saber:
+• dia, hora e local exato;
+• nome, endereço e dados da Carteira Nacional de Habilitação (CNH) da pessoa
+que estava dirigindo o veículo no momento do acidente;
+• nome e endereço de possíveis testemunhas, se houver;
+• providências tomadas por autoridades competentes e outras informações que
+contribuam para o esclarecimento da ocorrência;
+• A Seguradora pode exigir atestados ou certidões de autoridades competentes,
+bem como o resultado de inquéritos ou processos instaurados em virtude do fato
+que produziu o sinistro, sem prejuízo do pagamento da indenização no prazo
+devido. Alternativamente, poderá solicitar cópia da certidão de abertura do
+inquérito que porventura tiver sido instaurado.
+b) evitar o agravamento dos danos, sinalizando o local do acidente imediatamente e
+realizando todos os procedimentos necessários e a seu alcance, de forma a
+salvaguardar o veículo;
+c)
+seguir os procedimentos e indicações informados pela Seguradora;
+d) providenciar Boletim de Ocorrência;
+e)
+informar dados do causador do acidente, principalmente o nome e telefone do
+condutor e a placa do veículo;
+f)
+recusar quaisquer propostas de terceiro(s) para assumir a indevidamente a culpa
+pelo acidente, o que, além de configuar fraude,  é ineficaz perante a Seguradora e
+implica no cancelamento do seguro e perda do direito à indenização, conforme artigo
+765 do Código Civil Bra... [truncated, 1748 chars total]",1748,TRUE,The clause 'PROCEDIMENTOS EM CASO DE SINISTRO' starts on page 14 and concludes on page 15 right before the next section 'ENTREGA DE DOCUMENTOS BÁSICOS PARA A LIQUIDAÇÃO DO SINISTRO'.,procedure,TRUE,The pages display the Argo Seguros logo (predecessor of Akad Seguros) and deal with vehicle Casco insurance rules.,,"The boundaries precisely encompass the 'PROCEDIMENTOS EM CASO DE SINISTRO' section across pages 14-15, which describes claim notice and reporting procedures for vehicle insurance."
+7,6:12/12.1,6,15414612495202081.pdf,CASCO,Gente Seguradora S.A.,90180605000102,VD,15414.612495/2020-81,2020,2017-2021,17,17,text,deterministic,llm,coverage,0.95,12/12.1,,12.1 COBERTURA BÁSICA,,0,TRUE,"The clause header '12.1 COBERTURA BÁSICA' appears on page 17 without standalone introductory prose before its sub-clause 12.1.1, making the recorded page range 17-17 exact.",coverage,TRUE,The document clearly displays Gente Seguradora S.A. branding and standard Casco / automobile policy terms.,,"Clause 12.1 is a section header defining basic coverage for vehicle damages, correctly categorized as 'coverage' and located on page 17."
+8,8:a-condicoes-especiais-para-o-seguro-de-automovel/5/5.3,8,15414900414201379.pdf,CASCO,SUHAI SEGURADORA S.A.,16825255000123,VMR,15414.900414/2013-79,2013,2010-2016,49,49,text,deterministic,llm,condition,0.9,a-condicoes-especiais-para-o-seguro-de-automovel/5/5.3,A – CONDIÇÕES ESPECIAIS PARA O SEGURO DE AUTOMÓVEL,"5.3 A indenização integral será devida quando o veículo estiver livre de penhoras,","gravames ou ônus de qualquer natureza e sua documentação estiver devidamente
+regularizada.",90,TRUE,Clause 5.3 starts and finishes in its entirety on page 49 before its child subclause 5.3.1.,condition,TRUE,The document shows Suhai Seguradora branding and vehicle insurance terms (Casco).,,Clause 5.3 states a specific condition/prerequisite for total loss payout. The boundary precisely covers its direct text on page 49 without bleeding into sub-clauses or neighboring sections.
+9,9:12/12.2,9,15414900039201618.pdf,CASCO,CAIXA SEGURADORA S.A.,34020354000110,VMR,15414.900039/2016-18,2016,2010-2016,38,39,text,deterministic,llm,exclusion,0.99,12/12.2,,12.2. Prejuízos não-indenizáveis relacionados à cobertura de Responsabilidade,"Civil Facultativa – Veículos: Salvo quando contratado cobertura específica,
+a Seguradora não indenizará prejuízos decorrentes de:
+a) danos causados pelo Segurado a seus ascendentes, descendentes,
+cônjuge e irmãos, bem como a quaisquer parentes ou pessoas que com
+ele residam ou que dele dependam economicamente;
+b) danos causados a empregados ou prepostos do Segurado, quando a
+seu serviço;
+c) danos causados a sócio dirigentes ou a dirigentes de empresa do
+Segurado;
+d) danos a bens dos quais o Segurado tenha posse independentemente
+de ser de sua propriedade ou não.
+e) danos a bens de terceiros, móveis ou imóveis, em poder do Segurado
+para guarda, custódia, transporte, uso, manipulação ou execução de
+quaisquer trabalhos;
+f) responsabilidades assumidas pelo Segurado por contratos ou
+convenções, salvo se as referidas responsabilidades existissem para o
+Segurado mesmo na falta de tais contratos e convenções;
+g) multas e fianças impostas ao Segurado e despesas de qualquer
+natureza relativas fis ações ou processos criminais;
+h) danos
+sofridos
+por
+pessoas
+transportadas
+em
+locais
+não
+especificamente destinados e apropriados a tal fim;
+i)
+danos resultantes de prestações de serviços especializados de
+natureza técnico-profissional a que se destine o veículo e não
+relacionados com sua locomoção;
+j)
+danos causados por poluição ou contaminação ao meio ambiente, bem
+como quaisquer despesas para limpeza ou descontaminação;
+k) prejuízos patrimoniais e/ou lucros cessantes não resultantes
+diretame... [truncated, 1693 chars total]",1693,TRUE,The clause starts on PDF page 38 (document page 37) and concludes on PDF page 39 (document page 38) right before clause 12.3 begins.,exclusion,TRUE,The document displays Seguro Auto Youse and explicitly references Caixa Seguradora S.A. in the footer.,,Clause 12.2 enumerates non-indemnifiable losses (exclusions) under the RCF-V coverage. The recorded boundary correctly covers the entire clause without truncation or spillover.
+10,9:15/15.5/15.5.8,9,15414900039201618.pdf,CASCO,CAIXA SEGURADORA S.A.,34020354000110,VMR,15414.900039/2016-18,2016,2010-2016,44,44,text,deterministic,llm,condition,0.7,15/15.5/15.5.8,,15.5.8 Será relevante o agravamento que conduza ao aumento significativo e continuado da,"probabilidade de realização do risco descrito no questionário de avaliação de risco ou
+proposta de seguro.",106,TRUE,The clause 15.5.8 is completely and accurately contained within the recorded page without any truncation or merging.,condition,TRUE,"The document corresponds to Seguro Auto Youse by Caixa Seguradora S.A., consistent with Casco/Auto insurance.",,"Sub-clause 15.5.8 regulates the criteria for relevant aggravation of risk, which is a standard general policy condition. The text and boundaries are correctly captured."
+11,12:glossario,12,15414660377202594.pdf,CASCO,HDI SEGUROS S.A.,29980158000157,VD+VMR,15414.660377/2025-94,2025,2022-2025,5,9,text,deterministic,rule,definition,1.0,glossario,,GLOSSÁRIO,"Aceitação: É a aprovação da proposta apresentada pelo Segurado para a contratação do seguro, que
+serve de base para a emissão da Apólice.
+Acessórios: Peça adicional que não afeta o funcionamento do veículo e nele instalado de forma
+permanente para sua melhoria, sua decoração, proteção ou para lazer do usuário.
+Acidente: Acontecimento imprevisto e involuntário do qual resulta um dano causado ao objeto ou
+pessoa.
+Acidente Pessoal: Significa a lesão corporal fatal ou não, causada involuntariamente, provocada por
+acidente exclusivo e diretamente externo, súbito e violento, que por si só, e independente de toda e
+qualquer outra causa, tenha como consequência direta a morte ou invalidez permanente total ou
+parcial, ou torne necessário tratamento médico.
+Acidentes Pessoais de Passageiros: É o evento súbito e involuntário exclusivamente provocado por
+acidente de trânsito com veículo segurado, com data caracterizada, exclusivo e diretamente externo,
+súbito, involuntário e violento, causador de lesão física que, por si só, e independente de toda e
+qualquer outra causa, tenha como consequência direta a morte, ou invalidez permanente total ou
+parcial ou torne necessário tratamento médico dos passageiros do veículo segurado.
+Acompanhantes: Pessoas físicas que estiverem no veículo no momento da ocorrência do sinistro ou
+pane. O número máximo de acompanhantes será equivalente à capacidade legal do veículo, tal como
+constante no documento de propriedade do mesmo.
+Agravamento do Risco: É uma ... [truncated, 17918 chars total]",17918,TRUE,The GLOSSÁRIO section starts on page 5 with the title and initial definition ('Aceitação') and concludes cleanly at the bottom of page 9 with the final definition ('Vistoria de Sinistro'). Page 10 starts a new section.,definition,TRUE,Header and footer explicitly show 'HDI SEGUROS' and 'CONDIÇÕES CONTRATUAIS DE AUTOMÓVEL'.,,"The clause spans pages 5 to 9 in full, containing a comprehensive glossary of terms defined for an automobile insurance contract from HDI Seguros."
+12,13:riscos-excluidos,13,15414601367202517.pdf,CASCO,ZURICH MINAS BRASIL SEGUROS S.A.,17197385000121,VD+VMR,15414.601367/2025-17,2025,2022-2025,72,72,text,deterministic,rule,exclusion,1.0,riscos-excluidos,,RISCOS EXCLUÍDOS,"Além das exclusões previstas nas Condições Gerais do seguro, esta cobertura não
+garante:
+a) Perdas ou danos decorrentes de:
+•
+carregamento inadequado;
+•
+instalações improvisadas;
+•
+utilização em desacordo com normas técnicas;
+•
+descumprimento das recomendações do fabricante;
+•
+utilização fora dos padrões da ABNT ou normas aplicáveis.
+•
+sobrecarga elétrica;
+•
+ausência de aterramento;
+•
+instalações clandestinas ou irregulares;
+•
+uso de adaptadores, extensões ou conectores não homologados;
+•
+modificações não autorizadas;
+•
+ausência de dispositivos de proteção elétrica.
+b) Roubo, furto simples, extravio, desaparecimento ou perdas exclusivamente do
+cabo de carregamento
+.
+c) Roubo, furto qualificado, quando não houver contratação específica da cobertura
+adicional, sendo item de série ou não.
+d) Desgaste natural, corrosão, oxidação, vício próprio, deterioração gradual, falha
+mecânica ou defeito preexistente.
+e) Equipamentos destinados à utilização comercial, compartilhada, locação ou
+recarga pública.
+f) Não há cobertura em casos de danos parciais.
+g) Para o Equipamento de Recarga Residencial (Wallbox) não há cobertura.",1129,TRUE,The clause begins at the header 'RISCOS EXCLUÍDOS' and fully captures all list items from (a) through (g) without truncation or merging.,exclusion,TRUE,Processo SUSEP 15414.601367/2025-17 in the footer matches the filename and corresponds to auto insurance (CASCO).,,"The record accurately extracts the complete exclusion clause under the electric car charging cable coverage, correctly identifying its type as exclusion and matching the document provenance."
+13,13:cobertura-adicional-para-equipamentos-de-protecao-motocicletas/22,13,15414601367202517.pdf,CASCO,ZURICH MINAS BRASIL SEGUROS S.A.,17197385000121,VD+VMR,15414.601367/2025-17,2025,2022-2025,112,112,text,deterministic,llm,procedure,0.82,cobertura-adicional-para-equipamentos-de-protecao-motocicletas/22,COBERTURA ADICIONAL PARA EQUIPAMENTOS DE PROTEÇÃO (MOTOCICLETAS),22. FORO COMPETENTE,"O foro competente para as ações de seguro é o do domicílio do segurado ou do beneficiário,
+salvo se eles ajuizarem a ação optando por qualquer domicílio da seguradora ou de agente
+dela.
+Parágrafo único. Poderá ser pactuada, mediante instrumento assinado pelas partes, a
+resolução de litígios por meios alternativos, os quais deverão ocorrer no Brasil e estar
+submetidos às regras do direito brasileiro, inclusive na modalidade de arbitragem.",441,TRUE,"The clause '22. FORO COMPETENTE' is entirely contained on the middle page of the window, starting and ending cleanly with its heading, main text, and single paragraph without truncation or improper merging.",procedure,TRUE,"The SUSEP process number and terms (Casco, RCFV) are fully consistent with the specified auto insurance line and insurer.",,"The captured clause text perfectly matches the text on the page for clause 22, specifying the legal venue and alternative dispute resolution procedures."
+14,14:disposicoes-iniciais/3-3/13.10.7/13.10.7.2,14,15414002216200457.pdf,CASCO,ALLIANZ SEGUROS S.A.,61573796000166,VD+VMR,15414.002216/2004-57,2004,2004-2009,75,75,text,deterministic,llm,exclusion,0.95,disposicoes-iniciais/3-3/13.10.7/13.10.7.2,DISPOSIÇÕES INICIAIS,13.10.7.2 Não estão cobertos atos ou fatos exclusivamente para Logomarca,"• De acordo com as exclusões das coberturas de Vidros, Lanternas, Faróis e Retrovisores e Teto
+Solar/Panorâmico.",112,TRUE,"The clause 13.10.7.2 begins and ends on page 75, containing its single bullet point item without truncation or overlap with adjacent clauses.",exclusion,TRUE,"The document header and footer confirm Allianz Auto (Allianz Seguros S.A.), matching the CASCO product line.",,"The record corresponds precisely to clause 13.10.7.2 on page 75, properly categorized as an exclusion list for the specific logomark coverage."
+15,15:glossario,15,15414100326200483.pdf,CASCO,MAPFRE SEGUROS GERAIS S.A.,61074175000138,VD+VMR,15414.100326/2004-83,2004,2004-2009,5,12,text,deterministic,rule,definition,1.0,glossario,,GLOSSÁRIO,"Aceitação
+É a aprovação da Proposta de Seguro apresentada pelo Segurado, Proponente, Estipulante, ou por
+intermédio de seu representante legal, e/ou pelo Corretor de Seguros, para a contratação do seguro.
+Acidente
+Acontecimento imprevisto e involuntário, com data caracterizada, que ocorre de forma súbita e inesperada,
+causando danos à coisa ou à pessoa.
+Acidente de Trânsito
+Colisão, abalroamento ou capotagem, involuntária e externa, envolvendo diretamente o veículo segurado,
+durante o deslocamento ou locomoção por seus meios próprios, em via aberta para o tráfego de veículos
+em geral.
+Acessórios
+São peças fixadas em caráter permanente no veículo segurado, independentemente de ser ou não original
+de fábrica, tais como acessórios   referentes a som e imagem (rádios e toca-fitas, conjugados ou não,
+amplificadores, equalizadores, CD players, autofalantes, televisores, e aparelhos transmissores e ou
+receptores de rádio.
+Acidente(s) Pessoal(ais) de Passageiro(s) – APP
+É o evento súbito, involuntário e violento, com data caracterizada, exclusivamente, provocado por acidente
+de trânsito com o veículo segurado, causador de lesão física que, por si só, e independente de toda e
+qualquer outra causa, tenha como consequência direta a morte ou a invalidez permanente total ou parcial
+do(s) passageiro(s) do veículo segurado.
+Agravamento do Risco
+Circunstâncias que aumentam, de forma significativa e continuada, a intensidade ou a probabilidade da
+ocorrência do risco assumido pela seguradora e... [truncated, 19782 chars total]",19782,TRUE,"The 'GLOSSÁRIO' section starts at the top of page 5 and contains definitions from 'Aceitação' through 'Vistoria Prévia' on page 12, ending immediately before 'CONDIÇÕES GERAIS' on page 13.",definition,TRUE,The document header and footer confirm MAPFRE Seguros Gerais S.A. and Seguro de Automóvel (CASCO).,,"The glossary section spans exactly pages 5 to 12, matching the parser's recorded range and definition classification perfectly."
+16,15:condicoes-gerais,15,15414100326200483.pdf,CASCO,MAPFRE SEGUROS GERAIS S.A.,61074175000138,VD+VMR,15414.100326/2004-83,2004,2004-2009,13,13,text,deterministic,rule,condition,1.0,condicoes-gerais,CONDIÇÕES GERAIS,CONDIÇÕES GERAIS,,0,TRUE,"The section header 'CONDIÇÕES GERAIS' appears on page 13 and has no direct introductory text before child clause 1, so the page 13-13 boundary is correct.",other,TRUE,The document header and footer confirm MAPFRE and 'Seguro de Automóvel' (CASCO).,type_mismatch_llm,"The record correctly isolates the main section header 'CONDIÇÕES GERAIS' on page 13 prior to numbered clause 1 ('OBJETIVO DO SEGURO'). As a structural section header, its type is best categorized as 'other'."
+17,15:coberturas-basicas,15,15414100326200483.pdf,CASCO,MAPFRE SEGUROS GERAIS S.A.,61074175000138,VD+VMR,15414.100326/2004-83,2004,2004-2009,59,59,text,deterministic,rule,coverage,1.0,coberturas-basicas,COBERTURAS BÁSICAS,COBERTURAS BÁSICAS,"A CONTRATAÇÃO DE QUALQUER UMA DAS COBERTURAS BÁSICAS A SEGUIR LISTADAS
+EXCLUI A POSSIBILIDADE DE CONTRATAÇÃO DAS DEMAIS COBERTURAS BÁSICAS.
+Contratada uma das coberturas básicas a seguir discriminadas, devidamente mencionada na
+apólice e mediante pagamento de prêmio, o segurado terá direito, EM CASO DE SINISTRO
+COBERTO E INDENIZÁVEL, A:",338,TRUE,The introductory text and heading of the section 'COBERTURAS BÁSICAS' on page 59 are correctly isolated before its first numbered sub-clause.,coverage,TRUE,Document displays MAPFRE headers and footer indicating 'Condições Contratuais - Seguro de Automóvel'.,,The record accurately captures the introductory heading and prose of the basic coverages section on page 59 without prematurely truncating unnumbered content or merging neighboring clauses.
+18,15:coberturas-adicionais,15,15414100326200483.pdf,CASCO,MAPFRE SEGUROS GERAIS S.A.,61074175000138,VD+VMR,15414.100326/2004-83,2004,2004-2009,62,63,text,deterministic,rule,coverage,1.0,coberturas-adicionais,COBERTURAS ADICIONAIS,COBERTURAS ADICIONAIS,"Contratadas as coberturas a seguir discriminadas, devidamente mencionadas na apólice e
+mediante pagamento de prêmio adicional, o segurado terá direito ao uso dessas garantias,
+observadas as condições contratuais:",212,TRUE,The section header 'COBERTURAS ADICIONAIS' starts at the bottom of page 62 and its introductory introductory text appears at the top of page 63 right before subclause 1.,coverage,TRUE,Mapfre Seguros Gerais S.A. auto insurance conditions match the metadata.,,"The clause represents the overarching section header and introductory preamble for additional coverages, spanning pages 62 and 63 before the first numbered sub-item. The boundary and classification are accurate."
+19,15:13-danos-aos-vidros-top-plus/22,15,15414100326200483.pdf,CASCO,MAPFRE SEGUROS GERAIS S.A.,61074175000138,VD+VMR,15414.100326/2004-83,2004,2004-2009,113,113,text,deterministic,llm,coverage,0.7,13-danos-aos-vidros-top-plus/22,13 DANOS AOS VIDROS – TOP PLUS,22. INDENIZAÇÃO POR IMOBILIZAÇÃO DO VEÍCULO SEGURADO,"ESTA COBERTURA ADICIONAL NÃO PODERÁ SER CONTRATADA ISOLADAMENTE
+Contratando esta cobertura, mediante pagamento de prêmio adicional, o segurado terá direito:",156,TRUE,"The introductory body of clause 22 starts and ends on page 113 before its first numbered sub-clause (22.1), which is captured in its own record.",coverage,TRUE,"The header and footer clearly identify Mapfre and 'Seguro de Automóvel', matching the insurer and product line.",,The clause represents an additional auto insurance coverage ('Indenização por Imobilização do Veículo Segurado'). The introductory text and title on page 113 are perfectly delimited and match all metadata.
+20,15:riscos-excluidos,15,15414100326200483.pdf,CASCO,MAPFRE SEGUROS GERAIS S.A.,61074175000138,VD+VMR,15414.100326/2004-83,2004,2004-2009,120,120,text,deterministic,rule,exclusion,1.0,riscos-excluidos,RISCOS EXCLUÍDOS,RISCOS EXCLUÍDOS,"i.
+ALÉM DAS EXCLUSÕES PREVISTAS NA CLÁUSULA 26 – PREJUÍZOS NÃO
+INDENIZÁVEIS PARA TODAS AS COBERTURAS, NÃO ESTARÃO COBERTOS, AINDA,
+POR ESTA COBERTURA:",150,TRUE,The introductory header and text of 'RISCOS EXCLUÍDOS' on page 120 correctly captured prior to its numbered sub-clause (28.10.1).,exclusion,TRUE,Page header shows Mapfre and footer specifies Seguro de Automóvel with matching SUSEP process number.,,The record correctly isolates the unnumbered introductory exclusion section on page 120 before child clause 28.10.1. Clause classification as exclusion and document provenance are both accurate.
+21,16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/24,16,15414642930202515.pdf,RCF-A,AKAD SEGUROS S.A.,14868712000131,n/a,15414.642930/2025-15,2025,2022-2025,24,25,text,deterministic,llm,coverage,0.8,condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/24,CONDIÇÕES GERAIS DE RESPONSABILIDADE CIVIL FACULTATIVA DE VEÍCULOS – RCF-V,24. CUSTOS DE DEFESA,"24.1. O presente Contrato de Seguro garante, ainda, a indenização, por meio de reembolso pela Seguradora ao
+Segurado, os Custos de Defesa, para fins de defesa do Segurado em acordo extrajudicial ou em ação judicial ou
+arbitragem, na esfera cível, movida em face do Segurado, relativas a pedido de Terceiro reclamante em demandas
+referentes à Cláusula 5.4 do presente Contrato de Seguro.
+24.1.1. Fica garantido ao Segurado a livre escolha de profissionais para sua defesa.
+24.1.2. A contratação de honorários advocatícios e profissional habilitado para o exercício da função de advogado
+ficará a critério do Segurado, podendo o Segurado pleitear à Seguradora o pagamento de forma antecipada,
+mediante apresentação da contestação protocolizada, ou solicitar o reembolso ao final do processo judicial.
+24.2. Os Custos de Defesa estão limitados a 10% do valor dos pedidos cobertos ou 10 % da Importância Segurada,
+o que for menor, observado o limite de Custos de Defesa disposto na Apólice. Os Custos de Defesa não reduzem ou
+consomem os limites individuais de cada cobertura do seguro.
+24.2.1. Para os Custos de Defesa, somente haverá reembolso se o pedido que os originou for decorrente de um
+Risco Coberto pelas Coberturas contratadas.
+24.3. O Segurado deverá informar imediatamente a Seguradora sobre qualquer ocorrência, reclamação ou ação
+judicial cível ou em juízo arbitral movida por Terceiro(s), em razão de algum dos Riscos Cobertos na cobertura de
+RCF-V, e remeter cópia da documentação do pro... [truncated, 3773 chars total]",3773,TRUE,Clause 24 ('24. CUSTOS DE DEFESA') begins on page 24 and concludes on page 25 before clause 25 ('25. SUB-ROGAÇÃO DE DIREITOS'). The recorded page range 24-25 is completely accurate.,coverage,TRUE,The document header and logo clearly identify AKAD Seguros and the motor liability product (RCF-V).,,"The clause establishes coverage and reimbursement rules for defense costs incurred by the insured. Boundary, classification, and provenance are all correct."
+22,18:3,18,15414614145202131.pdf,RCF-A,SEGUROS SURA S.A.,33065699000127,n/a,15414.614145/2021-31,2021,2017-2021,4,4,text,deterministic,llm,definition,1.0,3,,3. Definições,"3.1. Aceitação do Risco: ato de aprovação após avaliação do Risco realizado pela
+Seguradora, conforme prazos estabelecidos nas normas vigentes.
+3.2. Agravação do Risco: São os atos ou omissões que aumentam a probabilidade da
+ocorrência do risco do sinistro ou severidade dos danos, praticados pelo Segurado,
+prepostos, representantes, funcionários ou seu(s) Beneficiário(s), após a apresentação
+da Proposta do Seguro à Seguradora.
+3.3. Apólice: documento que formaliza o contrato de Seguro. Abrange as cláusulas
+contratuais, estas subdividas em Condições Gerais, Especiais e, opcionalmente,
+Condições Particulares. Contém os dados do Segurado, do objeto Segurado, o valor do
+Prêmio e as Coberturas contratadas, seus respectivos limites máximos de indenização
+e Franquias quando aplicadas.",788,TRUE,"Section 3 'Definições' begins on page 4. In a clause-tree parser where sub-clauses are captured as distinct records, the recorded page range (4-4) accurately captures the section header and top-level definitions on page 4.",definition,TRUE,"The document header and footer show Seguros SURA S.A. and the product 'Condições Gerais – Responsabilidade Civil Facultativa do Condutor Durante Mobilidade Individual', matching the metadata.",,"Clause 3 ('Definições') is a standard definition section. The recorded page boundary correctly reflects the start of the section on page 4, and the insurer and product line match the document header."
+23,20:2-definicoes/2.10,20,15414604545202481.pdf,RCF-A,KOVR SEGURADORA S.A.,42366302000128,n/a,15414.604545/2024-81,2024,2022-2025,5,5,ocr,deterministic,llm,definition,0.95,2-definicoes/2.10,2) DEFINIÇÕES,"2.10. Ato lícito: Ação ou omissão voluntária, negligência ou imprudência, que viole direito e cause","danos a outrem, ainda que exclusivamente moral (artigo 186 do Código Civil brasileiro).",87,TRUE,The definition 2.10 'Ato Ilícito' is fully located on page 5 without truncation or overlap.,definition,TRUE,The document header clearly identifies KOVR SEGURADORA S.A. and the RCV insurance policy.,,"Clause 2.10 is an individual definition under section 2 ('DEFINIÇÕES'), cleanly captured on page 5 matching the insurer and product line."
+24,20:2-definicoes/2.8,20,15414604545202481.pdf,RCF-A,KOVR SEGURADORA S.A.,42366302000128,n/a,15414.604545/2024-81,2024,2022-2025,5,5,ocr,deterministic,llm,definition,0.95,2-definicoes/2.8,2) DEFINIÇÕES,2.8. Averbação: é o ato do Segurado de informar à Seguradora os dados referentes ao veículo que,"realizará a viagem segurada, notas fiscais e as características das mercadorias que foram
+embarcadas e serão transportadas.",123,TRUE,The clause 2.8 (Averbação) is fully and correctly captured on page 5 without truncation or merging.,definition,TRUE,The document header clearly shows KOVR SEGURADORA S.A. and Seguro Responsabilidade Civil Veicular (RCV).,,"Clause 2.8 is an individual definition entry under the section '2) DEFINIÇÕES', correctly isolated to page 5 with exact text match."
+25,20:2-definicoes/2.44,20,15414604545202481.pdf,RCF-A,KOVR SEGURADORA S.A.,42366302000128,n/a,15414.604545/2024-81,2024,2022-2025,7,8,ocr,deterministic,llm,definition,0.98,2-definicoes/2.44,2) DEFINIÇÕES,"2.44. Endosso: É o documento expedido pela Seguradora, durante a vigência do Apólice de Seguro,","e mediante concordância desta e do Segurado em decorrência de alteração de dados,
+7
+Avenida Brigadeiro Faria Lima, 3477 - Torre B Www.kovr.com.br
+2o andar - São Paulo - SP - CEP 04538-133 0800 646 8378
+CONDIÇÕES CONTRATUAIS
+À SEGURO RESPONSABILIDADE CIVIL VEICULAR - RCV K ( DV [E
+PROCESSO SUSEP: KOVR SEGURADORA S.A. — CNP) 42.366.302/0001-28
+Versão 01/2024
+modificação nas condições ou objetos do Apólice de Seguro ou transferência a outrem.",443,TRUE,The clause 2.44 (Endosso) begins at the bottom of page 7 and concludes cleanly at the top of page 8 before item 2.45.,definition,TRUE,The document header clearly confirms KOVR SEGURADORA S.A. and Seguro Responsabilidade Civil Veicular (RCV).,,"The boundary correctly spans pages 7 and 8, accurately capturing the definition item for 'Endosso' under section 2 (Definições) without missing content or overlapping with neighboring definitions."
+26,20:3-objetivo-do-seguro/32/3.4,20,15414604545202481.pdf,RCF-A,KOVR SEGURADORA S.A.,42366302000128,n/a,15414.604545/2024-81,2024,2022-2025,12,12,ocr,deterministic,llm,condition,0.7,3-objetivo-do-seguro/32/3.4,3) OBJETIVO DO SEGURO,"3.4. Fica expressamente estipulado, pela presente cláusula, que este seguro foi contratado pelo","Segurado com a indicação de TAC, e, em caso de sinistro coberto, a indenização/reembolso
+será paga nos termos do especificado no Certificado Individual.",152,TRUE,"The clause 3.4 starts and ends completely on page 12, exactly matching the captured text.",condition,TRUE,The header explicitly states KOVR SEGURADORA S.A. and Seguro Responsabilidade Civil Veicular - RCV.,,"Clause 3.4 is fully captured on page 12 without truncation. It sets a contractual condition regarding TAC indication and payment terms, matching the insurer and product line."
+27,20:5-contratacao/5.4,20,15414604545202481.pdf,RCF-A,KOVR SEGURADORA S.A.,42366302000128,n/a,15414.604545/2024-81,2024,2022-2025,12,13,ocr,deterministic,llm,condition,0.9,5-contratacao/5.4,5) CONTRATAÇÃO,"5.4. OSegurado, ao fazer a contratação do seguro, bem como no instante em que receber e aceitar","12
+Avenida Brigadeiro Faria Lima, 3477 - Torre B Www.kovr.com.br
+2o andar - São Paulo - SP - CEP 04538-133 0800 646 8378
+CONDIÇÕES CONTRATUAIS
+À SEGURO RESPONSABILIDADE CIVIL VEICULAR - RCV K ( DV [E
+PROCESSO SUSEP: KOVR SEGURADORA S.A. — CNP) 42.366.302/0001-28
+Versão 01/2024
+o Apólice de Seguro, declara sua concordância com as seguintes disposições:
+a. que todas as declarações e informações contidas no Apólice de Seguro, assim como
+quaisquer outras informações relativas ao risco, constituem suas declarações verdadeiras,
+sendo a cobertura da Apólice de Seguro, concedida com base na presunção da veracidade de
+tais declarações; e
+b. que será nula e sem efeito, a cobertura prevista na Apólice de Seguro, em caso de omissão
+de informações ou falsidade nas declarações prestadas na contratação e/ou quaisquer outras
+informações relativas ao risco, que possam ter influenciado na aceitação do risco coberto por
+este Seguro e/ou implicado em redução do Prêmio.",963,TRUE,"The clause begins at item 5.4 at the bottom of page 12 and properly concludes after sub-item 'b' at the top of page 13, directly preceding item 5.5.",condition,TRUE,Headers clearly identify KOVR SEGURADORA S.A. and Seguro Responsabilidade Civil Veicular - RCV.,,"Clause 5.4 spans across pages 12 and 13 as recorded, containing introductory text and lettered sub-items (a and b) establishing the contracting conditions and warranty of declarations for the policy."
+28,20:25-embargos-e-sancoes/25.2,20,15414604545202481.pdf,RCF-A,KOVR SEGURADORA S.A.,42366302000128,n/a,15414.604545/2024-81,2024,2022-2025,32,32,ocr,deterministic,llm,exclusion,1.0,25-embargos-e-sancoes/25.2,25) EMBARGOS E SANÇÕES,"25.2. Estão ainda excluídos da cobertura desse Apólice de Seguro, todos e quaisquer riscos cujo","imediato pagamento da respectiva indenização securitária esteja vedado, por embargos e
+sanções comerciais e econômicos internacionais impostos por entidades multilaterais
+integradas pelo Brasil, tais como, mas não se limitando, o GAFI (Grupo de Ação Financeira
+contra a Lavagem de Dinheiro e o Financiamento do Terrorismo): https://wwwfatf-gafi.org/ e
+a Organização das Nações Unidas (ONU): https://nacoesunidas.org/conheca/.",425,TRUE,The clause 25.2 is fully and correctly captured on page 32 without truncation or overlap.,exclusion,TRUE,The document header clearly displays KOVR Seguradora S.A. and Seguro Responsabilidade Civil Veicular - RCV.,,Sub-clause 25.2 is an express coverage exclusion related to international sanctions and embargos. It is accurately bounded on page 32 and matches the insurer and product line perfectly.
+29,21:glossario,21,15414634764202494.pdf,RCF-A,HDI GLOBAL SEGUROS S.A,18096627000153,n/a,15414.634764/2024-94,2024,2022-2025,2,4,text,deterministic,rule,definition,1.0,glossario,GLOSSÁRIO,GLOSSÁRIO,"Segue definição de cada termo e expressão utilizados nestas condições gerais para exata compreensão de seu conteúdo. A
+interpretação será apenas e tão somente a constante nesta cláusula, não cabendo a utilização de qualquer outra.
+Aceitação
+Ato de aprovação da proposta, submetida à seguradora para contratação do seguro.
+Apólice
+Documento que formaliza a aceitação do contrato de seguro e discrimina o bem segurado, as coberturas e o limite máximo
+de indenização contratado pelo segurado.
+Aviso de Sinistro
+Comunicação da ocorrência de um sinistro que o segurado é obrigado a fazer à seguradora, assim que dele tenha
+conhecimento.
+Beneficiário
+É a pessoa física ou jurídica que detém legalmente direito à indenização, no caso de evento coberto.
+Carta Verde
+Seguro, obrigatório, de responsabilidade civil do proprietário e/ou condutor de veículos terrestres (automóvel de passeio –
+particular ou de aluguel), não matriculados no país de ingresso, em viagem internacional, por países membros do MERCOSUL,
+para danos causados a pessoas ou objetos não transportados.
+Certificado de Seguro
+Documento destinado ao segurado, emitido pela seguradora no caso de contratação coletiva, quando da aceitação do
+proponente, da renovação do seguro ou da alteração do limite máximo de indenização ou prêmio.
+Condições Contratuais
+Correspondem ao conjunto das condições gerais, especiais e particulares de um mesmo seguro.
+Condições Especiais
+Conjunto das disposições específicas relativas a cada modalidade e ou cob... [truncated, 7740 chars total]",7740,TRUE,"The 'GLOSSÁRIO' section starts on page 2 and ends with the last definition ('Vistoria de Sinistro') at the bottom of page 4, exactly spanning pages 2-4 before Clause 1 starts on page 5.",definition,TRUE,The footer and header clearly state HDI Global Seguros SA and RC-V (Responsabilidade Civil Veículos) with matching Susep process number.,,"The clause represents the full glossary/definitions section spanning pages 2 through 4, perfectly captured without truncation or merging."
+30,23:servico-de-atendimento-ao-consumidor-sac,23,15414900317201629.pdf,RCF-A,GENERALI BRASIL SEGUROS S.A.,33072307000157,n/a,15414.900317/2016-29,2016,2010-2016,1,1,text,deterministic,llm,other,0.95,servico-de-atendimento-ao-consumidor-sac,,SERVIÇO DE ATENDIMENTO AO CONSUMIDOR – SAC,"Reclamações, sugestões e informações institucionais.
+Horário de atendimento: 24 horas por dia, 7 dias por semana
+SAC : 0800 88 90 200
+Deficiente Auditivo e de fala: 0800 88 90 400 (realizar a ligação de um aparelho telefônico adaptado com
+dispositivo TDD)",255,TRUE,The clause 'SERVIÇO DE ATENDIMENTO AO CONSUMIDOR – SAC' is completely and accurately contained on page 1.,other,TRUE,The document shows Generali Brasil Seguros and Generali Auto Essencial.,,The parser correctly captured the SAC informational section on page 1 in full without truncation or merger. It is an informational contact section best classified as 'other'.
+31,23:condicoes-gerais,23,15414900317201629.pdf,RCF-A,GENERALI BRASIL SEGUROS S.A.,33072307000157,n/a,15414.900317/2016-29,2016,2010-2016,4,4,text,deterministic,rule,condition,1.0,condicoes-gerais,,CONDIÇÕES GERAIS,"Conjunto de cláusulas contratuais, comuns a todas as modalidades e/ou coberturas de um mesmo plano de
+seguro, que estabelecem as obrigações e os direitos do Segurado e da Seguradora.",182,TRUE,The captured text precisely corresponds to the defined term 'CONDIÇÕES GERAIS' and its full definition text on page 4.,definition,TRUE,The insurer name Generali Brasil Seguros S.A. and the product Generali Auto Essencial are clearly visible.,type_mismatch_llm,"The item is an individual definition entry under section 1 ('PRINCIPAIS TERMOS UTILIZADOS') on page 4. The parser correctly extracted the boundaries of this entry, though it misclassified its type as a condition rather than a definition."
+32,23:vistoria-de-sinistro/12,23,15414900317201629.pdf,RCF-A,GENERALI BRASIL SEGUROS S.A.,33072307000157,n/a,15414.900317/2016-29,2016,2010-2016,18,19,text,deterministic,llm,condition,0.95,vistoria-de-sinistro/12,VISTORIA DE SINISTRO,12. DEVERES DO SEGURADO,"a)
+manter o veículo em bom estado de conservação e segurança;
+b) dar imediato conhecimento por escrito à Generali de quaisquer alterações no seu interesse sobre
+o veículo segurado, tais como: transferência de propriedade, alienação ou ônus, contratação ou
+cancelamento de qualquer outro seguro sobre o veículo (a não observância desta obrigação
+implicará o cancelamento da apólice);
+c)
+comunicar à Generali, imediatamente e por escrito, quaisquer fatos ou alterações verificados
+durante a vigência desta apólice, referentes ao veículo, seu CEP pernoite, mudança de domicílio
+do Segurado, alteração nos dados do Questionário de Avaliação de Risco ou, ainda, qualquer
+outro incidente que possa agravar consideravelmente o risco coberto, sob pena de perder o
+direito à garantia se provar que silenciou de má-fé;
+d) defender-se em juízo ou fora dele, de forma mais ampla, inclusive quanto ao mérito, pelos meios
+legais para tal finalidade; .
+e)
+comunicar o sinistro à Generali, tão logo tome conhecimento, adotando as providências
+necessárias para minorar suas consequências, sob pena de perder o direito à indenização;
+f)
+apresentar o veículo segurado para vistoria nas situações em que a Generali julgar necessário,
+nas renovações, nos endossos, ou ainda, nos atrasos de pagamento do prêmio, sob pena de
+perda de direito à indenização;
+g) comunicar imediatamente e por escrito à Generali sobre a ocorrência de qualquer fato de que
+possa advir responsabilidade civil nos termos do contrato;
+h) comunicar... [truncated, 3237 chars total]",3237,TRUE,The clause '12. DEVERES DO SEGURADO' starts on page 18 and its provisions and sub-clauses run through page 19 up to the start of clause 13.,condition,TRUE,The Generali logo and standard auto/RCF-A policy wording are clearly visible on all pages.,,"Clause 12 defines the duties and obligations of the insured ('Deveres do Segurado'), which is standardly categorized as a condition. The page range (18-19) accurately captures the clause."
+33,24:3/3.5/3.5.4,24,15414004464200513.pdf,ASSIST,MAPFRE SEGUROS GERAIS S.A.,61074175000138,n/a,15414.004464/2005-13,2005,2004-2009,14,14,text,deterministic,llm,condition,0.9,3/3.5/3.5.4,,"3.5.4. O pagamento de indenizações será automaticamente suspenso desde a data de inclusão do Segurado,","Beneficiário ou objeto do seguro em listas de sanções e embargos, sendo restabelecido apenas a partir das 24
+(vinte e quatro) horas subsequentes à sua exclusão da referida lista.",178,TRUE,The clause 3.5.4 text is fully contained on this single page and captured accurately without truncation or merging.,condition,TRUE,The document header and footer identify MAPFRE Seguros Gerais S.A. and the Seguro Garantia Mecânica product.,,Clause 3.5.4 stipulates the rule/condition under which claim payments are automatically suspended due to sanctions/embargoes. Its boundary and provenance are accurate.
+34,24:6/6.1-2/6.3.2,24,15414004464200513.pdf,ASSIST,MAPFRE SEGUROS GERAIS S.A.,61074175000138,n/a,15414.004464/2005-13,2005,2004-2009,27,27,text,deterministic,llm,coverage,0.95,6/6.1-2/6.3.2,,"6.3.2. Os eventuais desembolsos decorrentes das despesas com medidas de salvamento e contenção, ainda","que realizadas por terceiros, serão reembolsados pela Seguradora, desde que devidamente comprovados,
+observando-se sempre o limite aplicável a tais despesas, equivalente a 5% (cinco por cento) do Limite Máximo
+de Indenização garantido aplicável ao tipo de Sinistro iminente ou verificado.",288,TRUE,The clause 6.3.2 starts and ends completely on PDF page 27 (printed page 25). No text is truncated or merged.,coverage,TRUE,"The document displays the MAPFRE header and refers to Seguro Garantia Mecânica, matching the metadata.",,"Clause 6.3.2 is fully and correctly captured on the recorded page. It provides coverage/reimbursement for salvage and containment expenses up to 5% of the LMI, and the provenance is completely consistent with Mapfre."
+35,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1,25,15414618005202301.pdf,ASSIST,Too Seguros S.A.,33245762000107,n/a,15414.618005/2023-01,2023,2022-2025,4,4,ocr,deterministic,llm,coverage,0.4,condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1,CONDIÇÕES GERAIS SEGURO ASSISTÊNCIA E OUTRAS COBERTURAS - AUTO,1. OBJETIVO DO SEGURO,,0,TRUE,"The clause heading '1. OBJETIVO DO SEGURO' is located on page 4. Since sub-clause 1.1 is parsed into its own child record under the tree parser model, the page 4-4 boundary for the parent clause is correct.",coverage,TRUE,Document header and footer match Too Seguros and the 'Seguro Assistência e Outras Coberturas - Auto' product line.,,"The clause heading is accurately located on page 4 without boundary overlap or missing non-subclause text. The insurer and line of business match the document branding, and the clause describes the core coverage objective of the insurance contract."
+36,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/10/10.11/10.11.1,25,15414618005202301.pdf,ASSIST,Too Seguros S.A.,33245762000107,n/a,15414.618005/2023-01,2023,2022-2025,13,13,ocr,deterministic,llm,procedure,0.7,condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/10/10.11/10.11.1,CONDIÇÕES GERAIS SEGURO ASSISTÊNCIA E OUTRAS COBERTURAS - AUTO,10.11.1. É facultado à Seguradora o uso de meios remotos para o envio de,"boletos de cobrança, bem como o envio de mensagens sobre a elucidação
+financeira do seguro.",91,TRUE,The clause 10.11.1 begins and ends completely on page 13 as recorded.,procedure,TRUE,The document header displays the Too Seguros logo and footer references 'Seguro Assistência e Outras Coberturas – Auto'.,,Clause 10.11.1 is accurately parsed on page 13 without truncation. It details the operational procedure/method for dispatching payment slips remotely.
+37,25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.5,25,15414618005202301.pdf,ASSIST,Too Seguros S.A.,33245762000107,n/a,15414.618005/2023-01,2023,2022-2025,14,14,ocr,deterministic,llm,condition,0.8,pela-seguradora-e-realizados-exclusivamente-na-rede/12.5,PELA SEGURADORA E REALIZADOS EXCLUSIVAMENTE NA REDE,"12.5. Para fins de reparação do veículo em caso de Sinistro, é admitido o","uso de peças novas, originais e/ou genuínas do fabricante, nacionais ou
+importadas, desde que mantenham as especificações técnicas do
+fabricante.",145,TRUE,The clause text and heading are fully contained within page 14 without truncation or merging.,condition,TRUE,The document header displays Too Seguros and the footer indicates 'Seguro Assistência e Outras Coberturas - Auto'.,,"Clause 12.5 specifies requirements and conditions regarding the replacement parts permitted for vehicle repairs in the event of a claim. Boundaries, type, and provenance are all correct."
+38,25:pela-seguradora-e-realizados-exclusivamente-na-rede/16/16.2,25,15414618005202301.pdf,ASSIST,Too Seguros S.A.,33245762000107,n/a,15414.618005/2023-01,2023,2022-2025,19,19,ocr,deterministic,llm,condition,0.95,pela-seguradora-e-realizados-exclusivamente-na-rede/16/16.2,PELA SEGURADORA E REALIZADOS EXCLUSIVAMENTE NA REDE,"16.2. Sob pena de perder seus direitos, o Segurado obriga-se a:",,0,TRUE,"Clause 16.2 contains only the introductory statement before numbered sub-clauses 16.2.1 and 16.2.2, correctly located entirely on page 19.",condition,TRUE,The logo 'too seguros' and footer '(Condições Gerais Seguro Assistência e Outras Coberturas - Auto)' match the stated insurer and ASSIST product line.,,"The parser correctly identified the standalone parent clause 16.2 on page 19, its condition clause type, and the document provenance."
+39,25:pela-seguradora-e-realizados-exclusivamente-na-rede/16/16.4,25,15414618005202301.pdf,ASSIST,Too Seguros S.A.,33245762000107,n/a,15414.618005/2023-01,2023,2022-2025,20,20,ocr,deterministic,llm,condition,0.9,pela-seguradora-e-realizados-exclusivamente-na-rede/16/16.4,PELA SEGURADORA E REALIZADOS EXCLUSIVAMENTE NA REDE,16.4. O Segurado perderá o direito ao pagamento da indenização em,"caso de inobservância das obrigações convencionadas nas condições
+contratuais deste seguro.",91,TRUE,The clause 16.4 is complete and fully contained on page 20 without missing text or improper mergers.,condition,TRUE,The header and footer clearly show 'Too Seguros' and 'Condições Gerais Seguro Assistência e Outras Coberturas - Auto'.,,"Clause 16.4 establishes a loss-of-rights condition if contractual obligations are breached. Its text is completely captured on page 20, correctly typed as a condition, and provenance matches the document details."
+40,25:pela-seguradora-e-realizados-exclusivamente-na-rede/22/22.3,25,15414618005202301.pdf,ASSIST,Too Seguros S.A.,33245762000107,n/a,15414.618005/2023-01,2023,2022-2025,22,22,ocr,deterministic,llm,condition,0.8,pela-seguradora-e-realizados-exclusivamente-na-rede/22/22.3,PELA SEGURADORA E REALIZADOS EXCLUSIVAMENTE NA REDE,22.3. Este plano de seguro é estruturado no Regime Financeiro de,"Repartição Simples, portanto não haverá devolução ou resgate de prêmios
+de seguro ao Segurado ou ao beneficiário.",113,TRUE,"The clause 22.3 is fully contained on page 22 as captured, with exact text matches and no extraneous or omitted content.",condition,TRUE,"The page displays the Too Seguros logo and footer stating 'Condições Gerais Seguro Assistência e Outras Coberturas - Auto', matching the metadata.",,"Clause 22.3 properly defines the financial regime conditions under the Disposições Finais section on page 22. The boundary, classification as a condition, and provenance are all correct."
+41,27:condicoes-gerais,27,15414900502201885.pdf,ASSIST,VIRGINIA SURETY COMPANHIA DE SEGUROS DO BRASIL,03505295000146,n/a,15414.900502/2018-85,2018,2017-2021,1,1,text,deterministic,rule,condition,1.0,condicoes-gerais,CONDIÇÕES GERAIS,CONDIÇÕES GERAIS,"I.
+O registro deste plano na SUSEP não implica, por parte da Autarquia, incentivo
+ou recomendação à sua comercialização.
+II.
+O segurado poderá consultar a situação cadastral de seu corretor de seguros,
+no site www.susep.gov.br, por meio do número de seu registro na SUSEP, nome
+completo, CNPJ ou CPF.
+III.
+Para os casos não previstos nestas CONDIÇÕES GERAIS, serão aplicadas as
+leis que regulamentam os seguro no Brasil.",420,TRUE,"The captured text precisely covers the introductory regulatory and legal provisions (items I, II, and III) under the 'CONDIÇÕES GERAIS' heading on page 1 before Cláusula 1 begins.",condition,TRUE,"The header explicitly shows 'VIRGINIA SURETY' and 'Assistência e Outras Coberturas – Auto', matching the insurer and product line.",,The clause represents the preamble/general provisions of the policy's General Conditions. The boundary on page 1 correctly isolates this preamble prior to the first numbered clause (Cláusula 1).
+42,27:condicoes-gerais/27/27.2/27.2.3,27,15414900502201885.pdf,ASSIST,VIRGINIA SURETY COMPANHIA DE SEGUROS DO BRASIL,03505295000146,n/a,15414.900502/2018-85,2018,2017-2021,20,20,text,deterministic,llm,condition,0.9,condicoes-gerais/27/27.2/27.2.3,CONDIÇÕES GERAIS,"27.2.3. Na hipótese de continuidade do contrato, a SEGURADORA poderá cobrar a",diferença de PRÊMIO cabível.,28,TRUE,The clause text and heading for sub-item 27.2.3 are fully contained on page 20.,condition,TRUE,The document header clearly displays Virginia Surety Companhia de Seguros do Brasil and the product 'Seguro Reparos Mecânicos'.,,"Sub-clause 27.2.3 establishes rules regarding premium adjustment upon contract continuation under risk aggravation conditions, which is correctly classified as a condition and completely captured on page 20."
+43,27:seguro-reparos-mecanicos-automoveis/3/3.2,27,15414900502201885.pdf,ASSIST,VIRGINIA SURETY COMPANHIA DE SEGUROS DO BRASIL,03505295000146,n/a,15414.900502/2018-85,2018,2017-2021,22,22,text,deterministic,llm,coverage,0.9,seguro-reparos-mecanicos-automoveis/3/3.2,SEGURO REPAROS MECÂNICOS AUTOMÓVEIS,3.2. COBERTURA MOTOR: inclui exclusivamente as seguintes peças:,,0,TRUE,The clause text and heading are located completely on page 22 before subclause 3.2.1 begins.,coverage,TRUE,The document header clearly shows Virginia Surety and Seguro Reparos Mecânicos (Mechanical Breakdown/Assistance).,,"Clause 3.2 is an introductory coverage heading that introduces the covered motor components under the 'Riscos Cobertos' section. Its immediate subclauses are handled as separate records in the tree structure, making the single-page boundary on page 22 accurate."
+44,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.18,28,15414607840202570.pdf,GAR.EST,ASSURANT SEGURADORA SA,03823704000152,n/a,15414.607840/2025-70,2025,2022-2025,3,3,text,deterministic,llm,definition,0.95,condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.18,,2.18. Dolo,"Má-fé; agir de modo contrário à lei ou ao direito,
+fazendo-o propositalmente.",77,TRUE,The clause 2.18 Dolo is fully located on page 3 and was captured accurately without truncations or mergers.,definition,TRUE,The header explicitly identifies Assurant Seguradora S.A. and the product line Seguro Garantia Estendida Original Auto/Moto (GAR.EST).,,"The clause represents a single definition entry (2.18 Dolo) under the Definitions section, entirely contained on page 3. All details align perfectly."
+45,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/25,28,15414607840202570.pdf,GAR.EST,ASSURANT SEGURADORA SA,03823704000152,n/a,15414.607840/2025-70,2025,2022-2025,11,11,text,deterministic,llm,condition,0.85,condicoes-gerais-seguro-garantia-estendida-original-auto-moto/25,,25. INSPEÇÃO,"A Seguradora se reserva o direito de proceder,
+durante a vigência do contrato, à inspeção de
+objetos que se relacionem com o seguro e a
+averiguação das circunstâncias que aos mesmos
+se refiram.",193,TRUE,The clause text for section 25 is accurately captured on page 11 up to the start of its sub-clause 25.1.,condition,TRUE,Content references 'seguro de garantia estendida' and standard policy conditions for Assurant.,,"Clause 25. INSPEÇÃO is completely and cleanly captured on page 11 before sub-clause 25.1 begins. Its nature is a contractual condition regarding inspection rights, matching the parser's classification and provenance."
+46,29:12-limite-maximo-de-indenizacao/21.3/21.3.4,29,15414631153201927.pdf,GAR.EST,CARDIF DO BRASIL SEGUROS E GARANTIAS S.A.,08279191000184,n/a,15414.631153/2019-27,2019,2017-2021,17,18,text,deterministic,llm,condition,0.8,12-limite-maximo-de-indenizacao/21.3/21.3.4,12  LIMITE MÁXIMO DE INDENIZAÇÃO,"21.3.4. Na hipótese de descumprimento doloso, por parte do Segurado, no item 21.3, aplicarse-á a perda do direito à indenização prevista no item 21.1.1. Nessa situação, o Segurado","permanecerá obrigado ao pagamento integral do prêmio e ao ressarcimento de todas as despesas
+incorridas pela Seguradora com a contratação.
+21.3.5
+Na hipótese de descumprimento culposo, por parte do Segurado, da cláusula 21.3, ficará
+este obrigado a pagar a diferença de prêmio apurada ou, se a garantia for tecnicamente impossível ou o
+18
+fato corresponder a tipo de risco que não seja normalmente subscrito pela seguradora, não fará jus à
+garantia.",449,FALSE,"The parser merged clause 21.3.4 with its sibling sub-clause 21.3.5, extending the range onto page 18. Clause 21.3.4 ends entirely on page 17.",condition,TRUE,The document displays BNP Paribas Cardif branding and refers to extended warranty insurance (garantia estendida).,boundary_mismatch_llm,The clause text incorrectly includes sibling sub-clause 21.3.5 instead of separating it. The content itself is a contractual condition regarding loss of rights upon intentional failure to inform the insurer of risk aggravation.
+47,29:25-atualizacao-de-valores/2,29,15414631153201927.pdf,GAR.EST,CARDIF DO BRASIL SEGUROS E GARANTIAS S.A.,08279191000184,n/a,15414.631153/2019-27,2019,2017-2021,21,21,text,deterministic,llm,coverage,0.35,25-atualizacao-de-valores/2,25  ATUALIZAÇÃO DE VALORES,2. GARANTIA ESTENDIDA – SEGURO DE GARANTIA ESTENDIDA REDUZIDA,,0,TRUE,"The clause heading '2 GARANTIA ESTENDIDA – SEGURO DE GARANTIA ESTENDIDA REDUZIDA' appears on page 21 and immediately introduces its subclause 2.1, with no direct body text. The recorded page range 21-21 is accurate for this parent node.",coverage,TRUE,The pages display BNP Paribas Cardif branding and define extended warranty (Garantia Estendida) coverage conditions.,,The clause represents a major coverage section heading under the Special Conditions for Extended Warranty. Its boundaries on page 21 are exact for a parent node in a hierarchical tree.
+48,30:5,30,15414000861200605.pdf,CARTA VERDE,HDI SEGUROS S.A.,29980158000157,n/a,15414.000861/2006-05,2006,2004-2009,6,7,text,deterministic,llm,condition,0.78,5,,5. SOMAS SEGURADAS E LIMITES MÁXIMOS DE RESPONSABILIDADE,"5.1. São os seguintes os montantes segurados:
+a) Morte, Despesas Médico-Hospitalares e/ou Danos Pessoais......................US$40.000,00 por
+pessoa.
+b) Danos Materiais.........................................................................................US$20.000,00 por
+terceiro.
+5.1.1. Os honorários dos advogados e as despesas incorridas para a defesa do segurado não estão
+compreendidos nos limites estabelecidos para as somas seguradas previstas no subitem.
+Quanto aos honorários dos advogados limita-se a 50% do valor da indenização paga ao segurado.
+5.1.2. No caso de várias reclamações relacionadas com o mesmo evento, o limite da
+responsabilidade da sociedade seguradora pela cobertura prevista no subitem 5.1.a, fica limitada a
+US$ 200,000.00, e subitem 5.1.b, será de US$ 40,000.00.
+5.2. Não obstante a determinação dos valores previstos no subitem 5.1 desta Cláusula, poderão
+ser acertados, entre o segurado e a entidade seguradora, limites de soma segurada mais elevados,
+mediante Cláusula particular a ser incluída na presente apólice.
+5.3. As condições particulares que venham a ser contratadas, tendo como base a presente
+apólice, não podem estabelecer limites de cobertura inferiores aos contidos nestas condições
+gerais.",1242,TRUE,The clause '5. SOMAS SEGURADAS E LIMITES MÁXIMOS DE RESPONSABILIDADE' begins on page 6 and its content cleanly terminates before clause 6 on page 7.,coverage,TRUE,"The document footer clearly displays HDI Seguros with Processo SUSEP 15414.000861/2006-05, and the content matches the Carta Verde standard policy (MERCOSUL, USD limits).",type_mismatch_llm,The page boundaries 6-7 precisely capture the heading and complete text of Clause 5 before Clause 6 begins. The clause defines the insured amounts and maximum liability limits (Coverage / Condition) for the Carta Verde product.
+49,30:7,30,15414000861200605.pdf,CARTA VERDE,HDI SEGUROS S.A.,29980158000157,n/a,15414.000861/2006-05,2006,2004-2009,7,7,text,deterministic,llm,exclusion,0.99,7,,7. PREJUÍZOS NÃO INDENIZÁVEIS,"Ademais das exclusões previstas nesta apólice tampouco serão indenizadas aquelas reclamações
+resultantes de:
+a) Reconhecimento de culpabilidade ou de direito de indenização ou realização de transações de
+qualquer espécie que formalize o segurado sem autorização escrita do segurador;
+b) Uma contestação que seja consequência do início pelo segurado de ação por danos e
+prejuízos causados por um fato coberto por esta apólice sem que tenha havido prévio
+consentimento por escrito do segurador.",492,TRUE,"The clause begins with heading 7 and concludes after item (b) on page 7, exactly matching the parser output.",exclusion,TRUE,"Footer clearly identifies HDI Seguros and SUSEP process 15414.000861/2006-05, consistent with Carta Verde insurance conditions.",,Clause 7 details non-indemnifiable losses (exclusions) and is fully and accurately captured within page 7 without any omission or extraneous text.
+50,30:8/8.1,30,15414000861200605.pdf,CARTA VERDE,HDI SEGUROS S.A.,29980158000157,n/a,15414.000861/2006-05,2006,2004-2009,7,7,text,deterministic,llm,condition,0.9,8/8.1,,8.1. Certificado do Seguro,"O segurado será obrigatoriamente portador, durante sua permanência no exterior, do certificado
+emitido pela seguradora que comprove a contratação deste seguro.",159,TRUE,"The sub-clause 8.1 is fully contained on page 7, starting with its title and ending before sub-clause 8.2.",condition,TRUE,"The footer confirms HDI Seguros and SUSEP process 15414.000861/2006-05, consistent with Carta Verde conditions.",,"Sub-clause 8.1 establishes the insured's obligation to carry the insurance certificate abroad, correctly classifying it as a condition. The page range and extracted text match the document perfectly."
