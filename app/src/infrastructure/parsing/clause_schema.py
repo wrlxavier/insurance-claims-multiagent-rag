@@ -42,6 +42,7 @@ class ParsedClauseRecord(BaseModel):
     page_start: Annotated[int, Field(ge=1)]
     page_end: Annotated[int, Field(ge=1)]
     source: Literal["text", "ocr"]
+    boundary_source: str | None = None
     susep_process: _NonEmptyStr
     insurer: _NonEmptyStr
     cnpj: _NonEmptyStr
@@ -77,6 +78,7 @@ def flatten_typed_clause(
         page_start=clause.page_start,
         page_end=clause.page_end,
         source=source,
+        boundary_source=clause.boundary_source.value,
         susep_process=provenance.susep_process,
         insurer=provenance.insurer,
         cnpj=provenance.cnpj,

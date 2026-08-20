@@ -12,7 +12,7 @@ from domain.clause_classification import (
     TypedClause,
     TypeSource,
 )
-from domain.clause_tree import Clause, HeadingConvention
+from domain.clause_tree import BoundarySource, Clause, HeadingConvention
 from infrastructure.parsing.clause_schema import SCHEMA_VERSION, flatten_typed_clause
 
 
@@ -71,6 +71,20 @@ def test_flatten_typed_clause_produces_valid_record() -> None:
     assert record.text == "Texto da cobertura."
     assert record.filing_year == "2019"
     assert record.source == "text"
+    assert record.boundary_source == "deterministic"
+
+
+@pytest.mark.unit
+def test_flatten_typed_clause_propagates_vision_escalated_boundary_source() -> None:
+    typed = _typed_clause()
+    escalated_clause = replace(
+        typed.clause, boundary_source=BoundarySource.VISION_ESCALATED
+    )
+    typed = replace(typed, clause=escalated_clause)
+
+    record = flatten_typed_clause(typed, source="text")
+
+    assert record.boundary_source == "vision_escalated"
 
 
 @pytest.mark.unit
