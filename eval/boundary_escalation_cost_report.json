@@ -1,0 +1,13 @@
+{
+  "documents_processed": 30,
+  "suspicious_clause_count": 1078,
+  "applied_count": 27,
+  "split_suggested_count": 59,
+  "cache_hit_count": 1078,
+  "call_count": 0,
+  "total_input_tokens": 0,
+  "total_output_tokens": 0,
+  "wall_clock_seconds": 0.0,
+  "estimated_cost_usd": 0.0,
+  "pricing_note": "estimated_cost_usd uses hardcoded per-1M-token price constants in this script -- check against the provider's current pricing before treating it as authoritative."
+}

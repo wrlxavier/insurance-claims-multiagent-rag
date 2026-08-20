@@ -195,7 +195,17 @@ from domain.clause_tree import (
 )
 from domain.extracted_text import ExtractedDocument, ExtractedPage, ExtractedSpan
 
-CLAUSE_SEGMENTATION_VERSION = "v6"
+# [M1-08c] v6 -> v7: numbering-continuity heading fallback (see
+# [_detect_sibling_continuation]). Bumping this also regenerates the
+# clause-tree cache, which matters beyond this change: [M1-04d] added
+# `content_line_pages` to [domain.clause_tree.Clause] WITHOUT bumping the
+# version, and because `scripts/build_clause_tree.py`'s cache write is a
+# no-op once a file exists, every cached tree kept an empty
+# `content_line_pages` -- silently reducing the whole boundary-escalation
+# pass to a no-op (it applied 0 of 252 proposed corrections) until [M1-08c]
+# diagnosed it. Bump this constant whenever the cached tree's *shape*
+# changes, not only when the detection algorithm does.
+CLAUSE_SEGMENTATION_VERSION = "v7"
 
 NUMBERED_BOLD_THRESHOLD = 0.5
 PART_BOLD_THRESHOLD = 0.9
@@ -680,6 +690,59 @@ def _detect_heading(
     )
 
 
+def _numbering_successor(label: str) -> str | None:
+    """The label that would immediately follow ``label`` among its siblings.
+
+    ``"6.3" -> "6.4"``, ``"6.1.3" -> "6.1.4"``, ``"7" -> "8"``. Returns None
+    for anything whose last component is not a plain integer.
+    """
+    if not label:
+        return None
+    parts = label.split(".")
+    if not parts[-1].isdigit():
+        return None
+    return ".".join([*parts[:-1], str(int(parts[-1]) + 1)])
+
+
+def _detect_sibling_continuation(
+    text: str, numbering_labels: list[str]
+) -> _HeadingMatch | None:
+    """Recognize the numeric successor of an open clause as a heading.
+
+    Font weight is not a reliable heading signal everywhere in this corpus.
+    Doc 8 typesets "6.3" bold (bold_fraction 0.99) but leaves its own
+    siblings "6.4"/"6.5" in the body font (0.03), so [_detect_heading]'s
+    bold gate silently swallows them into 6.3's content -- the
+    adjacent-sibling merge both [M1-08b] and [M1-08c] measured as the
+    largest remaining boundary-failure cluster, and the one [M1-04d]'s
+    vision escalation could never fix (its correction step works at page
+    granularity, while these merges are intra-page).
+
+    Numbering continuity is evidence independent of typesetting: a line
+    opening with exactly the label that follows a currently open clause's
+    is a heading however it is styled. ``numbering_labels`` is the open
+    stack's labels, innermost last, so "6.1.3.3" followed by "6.1.4" is
+    recognized against the ancestor "6.1.3", not just the innermost clause.
+
+    The caller additionally requires a position signal (see
+    [_has_heading_position_signal]), so a mid-paragraph mention like
+    "...conforme 6.4 acima" on a wrapped line is not mistaken for a heading.
+    """
+    match = _NUMBERED_DECIMAL_DEEP.match(text) or _NUMBERED_DECIMAL_TOP.match(text)
+    if match is None:
+        return None
+    token = match.group(1)
+    for label in reversed(numbering_labels):
+        if _numbering_successor(label) == token:
+            return _HeadingMatch(
+                convention=HeadingConvention.NUMBERED_DECIMAL,
+                numbering_label=token,
+                depth=token.count(".") + 1,
+                title=text,
+            )
+    return None
+
+
 def _try_join_bare_numeral_title(
     lines: list[_Line], index: int
 ) -> tuple[_HeadingMatch, int] | None:
@@ -1093,6 +1156,19 @@ def segment_document(document: ExtractedDocument) -> ClauseTree:
             total_char_count += len(lines[index + 1].text)
         else:
             heading = _detect_heading(line.text, line.bold_fraction, ocr=line.is_ocr)
+            wrap_start = index + 1
+        if heading is None:
+            # Numbering continuity as a font-independent fallback -- see
+            # [_detect_sibling_continuation]. Deliberately NOT gated on
+            # [_has_heading_position_signal]: docs 17 and 24 set their
+            # numbered sub-clauses at exactly the ordinary line pitch
+            # (gap 15.72-15.84 against a 15.8 modal), so vertical spacing
+            # carries no signal there at all -- the same reason the main
+            # loop never applies that gate to bold numbered headings
+            # either. Exact-successor matching is the discriminator.
+            heading = _detect_sibling_continuation(
+                line.text, [builder.numbering_label for builder in stack]
+            )
             wrap_start = index + 1
         if heading is None:
             attach_content(line.text, line.page_number)

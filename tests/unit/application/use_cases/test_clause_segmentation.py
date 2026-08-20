@@ -1532,3 +1532,110 @@ def test_content_line_pages_parallels_content_lines_across_a_page_break() -> Non
     )
     assert clause.content_line_pages == (1, 2, 2)
     assert len(clause.content_line_pages) == len(clause.content_lines)
+
+
+@pytest.mark.unit
+def test_non_bold_numbering_successor_opens_its_own_clause() -> None:
+    """[M1-08c] doc 8 p52: siblings typeset inconsistently still split.
+
+    "6.3" is set bold (bold_fraction 0.99) but its own siblings "6.4"/"6.5"
+    sit in the body font (0.03), so the bold gate in [_detect_heading]
+    swallows them into 6.3's content -- the adjacent-sibling merge that was
+    the largest remaining boundary-failure cluster in both [M1-08b] and
+    [M1-08c]. Numbering continuity is evidence independent of typesetting.
+    """
+    lines_spec = [
+        (_heading_line(1, 0, "6. INDENIZAÇÃO"), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum um."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum dois."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum tres."), 145.0),
+        (_body_line(1, 4, "Texto de corpo comum quatro."), 160.0),
+        (_body_line(1, 5, "Texto de corpo comum cinco."), 175.0),
+        # 30pt gap, bold: detected by the ordinary numbered gate.
+        (_heading_line(1, 6, "6.3 As condições mencionadas acima"), 205.0),
+        (_body_line(1, 7, "na modalidade Valor Determinado."), 220.0),
+        # 30pt gap, NOT bold: only numbering continuity identifies it.
+        (_body_line(1, 8, "6.4 Correrão por conta da Seguradora"), 250.0),
+        (_body_line(1, 9, "as despesas de contenção e salvamento."), 265.0),
+        # 30pt gap, NOT bold: successor of 6.4, same fallback.
+        (_body_line(1, 10, "6.5 Correrão por conta da Seguradora"), 295.0),
+        (_body_line(1, 11, "os valores referentes aos danos materiais."), 310.0),
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+
+    tree = segment_document(_document([_page(1, spans)]))
+
+    labels = {c.numbering_label for c in tree.all_clauses}
+    assert {"6.3", "6.4", "6.5"} <= labels
+
+    clause_63 = _find(tree, "6.3")
+    assert clause_63.content_lines == ("na modalidade Valor Determinado.",)
+    assert _find(tree, "6.4").content_lines == (
+        "as despesas de contenção e salvamento.",
+    )
+    # 6.4/6.5 are siblings of 6.3, not children of it.
+    assert _find(tree, "6.4").parent_id == clause_63.parent_id
+    assert _find(tree, "6.5").parent_id == clause_63.parent_id
+
+
+@pytest.mark.unit
+def test_non_successor_numbering_stays_content() -> None:
+    """The fallback is continuity-gated: an unrelated label is not a heading.
+
+    Without this, any body line opening with a decimal token would be
+    promoted, which is exactly the over-splitting the bold gate exists to
+    prevent in the first place.
+    """
+    lines_spec = [
+        (_heading_line(1, 0, "6. INDENIZAÇÃO"), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum um."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum dois."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum tres."), 145.0),
+        (_body_line(1, 4, "Texto de corpo comum quatro."), 160.0),
+        (_heading_line(1, 5, "6.3 As condições mencionadas acima"), 190.0),
+        # 30pt gap but "6.9" does not follow "6.3" -- stays content.
+        (_body_line(1, 6, "6.9 conforme o item citado anteriormente."), 220.0),
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+
+    tree = segment_document(_document([_page(1, spans)]))
+
+    assert "6.9" not in {c.numbering_label for c in tree.all_clauses}
+    assert _find(tree, "6.3").content_lines == (
+        "6.9 conforme o item citado anteriormente.",
+    )
+
+
+@pytest.mark.unit
+def test_numbering_successor_at_ordinary_line_pitch_still_opens_a_clause() -> None:
+    """[M1-08c] docs 17/24: spacing carries no heading signal in some documents.
+
+    Both set their numbered sub-clauses at exactly the ordinary line pitch
+    (15.72-15.84pt against a 15.8pt modal gap), so gating the
+    numbering-continuity fallback on [_has_heading_position_signal] left
+    those merges unfixed. The gate is deliberately not applied here -- the
+    same way the main loop never applies it to bold numbered headings --
+    leaving exact-successor matching as the discriminator.
+
+    Accepted tradeoff: a wrapped body line beginning with precisely the
+    successor label would now be promoted to a heading. That requires the
+    wrap to land on the one token that continues the sequence, which the
+    corpus evidence behind [M1-08c] did not show occurring, while the
+    merges this admits were its largest boundary-failure cluster.
+    """
+    lines_spec = [
+        (_heading_line(1, 0, "6. INDENIZAÇÃO"), 100.0),
+        (_body_line(1, 1, "Texto de corpo comum um."), 115.0),
+        (_body_line(1, 2, "Texto de corpo comum dois."), 130.0),
+        (_body_line(1, 3, "Texto de corpo comum tres."), 145.0),
+        (_body_line(1, 4, "Texto de corpo comum quatro."), 160.0),
+        (_heading_line(1, 5, "6.3 As condições mencionadas acima"), 190.0),
+        # Ordinary 15pt pitch -- no extra spacing, as in docs 17 and 24.
+        (_body_line(1, 6, "6.4 Correrão por conta da Seguradora"), 205.0),
+    ]
+    spans = [_with_y0(span, y0=y0) for span, y0 in lines_spec]
+
+    tree = segment_document(_document([_page(1, spans)]))
+
+    assert "6.4" in {c.numbering_label for c in tree.all_clauses}
+    assert _find(tree, "6.3").content_lines == ()

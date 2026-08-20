@@ -181,6 +181,35 @@ def _has_page_attribution(clause: Clause) -> bool:
     )
 
 
+def _pages_shared_with_others(
+    clauses_by_id: dict[str, Clause],
+    order: list[str],
+    pages: set[int],
+    involved: set[str],
+) -> set[int]:
+    """Return which of ``pages`` also carry content from clauses outside ``involved``.
+
+    A vision review can only reason at page granularity -- it is shown page
+    images -- but a page routinely carries several clauses (a glossary page
+    in doc 23 carries 13). Reassigning a whole page's lines between two
+    neighbours therefore sweeps up any third clause sharing that page.
+    [M1-08c] measured this as the dominant cause of the boundary
+    regressions the first escalation run introduced: 95 of its 136 applied
+    corrections moved lines on a page shared with a third clause. See
+    ``docs/PARSING.md``'s third-measurement section for the evidence.
+    """
+    if not pages:
+        return set()
+    shared: set[int] = set()
+    for clause_id in order:
+        if clause_id in involved:
+            continue
+        for page in clauses_by_id[clause_id].content_line_pages:
+            if page in pages:
+                shared.add(page)
+    return shared
+
+
 def _apply_start_edge(
     clauses_by_id: dict[str, Clause], order: list[str], index: int, new_start: int
 ) -> tuple[dict[str, Clause], bool, str]:
@@ -215,6 +244,21 @@ def _apply_start_edge(
             False,
             "preceding neighbor has no per-line page attribution; "
             "front-edge correction not applied",
+        )
+
+    if new_start > clause.page_start:
+        moving_pages = {p for p in clause.content_line_pages if p < new_start}
+    else:
+        moving_pages = {p for p in prev.content_line_pages if p >= new_start}
+    shared = _pages_shared_with_others(
+        clauses_by_id, order, moving_pages, {clause.clause_id, prev_id}
+    )
+    if shared:
+        return (
+            clauses_by_id,
+            False,
+            f"page(s) {sorted(shared)} also carry other clauses' content; a "
+            "page-granular front-edge correction would sweep them up; not applied",
         )
 
     if new_start > clause.page_start:
@@ -303,6 +347,21 @@ def _apply_end_edge(
             False,
             "following neighbor has no per-line page attribution; "
             "back-edge correction not applied",
+        )
+
+    if new_end < clause.page_end:
+        moving_pages = {p for p in clause.content_line_pages if p > new_end}
+    else:
+        moving_pages = {p for p in next_clause.content_line_pages if p <= new_end}
+    shared = _pages_shared_with_others(
+        clauses_by_id, order, moving_pages, {clause.clause_id, next_id}
+    )
+    if shared:
+        return (
+            clauses_by_id,
+            False,
+            f"page(s) {sorted(shared)} also carry other clauses' content; a "
+            "page-granular back-edge correction would sweep them up; not applied",
         )
 
     if new_end < clause.page_end:
@@ -415,6 +474,11 @@ def _apply_boundary_review(
     index = order.index(clause_id)
     applied_any = False
     notes: list[str] = []
+    # Snapshot taken after the boundary_source stamp but before any edge is
+    # applied, so the identity-retention guard below can revert the content
+    # changes without discarding the record that this clause was reviewed.
+    stamped_state = dict(clauses_by_id)
+    original_lines = set(clause.content_lines)
 
     if new_start != clause.page_start:
         clauses_by_id, ok, note = _apply_start_edge(
@@ -430,6 +494,22 @@ def _apply_boundary_review(
         applied_any = applied_any or ok
         if note:
             notes.append(note)
+
+    # A boundary *refinement* must leave the clause substantially itself. If
+    # applying both edges moved every one of its own lines elsewhere, the
+    # model is not refining a boundary -- it is asserting the clause lives
+    # somewhere else entirely, which line reassignment cannot express safely.
+    # [M1-08c] measured one such case replacing a clause's 36 correct lines
+    # with 32 lines belonging to its neighbour.
+    if applied_any and original_lines:
+        retained = set(clauses_by_id[clause_id].content_lines) & original_lines
+        if not retained:
+            return (
+                stamped_state,
+                False,
+                "correction would move the clause's entire content elsewhere; "
+                "not applied",
+            )
 
     if not notes:
         return clauses_by_id, True, "corrected page range applied"
