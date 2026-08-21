@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts
 
 help:
 	@echo "Available targets:"
@@ -20,6 +20,8 @@ help:
 	@echo "  validate-parsing-quality-sample - Automated LLM validation of the M1-08b sample (fills judgment columns)"
 	@echo "  score-parsing-quality  - Score the annotated M1-08 sample and write eval/parsing_quality_results.md"
 	@echo "  escalate-vision-boundaries - M1-04d: vision-LLM boundary review of suspicious clauses (opt-in, not part of parse)"
+	@echo "  fetch-corpus-artifacts - Download the pre-computed corpus/LLM caches instead of running make parse"
+	@echo "  package-corpus-artifacts - Maintainer-only: build the release tarball fetch-corpus-artifacts downloads"
 
 install:
 	uv sync
@@ -67,3 +69,9 @@ score-parsing-quality:
 
 escalate-vision-boundaries:
 	PYTHONPATH=app/src uv run python scripts/escalate_vision_boundaries.py
+
+fetch-corpus-artifacts:
+	PYTHONPATH=app/src uv run python scripts/fetch_corpus_artifacts.py
+
+package-corpus-artifacts:
+	PYTHONPATH=app/src uv run python scripts/package_corpus_artifacts.py
