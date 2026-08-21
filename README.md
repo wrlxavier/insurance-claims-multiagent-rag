@@ -10,6 +10,25 @@ inconsistent with the conditions of a registered insurance product — it
 cannot say whether a real claim is covered or denied. See
 [`docs/SCOPE.md`](docs/SCOPE.md) for the full statement.
 
+## Fast start: inspect the parsed corpus without running the pipeline
+
+The full M1 parsing pipeline (OCR, LLM clause classification, the vision-LLM
+boundary-escalation pass, LLM validation) costs real tokens and real
+wall-clock time. If you just want to inspect the already-published result —
+the finished 4,925-clause corpus and the LLM caches behind it — run this
+instead of `make parse`:
+
+```bash
+make fetch-corpus-artifacts
+```
+
+This downloads a small (~10MB) release asset and needs no `.env`/LLM
+credentials. See [`docs/PARSING.md`](docs/PARSING.md) for the published
+accuracy numbers this corpus was measured against. Note: if you later run
+`make parse` locally anyway, `git status`/`git diff` on `build/manifest.json`
+will show a one-line difference on the `built_at_utc` timestamp field only —
+everything else reproduces byte-identical.
+
 ## Development Commands
 
 ### System dependencies
