@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set
 
 help:
 	@echo "Available targets:"
@@ -22,6 +22,7 @@ help:
 	@echo "  escalate-vision-boundaries - M1-04d: vision-LLM boundary review of suspicious clauses (opt-in, not part of parse)"
 	@echo "  fetch-corpus-artifacts - Download the pre-computed corpus/LLM caches instead of running make parse"
 	@echo "  package-corpus-artifacts - Maintainer-only: build the release tarball fetch-corpus-artifacts downloads"
+	@echo "  validate-golden-set - Validate data/golden_set/*.jsonl against the schema and the parsed corpus"
 
 install:
 	uv sync
@@ -75,3 +76,6 @@ fetch-corpus-artifacts:
 
 package-corpus-artifacts:
 	PYTHONPATH=app/src uv run python scripts/package_corpus_artifacts.py
+
+validate-golden-set:
+	PYTHONPATH=app/src uv run python scripts/validate_golden_set.py
