@@ -5,6 +5,7 @@ from scripts.find_candidate_clauses import (
     ClauseNotFoundError,
     extract_cross_references,
     find_candidates,
+    find_document_order_neighbours,
 )
 
 from infrastructure.parsing.clause_schema import ParsedClauseRecord
@@ -209,3 +210,91 @@ def test_find_candidates_raises_for_unknown_clause_id() -> None:
     target = make_record()
     with pytest.raises(ClauseNotFoundError, match="not found"):
         find_candidates([target], "does-not-exist")
+
+
+def make_root_record(**overrides: object) -> ParsedClauseRecord:
+    """Build a root-level record with no bundle_section -- the blind-spot state."""
+    fields: dict[str, object] = {
+        "clause_id": "9:1-2",
+        "path": "1-2",
+        "parent_id": None,
+        "bundle_section": None,
+        "text": "",
+    }
+    fields.update(overrides)
+    return make_record(**fields)
+
+
+@pytest.mark.unit
+def test_document_order_neighbours_empty_when_clause_has_a_parent() -> None:
+    target = make_record(parent_id="1:cond-gerais", bundle_section=None)
+    assert find_document_order_neighbours([target], target) == set()
+
+
+@pytest.mark.unit
+def test_document_order_neighbours_empty_when_clause_has_a_bundle_section() -> None:
+    target = make_root_record(bundle_section="SEÇÃO A")
+    assert find_document_order_neighbours([target], target) == set()
+
+
+@pytest.mark.unit
+def test_document_order_neighbours_returns_window_either_side() -> None:
+    roots = [
+        make_root_record(clause_id=f"9:{i}", path=str(i), page_start=i, page_end=i)
+        for i in range(1, 10)
+    ]
+    target = next(r for r in roots if r.clause_id == "9:5")
+    assert find_document_order_neighbours(roots, target, window=2) == {
+        "9:3",
+        "9:4",
+        "9:6",
+        "9:7",
+    }
+
+
+@pytest.mark.unit
+def test_document_order_neighbours_clamps_at_document_start() -> None:
+    roots = [
+        make_root_record(clause_id=f"9:{i}", path=str(i), page_start=i, page_end=i)
+        for i in range(1, 6)
+    ]
+    target = next(r for r in roots if r.clause_id == "9:1")
+    assert find_document_order_neighbours(roots, target, window=3) == {
+        "9:2",
+        "9:3",
+        "9:4",
+    }
+
+
+@pytest.mark.unit
+def test_document_order_neighbours_ignores_other_documents() -> None:
+    target = make_root_record(clause_id="9:1", path="1", page_start=1, page_end=1)
+    other_doc = make_root_record(
+        clause_id="8:1", document_id="8", path="1", page_start=1, page_end=1
+    )
+    assert find_document_order_neighbours([target, other_doc], target) == set()
+
+
+@pytest.mark.unit
+def test_find_candidates_surfaces_neighbours_for_orphan_clause() -> None:
+    """The blind spot the fourth signal exists to close (M2-02 review)."""
+    roots = [
+        make_root_record(clause_id=f"9:1-{i}", path=f"1-{i}", page_start=i, page_end=i)
+        for i in range(1, 5)
+    ]
+    target = next(r for r in roots if r.clause_id == "9:1-2")
+    candidates = find_candidates(roots, target.clause_id)
+    assert [c.clause_id for c in candidates] == ["9:1-1", "9:1-3", "9:1-4"]
+    assert all("document_order_neighbour" in c.reasons for c in candidates)
+
+
+@pytest.mark.unit
+def test_find_candidates_does_not_add_neighbours_when_bundle_section_is_set() -> None:
+    target = make_root_record(
+        clause_id="9:1-2", path="1-2", bundle_section="SEÇÃO A", page_start=2
+    )
+    neighbour = make_root_record(
+        clause_id="9:1-3", path="1-3", bundle_section="OUTRA SEÇÃO", page_start=3
+    )
+    candidates = find_candidates([target, neighbour], target.clause_id)
+    assert candidates == []

@@ -9,7 +9,7 @@ is complete. This is conceptually an early, reduced version of [M3-06]'s
 exclusion co-retrieval, brought forward as a curation tool before it exists
 as part of the product.
 
-Purely structural/deterministic -- no LLM call, no content judgment. Three
+Purely structural/deterministic -- no LLM call, no content judgment. Four
 signals, computed against clauses in the same document, merged per candidate
 when more than one applies:
 
@@ -17,6 +17,21 @@ when more than one applies:
 - matching ``bundle_section``
 - a textual cross-reference ("cláusula N[.M...]") in the query clause's body
   that points at the candidate's numbering (its ``path``'s last segment)
+- ``document_order_neighbour`` -- the nearest root-level clauses by document
+  position, and **only** for a query clause with both ``parent_id is None``
+  and ``bundle_section is None``.
+
+That last signal exists because the first two structurally cannot fire for
+such a clause: with no parent and no bundle section, both guards
+short-circuit and only the cross-reference regex is left. Measured over the
+15 CASCO documents, 251 of the 258 clauses in that state (97.3%) returned
+zero candidates, against 0.0% for any clause carrying a ``bundle_section``
+-- the tool was blind precisely where the source documents are most
+fragmented (all 33 clauses of document 5, 47% of document 9, 44% of
+document 4). Document order is the only structural relation left when the
+tree gives us nothing, so it is used as a last tier rather than as a general
+signal: firing it for clauses the tree already describes would add noise to
+candidate lists that are usually already at the cap.
 
 Candidates are sorted by number of matching signals (most first), then by
 ``clause_id``, and capped at ``--max-candidates`` (default 10).
@@ -45,6 +60,7 @@ from infrastructure.parsing.clause_schema import ParsedClauseRecord
 from infrastructure.parsing.corpus_artifact import JSONL_PATH, read_parsed_clauses_jsonl
 
 DEFAULT_MAX_CANDIDATES = 10
+DEFAULT_ORDER_NEIGHBOUR_WINDOW = 3
 
 _CROSS_REFERENCE_PATTERN = re.compile(r"cl[áa]usulas?\s+(\d+(?:\.\d+)*)", re.IGNORECASE)
 
@@ -92,6 +108,44 @@ def extract_cross_references(text: str) -> set[str]:
     return {match.group(1) for match in _CROSS_REFERENCE_PATTERN.finditer(text)}
 
 
+def find_document_order_neighbours(
+    records: list[ParsedClauseRecord],
+    target: ParsedClauseRecord,
+    *,
+    window: int = DEFAULT_ORDER_NEIGHBOUR_WINDOW,
+) -> set[str]:
+    """Return the clause_ids of the `window` nearest root-level clauses either side.
+
+    Empty unless `target` has both `parent_id is None` and
+    `bundle_section is None` -- see the module docstring for why this tier is
+    gated rather than always on. Ordering is by ``(page_start, clause_id)``,
+    which is stable across re-parses that don't move a clause's page.
+    """
+    if target.parent_id is not None or target.bundle_section is not None:
+        return set()
+
+    roots = sorted(
+        (
+            record
+            for record in records
+            if record.document_id == target.document_id and record.parent_id is None
+        ),
+        key=lambda record: (record.page_start, record.clause_id),
+    )
+    try:
+        position = next(
+            index
+            for index, record in enumerate(roots)
+            if record.clause_id == target.clause_id
+        )
+    except StopIteration:
+        return set()
+
+    start = max(0, position - window)
+    neighbours = roots[start:position] + roots[position + 1 : position + 1 + window]
+    return {record.clause_id for record in neighbours}
+
+
 def find_candidates(
     records: list[ParsedClauseRecord],
     clause_id: str,
@@ -105,6 +159,7 @@ def find_candidates(
     """
     target = find_clause(records, clause_id)
     referenced_numbers = extract_cross_references(target.text)
+    order_neighbours = find_document_order_neighbours(records, target)
 
     reasons_by_id: dict[str, list[str]] = {}
     titles_by_id: dict[str, str] = {}
@@ -126,6 +181,8 @@ def find_candidates(
         numbering = record.path.rsplit("/", 1)[-1]
         if numbering in referenced_numbers:
             reasons.append(f"cross_reference:{numbering}")
+        if record.clause_id in order_neighbours:
+            reasons.append("document_order_neighbour")
         if reasons:
             reasons_by_id[record.clause_id] = reasons
             titles_by_id[record.clause_id] = record.title
