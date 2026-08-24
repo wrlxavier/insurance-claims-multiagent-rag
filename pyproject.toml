@@ -134,6 +134,7 @@ ignore_missing_imports = true
 # [tool.mypy]'s `files` above.
 [[tool.mypy.overrides]]
 module = [
+    "adversarial_clause_selection",
     "casco_clause_selection",
     "find_candidate_clauses",
     "validate_golden_set",

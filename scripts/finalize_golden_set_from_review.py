@@ -14,18 +14,21 @@ For every row with ``approved`` truthy and no ``finalized_question_id`` yet
 ``question_id`` for that row's ``question_type`` -- continuing from
 whatever is already in ``data/golden_set/<type>.jsonl``, never assuming a
 fresh start, since this script may be rerun later against other draft CSVs
-(e.g. M2-03's) -- fills ``authored_at`` from the row, falling back to
-today's date (see [row_to_golden_question]), validates the row through
-[infrastructure.evaluation.golden_set_schema.GoldenQuestion], appends it to
-the right JSONL file, and writes the assigned id back into the CSV's
+(e.g. M2-03's, via ``--csv``) -- fills ``authored_at`` from the row, falling
+back to today's date (see [row_to_golden_question]), validates the row
+through [infrastructure.evaluation.golden_set_schema.GoldenQuestion], appends
+it to the right JSONL file, and writes the assigned id back into the CSV's
 ``finalized_question_id`` column. Finally runs
 ``scripts/validate_golden_set.py`` and reports pass/fail.
 
-Run via ``make finalize-golden-set-casco``.
+Run via ``make finalize-golden-set-casco`` (default CSV) or
+``make finalize-golden-set-adversarial`` (``--csv
+eval/golden_set_draft_adversarial.csv``).
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import re
@@ -229,5 +232,16 @@ def main(csv_path: Path = DEFAULT_CSV_PATH) -> None:
         print(f"  {question_type}: {len(questions)}")
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--csv",
+        type=Path,
+        default=DEFAULT_CSV_PATH,
+        help=f"Draft CSV to finalize (default: {DEFAULT_CSV_PATH}).",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main()
+    main(csv_path=_parse_args().csv)
