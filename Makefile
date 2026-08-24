@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions
 
 help:
 	@echo "Available targets:"
@@ -32,6 +32,11 @@ help:
 	@echo "  draft-synthetic-claims - M2-04: draft candidate synthetic claim narratives into eval/synthetic_claims_draft.csv for review (--dry-run prints selection counts, no LLM calls)"
 	@echo "  finalize-synthetic-claims - M2-04: promote approved rows from eval/synthetic_claims_draft.csv into data/synthetic_claims/claims.jsonl"
 	@echo "  validate-synthetic-claims - Validate data/synthetic_claims/claims.jsonl against the schema and the parsed corpus"
+	@echo "  draft-product-claim-mismatch - M2-05: draft candidate product/claim mismatch narratives into eval/product_claim_mismatch_draft.csv for review (--dry-run prints selection counts, no LLM calls)"
+	@echo "  finalize-product-claim-mismatch - M2-05: promote approved rows from eval/product_claim_mismatch_draft.csv into data/synthetic_claims/product_claim_mismatch.jsonl"
+	@echo "  validate-product-claim-mismatch - Validate data/synthetic_claims/product_claim_mismatch.jsonl against the schema and the parsed corpus"
+	@echo "  draft-unanswerable-questions - M2-05: draft candidate unanswerable golden questions into eval/unanswerable_draft.csv for review (--dry-run prints selection counts, no LLM calls)"
+	@echo "  finalize-unanswerable-questions - M2-05: promote approved rows from eval/unanswerable_draft.csv into data/golden_set/unanswerable.jsonl"
 
 install:
 	uv sync
@@ -130,3 +135,19 @@ finalize-synthetic-claims:
 
 validate-synthetic-claims:
 	PYTHONPATH=app/src uv run python scripts/validate_synthetic_claims.py
+
+draft-product-claim-mismatch:
+	PYTHONPATH=app/src uv run python scripts/draft_product_claim_mismatch.py
+
+finalize-product-claim-mismatch:
+	PYTHONPATH=app/src uv run python scripts/finalize_product_claim_mismatch_from_review.py
+
+validate-product-claim-mismatch:
+	PYTHONPATH=app/src uv run python scripts/validate_product_claim_mismatch.py
+
+draft-unanswerable-questions:
+	PYTHONPATH=app/src uv run python scripts/draft_unanswerable_questions.py
+
+finalize-unanswerable-questions:
+	PYTHONPATH=app/src uv run python scripts/finalize_golden_set_from_review.py \
+		--csv eval/unanswerable_draft.csv

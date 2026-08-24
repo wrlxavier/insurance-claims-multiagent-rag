@@ -94,5 +94,59 @@ One JSON object per line, validated by
 Every claim in this set targets its own, correctly-matched product line —
 e.g. an ASSIST claim tests ASSIST's own coverage/exclusion clauses. Claims
 deliberately aimed at the *wrong* product line (an own-damage claim submitted
-against a liability-only document, say) are a separate dataset, scoped to a
-later issue (M2-05), so the two sets don't overlap.
+against a liability-only document, say) are a separate dataset,
+`product_claim_mismatch.jsonl` (see below), so the two sets don't overlap.
+
+## Product/claim mismatch set (M2-05)
+
+`product_claim_mismatch.jsonl` holds the mirror-image dataset: claims
+deliberately aimed at the *wrong* product line — a claim describing damage
+to the insured's own vehicle, submitted against a document that
+structurally cannot cover that (the four non-CASCO lines: RCF-A, ASSIST,
+GAR.EST, CARTA VERDE). Same `SyntheticClaim` schema, same "entirely
+synthetic" and PII rules as `claims.jsonl` above; every row's
+`expected_verdict` is `incompatible` by construction, so `claim_id` uses a
+verdict-independent `mismatch-{seq:03d}` scheme instead of `claims.jsonl`'s
+`{verdict}-{seq:03d}` (both files share the `incompatible` verdict, and a
+shared numbering scheme would collide between them).
+
+Same three-layer flow, adapted for this dataset:
+
+1. **Deterministic anchor selection**
+   (`scripts/product_claim_mismatch_selection.py`, no model) picks, for
+   each non-CASCO document, the clause that states what the product
+   actually covers (titled "OBJETIVO DO SEGURO", "RISCO COBERTO", etc.) —
+   the anchor that evidences the incompatibility in the document's own
+   words, not merely asserted.
+2. **LLM narrative drafting** (`scripts/draft_product_claim_mismatch.py`,
+   same OpenRouter `google/gemini-3.7-flash` / `google-vertex/global` pin)
+   writes an everyday own-vehicle-peril narrative (collision, theft, fire,
+   glass breakage, hail, flood) against that document — the model never
+   sees or decides the verdict, which is fixed to `incompatible`
+   structurally.
+3. **Human review** — `eval/product_claim_mismatch_draft.csv` carries the
+   draft/review trail; `scripts/finalize_product_claim_mismatch_from_review.py`
+   promotes approved rows and `scripts/validate_product_claim_mismatch.py`
+   checks two dataset-specific invariants beyond the shared schema: every
+   `document_id` resolves to a non-CASCO product line, and every
+   `expected_verdict` is `incompatible`.
+
+Reproduce with:
+
+```
+PYTHONPATH=app/src uv run python scripts/draft_product_claim_mismatch.py --dry-run   # scenario counts, no LLM calls
+PYTHONPATH=app/src uv run python scripts/draft_product_claim_mismatch.py             # drafts eval/product_claim_mismatch_draft.csv
+PYTHONPATH=app/src uv run python scripts/finalize_product_claim_mismatch_from_review.py  # promotes approved rows
+PYTHONPATH=app/src uv run python scripts/validate_product_claim_mismatch.py         # structural + scope validation
+```
+
+11 claims (DoD floor: ≥8), including both liability-only insurers named in
+`docs/DATA_SOURCES.md` as the corpus's clearest mismatch cases — HDI Global
+(document 21) and ARCA (document 22):
+
+| Product line | Claims |
+| --- | --- |
+| RCF-A | 5 |
+| ASSIST | 3 |
+| GAR.EST | 2 |
+| CARTA VERDE | 1 |
