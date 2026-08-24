@@ -141,5 +141,8 @@ module = [
     "pii_safety_net",
     "synthetic_claims_selection",
     "validate_synthetic_claims",
+    "product_claim_mismatch_selection",
+    "unanswerable_question_selection",
+    "validate_product_claim_mismatch",
 ]
 ignore_missing_imports = true
