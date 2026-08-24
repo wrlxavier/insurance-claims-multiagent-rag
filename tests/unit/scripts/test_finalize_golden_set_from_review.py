@@ -5,13 +5,16 @@ GOLDEN_SET_DIR] at a tmp_path for every test that touches it, so these
 tests never read or write the repo's real `data/golden_set/`.
 """
 
+import sys
 from datetime import date
 from pathlib import Path
 
 import pytest
 import scripts.finalize_golden_set_from_review as finalize_module
 from scripts.finalize_golden_set_from_review import (
+    DEFAULT_CSV_PATH,
     FinalizeError,
+    _parse_args,
     finalize_rows,
     is_approved,
     next_sequence_numbers,
@@ -157,3 +160,23 @@ def test_finalize_rows_returns_valid_golden_questions(
     rows = [make_row(row_id="1-00")]
     _, new_by_type = finalize_rows(rows, authored_at=AUTHORED_AT)
     assert isinstance(new_by_type["direct_lookup"][0], GoldenQuestion)
+
+
+@pytest.mark.unit
+def test_parse_args_defaults_to_casco_csv_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["finalize_golden_set_from_review.py"])
+    assert _parse_args().csv == DEFAULT_CSV_PATH
+
+
+@pytest.mark.unit
+def test_parse_args_accepts_explicit_csv_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "finalize_golden_set_from_review.py",
+            "--csv",
+            "eval/golden_set_draft_adversarial.csv",
+        ],
+    )
+    assert _parse_args().csv == Path("eval/golden_set_draft_adversarial.csv")

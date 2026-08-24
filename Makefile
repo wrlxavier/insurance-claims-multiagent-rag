@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial
 
 help:
 	@echo "Available targets:"
@@ -26,6 +26,9 @@ help:
 	@echo "  draft-golden-questions-casco - M2-02: draft candidate golden questions over the 15 CASCO documents into eval/golden_set_draft_casco.csv for review (overwrites that file; use repair- once rows are finalized)"
 	@echo "  repair-golden-questions-casco - M2-02: re-draft/complete the CASCO draft using the author's review verdicts (requires REVIEW=<csv>)"
 	@echo "  finalize-golden-set-casco - M2-02: promote approved rows from eval/golden_set_draft_casco.csv into data/golden_set/*.jsonl"
+	@echo "  draft-golden-questions-adversarial - M2-03: draft candidate adversarial golden questions (coverage_with_exclusion, cross_document, hdi_brand_collision, bundle_section) into eval/golden_set_draft_adversarial.csv for review"
+	@echo "  repair-golden-questions-adversarial - M2-03: re-draft the adversarial draft using the author's review verdicts (requires REVIEW=<csv>)"
+	@echo "  finalize-golden-set-adversarial - M2-03: promote approved rows from eval/golden_set_draft_adversarial.csv into data/golden_set/*.jsonl"
 
 install:
 	uv sync
@@ -100,3 +103,18 @@ repair-golden-questions-casco:
 
 finalize-golden-set-casco:
 	PYTHONPATH=app/src uv run python scripts/finalize_golden_set_from_review.py
+
+draft-golden-questions-adversarial:
+	PYTHONPATH=app/src uv run python scripts/draft_golden_questions_adversarial.py
+
+repair-golden-questions-adversarial:
+	@test -n "$(REVIEW)" || { \
+		echo "REVIEW is required: make $@ REVIEW=eval/<your-review>.csv"; \
+		exit 1; \
+	}
+	PYTHONPATH=app/src uv run python scripts/draft_golden_questions_adversarial.py \
+		--review-csv $(REVIEW)
+
+finalize-golden-set-adversarial:
+	PYTHONPATH=app/src uv run python scripts/finalize_golden_set_from_review.py \
+		--csv eval/golden_set_draft_adversarial.csv
