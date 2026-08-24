@@ -138,5 +138,8 @@ module = [
     "casco_clause_selection",
     "find_candidate_clauses",
     "validate_golden_set",
+    "pii_safety_net",
+    "synthetic_claims_selection",
+    "validate_synthetic_claims",
 ]
 ignore_missing_imports = true
