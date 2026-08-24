@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial
+.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims
 
 help:
 	@echo "Available targets:"
@@ -29,6 +29,9 @@ help:
 	@echo "  draft-golden-questions-adversarial - M2-03: draft candidate adversarial golden questions (coverage_with_exclusion, cross_document, hdi_brand_collision, bundle_section) into eval/golden_set_draft_adversarial.csv for review"
 	@echo "  repair-golden-questions-adversarial - M2-03: re-draft the adversarial draft using the author's review verdicts (requires REVIEW=<csv>)"
 	@echo "  finalize-golden-set-adversarial - M2-03: promote approved rows from eval/golden_set_draft_adversarial.csv into data/golden_set/*.jsonl"
+	@echo "  draft-synthetic-claims - M2-04: draft candidate synthetic claim narratives into eval/synthetic_claims_draft.csv for review (--dry-run prints selection counts, no LLM calls)"
+	@echo "  finalize-synthetic-claims - M2-04: promote approved rows from eval/synthetic_claims_draft.csv into data/synthetic_claims/claims.jsonl"
+	@echo "  validate-synthetic-claims - Validate data/synthetic_claims/claims.jsonl against the schema and the parsed corpus"
 
 install:
 	uv sync
@@ -118,3 +121,12 @@ repair-golden-questions-adversarial:
 finalize-golden-set-adversarial:
 	PYTHONPATH=app/src uv run python scripts/finalize_golden_set_from_review.py \
 		--csv eval/golden_set_draft_adversarial.csv
+
+draft-synthetic-claims:
+	PYTHONPATH=app/src uv run python scripts/draft_synthetic_claims.py
+
+finalize-synthetic-claims:
+	PYTHONPATH=app/src uv run python scripts/finalize_synthetic_claims_from_review.py
+
+validate-synthetic-claims:
+	PYTHONPATH=app/src uv run python scripts/validate_synthetic_claims.py
