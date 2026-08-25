@@ -44,3 +44,9 @@ jobs:
 
       - name: Unit tests
         run: PYTHONPATH=app/src uv run pytest -m unit
+
+      - name: Fetch corpus artifacts
+        run: make fetch-corpus-artifacts
+
+      - name: Validate golden set
+        run: make validate-golden-set

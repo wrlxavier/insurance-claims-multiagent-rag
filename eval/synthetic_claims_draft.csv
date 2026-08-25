@@ -1,0 +1,754 @@
+row_id,product_line,scenario_type,document_id,insurer,susep_process,primary_clause_id,primary_clause_title,primary_clause_text,secondary_clause_id,secondary_clause_title,secondary_clause_text,missing_fact_type,missing_fact_instruction,narrative,expected_verdict,reference_clause_ids,reference_clause_texts,selection_notes,draft_notes,pii_flag,authored_at,provider_used,review_verdict,review_correction,approved,finalized_claim_id
+sc-compat-1-00,CASCO,compatible,1,PORTO SEGURO COMPANHIA DE SEGUROS GERAIS,15414.610650/2024-59,1:anexos-limite-maximo-de-indenizacao-de-vidros,ANEXOS LIMITE MÁXIMO DE INDENIZAÇÃO DE VIDROS,"A cláusula de cobertura a Vidros, Faróis e Lanternas e Retrovisores contratada consta no Bilhete
+de seguro, sendo a cláusula 38N.
+Para esta cláusula, temos os seguintes limites máximos:
+Importância Segurada do Veículo
+Valor Máximo Indenizável
+Até R$ 50.000,00
+Até R$ 10.000,00
+Até R$ 80.000,00
+Até R$ 15.000,00
+Limite Máximo de Indenização
+SAC (exclusivo para informação, cancelamento e reclamações
+Atendimento Brasil
+0800 703 1280
+Atendimento exclusivo para deficientes auditivos
+0800 727 8736",,,,,,"Olha, acho que foi no meio da semana retrasada, tava uma chuva bem chata no fim de tarde e eu tava voltando do supermercado com as compras no banco de trás. Um caminhão passou na pista ao lado e espirrou uma pedra daquelas britas de asfalto direto no meu farol dianteiro e pegou de raspão na carcaça do retrovisor. O farol trincou todinho na hora e rachou a lente. Tentei passar um pano depois pra ver se era só sujeira, mas quebrou mesmo. Queria ver como faço pra agendar essa troca porque tá horrível de dirigir à noite com o farol quebrado.",compatible,1:anexos-limite-maximo-de-indenizacao-de-vidros,"[1:anexos-limite-maximo-de-indenizacao-de-vidros] ANEXOS LIMITE MÁXIMO DE INDENIZAÇÃO DE VIDROS: A cláusula de cobertura a Vidros, Faróis e Lanternas e Retrovisores contratada consta no Bilhete
+de seguro, sendo a cláusula 38N.
+Para esta cláusula, temos os seguintes limites máximos:
+Importância Se",,"Técnicas de ruído com menção a compras no banco de trás e chuva fraca. Evento compatível com cobertura de vidros, faróis e retrovisores.",,,,aprovado,,Y,compatible-001
+sc-compat-2-01,CASCO,compatible,2,AZUL COMPANHIA DE SEGUROS GERAIS,15414.603040/2022-37,2:12-obrigacoes-do-segurado/19/19.1/19.1.2,19.1.2 Sinistro de Indenização Integral,"Ocorrerá a indenização integral sempre que os prejuízos e/ou despesas relativas ao conserto do
+veículo segurado, resultantes de um mesmo sinistro, forem iguais ou superiores a 75% (setenta e
+cinco por cento) do valor do veículo determinado no Bilhete de seguro.
+19.1.2.1 Mediante acordo entre as partes, a Azul Seguros poderá optar pelo pagamento da
+Indenização Integral do Veículo Segurado, ainda que os prejuízos e/ou despesas relativas ao
+conserto do veículo segurado, resultantes de um mesmo sinistro, não sejam iguais ou superiores
+a 75% (setenta e cinco por cento) do valor do veículo determinado no Bilhete de seguro.
+19.1.2.2. A indenização somente será paga se:
+a) o veículo estiver livre de dívidas, inclusive estadias, penhoras, ônus, gravames, contestações
+ou restrições de qualquer natureza;
+b) o veículo apresentar documentos ou registros autênticos e regulares;
+c) o segurado, no caso de veículo sinistrado (salvado), providenciar a transferência de
+propriedade para a seguradora, nos termos do Código de Trânsito Brasileiro, pois a seguradora
+não possui legitimidade para pleitear essa transferência junto aos órgãos públicos.
+19.1.2.3 O pagamento será devido quando o veículo roubado ou furtado não tenha sido
+localizado oficialmente até a data da liquidação do sinistro. Caso o veículo venha a ser localizado
+antes da liquidação e o documento de compra e venda tenha sido preenchido com a intenção da
+transferência de propriedade para à Azul Seguros, esta deverá reembolsar o valor para emissão
+de 2a via.
+A seguradora indenizará o segurado ou o proprietário legal do veículo, mediante
+acordo entre as partes, caso sejam distintos. através de transferência bancária. Outras
+formas de pagamento poderão ser adotadas mediante acordo entre as partes.
+Não haverá dedução de avarias previamente constatadas e nem da franquia, nos casos de
+Indenização Integral.
+19.1.2.4 Fica entendido e acordado que se for verificada irregularidade na documentação de
+propriedade do veículo segurado, ou",,,,,,"Olha, acho que faz umas duas semanas, eu estava voltando do mercado no fim da tarde num dia de chuva muito forte. O trânsito estava horrível e a pista cheia de poça d'água. Meu carro acabou aquaplanando numa descida, perdi totalmente o controle da direção, rodei na pista e bati forte contra uma mureta de concreto, e depois ainda caí num desnível da pista. Disparou todos os airbags, destruiu a frente toda, afetou o motor e entortou a estrutura inteira do chassi e o teto. O guincho removeu o carro direto pra oficina e o avaliador me disse que os estragos passaram com folga de mais de 80% do valor do veículo, dando perda total. A documentação do carro está toda em dia no meu nome, sem dívida ou restrição nenhuma, e queria receber as orientações pra enviar os papéis e receber o valor integral do carro.",compatible,2:12-obrigacoes-do-segurado/19/19.1/19.1.2,"[2:12-obrigacoes-do-segurado/19/19.1/19.1.2] 19.1.2 Sinistro de Indenização Integral: Ocorrerá a indenização integral sempre que os prejuízos e/ou despesas relativas ao conserto do
+veículo segurado, resultantes de um mesmo sinistro, forem iguais ou superiores a 75% (setenta e
+cinco por",,"Uso de relato com detalhes irrelevantes (trânsito, ida ao mercado, chuva) e data imprecisa ('faz umas duas semanas'). Descreve perda total sem ativação de cláusulas de exclusão.",,,,aprovado,,Y,compatible-002
+sc-compat-3-02,CASCO,compatible,3,AKAD SEGUROS S.A.,15414.630997/2019-51,3:cobertura-basica-b/1,1. OBJETIVO:,"A presente cobertura tem por objetivo garantir a indenização integral do veículo
+segurado decorrentes de danos e/ou perdas em decorrência de:
+a) Colisão, abalroamento ou capotagem acidental;
+b) Queda acidental em precipícios, pontes ou viadutos;
+c) Queda acidental sobre o veículo de qualquer agente externo que não faça parte
+integrante do mesmo ou não esteja nele afixado;
+d) Incêndio ou explosão acidental, raio e suas consequências;
+e) Granizo, furacão e terremoto;
+f) Despesas necessárias ao socorro e salvamento do veículo em consequência de um dos
+riscos cobertos, comprovadamente efetuadas pelo Segurado e/ou por terceiros,
+durante e/ou após a ocorrência de um sinistro, respeitando-se o limite máximo de
+indenização contratado.",,,,,,"Olha, estou escrevendo porque sofri um acidente bem feio na rodovia voltando do trabalho, acho que faz umas duas semanas, numa tarde em que estava chovendo horrores. O trânsito estava uma loucura e a pista muito escorregadia. Eu vinha na velocidade normal quando um caminhão freou brusco na minha frente, tentei desviar pro acostamento, mas o carro acabou aquaplanando, rodou na pista e bateu violentamente contra o guard-rail, capotando em seguida. Graças a Deus ninguém se feriu gravemente, mas o carro amassou o teto todo, estourou os airbags e o motor estragou bastante, o guincho teve que levar direto pro pátio. Eu estava tão atordoado na hora que até esqueci minha mochila e marmita dentro do veículo.",compatible,3:cobertura-basica-b/1,"[3:cobertura-basica-b/1] 1. OBJETIVO:: A presente cobertura tem por objetivo garantir a indenização integral do veículo
+segurado decorrentes de danos e/ou perdas em decorrência de:
+a) Colisão, abalroamento ou capotagem acidental;
+b) Queda ",,"Técnicas de ruído: menção tangencial à chuva, trânsito e marmita esquecida; data imprecisa ('faz umas duas semanas').",,,,aprovado,,Y,compatible-003
+sc-compat-4-03,CASCO,compatible,4,SEGUROS SURA S.A.,15414.622449/2022-52,4:1-3,1. Riscos Cobertos,"Quando contratada a presente cobertura, esta tem por objetivo garantir a indenização
+aos Danos causados ao Veículo Segurado e/ou Danos a Terceiros, desde que o
+Segurado tenha contratado a cobertura de Responsabilidade Civil Facultativa Danos
+Corporais e/ou Materiais, ocasionados por qualquer Risco coberto e amparado pelas
+Coberturas contratadas na Apólice ou Certificado de Seguro, quando o Veículo Segurado
+estiver em uso por outra pessoa, que não o Segurado.",,,,,,"Olha, foi mais ou menos no meio da semana passada, acho que numa quarta-feira bem chuvosa. Eu tinha emprestado meu carro pro meu irmão ir buscar umas encomendas, porque o dele estava na oficina. Ele estava dirigindo com calma numa avenida aqui da cidade quando um outro carro cruzou a preferencial e bateu de raspão na lateral do meu carro. Amassou a porta e o para-lama, e o carro da outra pessoa também deu uma amassada no para-choque. O trânsito ficou travado por horas por causa daquela chuva toda. Meu irmão é super cuidadoso e tem habilitação há anos, então queria acionar o seguro pra arrumar a lataria do meu carro e ver a parte do outro motorista.",compatible,4:1-3,"[4:1-3] 1. Riscos Cobertos: Quando contratada a presente cobertura, esta tem por objetivo garantir a indenização
+aos Danos causados ao Veículo Segurado e/ou Danos a Terceiros, desde que o
+Segurado tenha contratado a cobertura de",,"Ruído: menção ao trânsito travado, chuva forte e motivo do empréstimo do carro.",,,,aprovado,,Y,compatible-004
+sc-compat-16-00,RCF-A,compatible,16,AKAD SEGUROS S.A.,15414.642930/2025-15,16:condicoes-especiais-2/1,1. Riscos Cobertos,"1.1. Esta cobertura garante ao Segurado, nos termos da Cláusula 3. OBJETIVO DO SEGURO das Condições
+Gerais, até o Limite Máximo de Indenização contratado, a indenização das quantias pelas quais o Segurado
+seja responsável civilmente, por danos corporais involuntários causados a Terceiros por veículo segurado e
+que o Segurado seja obrigado a indenizá-los, por ou em decisão judicial transitada em julgado, decisão arbitral
+ou em acordo pactuado entre o Segurado e os Terceiros prejudicados, desde que com anuência prévia e
+expressa da Seguradora.
+1.1.1. Também estão garantidos os danos corporais involuntários causados a Terceiros pela carga
+transportada e pelo reboque ou semirreboque atrelado ao veículo segurado no momento do acidente de
+trânsito.",,,,,,"Olha, aconteceu um acidente meio chato faz umas duas semanas, era uma terça ou quarta de chuva e o trânsito tava bem parado perto do centro da cidade. Eu estava voltando do trabalho, super cansado da rotina, fui arrancar no semáforo quando abriu e acabei atingindo um rapaz que estava atravessando a pé. Foi sem querer, ele acabou caindo e quebrou o braço no meio-fio, precisou até chamar a ambulância pro pronto-socorro. Fiquei no local até o atendimento e agora a família dele me procurou para a gente fazer um acerto sobre os gastos médicos e o tratamento dele, então gostaria de ver com a seguradora como fazemos esse acordo de danos corporais.",compatible,16:condicoes-especiais-2/1,"[16:condicoes-especiais-2/1] 1. Riscos Cobertos: 1.1. Esta cobertura garante ao Segurado, nos termos da Cláusula 3. OBJETIVO DO SEGURO das Condições
+Gerais, até o Limite Máximo de Indenização contratado, a indenização das quantias pelas quais o Segu",,"Ruído de trânsito lento, chuva e cansaço pós-trabalho; data imprecisa ('faz umas duas semanas, terça ou quarta').",,,,aprovado,,Y,compatible-005
+sc-compat-17-01,RCF-A,compatible,17,BRADESCO AUTO/RE COMPANHIA DE SEGUROS,15414.902071/2014-68,17:clausula-particular-no-2-contrato-de-aposentados/2,2. Ratificam-se todos os termos das Condições Contratuais deste bilhete que não tenham sido alterados por,"esta cláusula particular.
+CLÁUSULA PARTICULAR No 4 – COBERTURA EXCLUSIVA PARA GARANTIA DE DANOS
+MATERIAIS COM DANOS MORAIS
+1. Não obstante do disposto nas Condições Especiais da Cobertura Básica 02 (Responsabilidade Civil de Veículo –
+RCF-V - com Danos Morais), para o presente seguro garante exclusivamente o reembolso das indenizações que o
+Segurado for obrigado a pagar por danos materiais causados involuntariamente a terceiros em decorrência de
+acidente de trânsito envolvendo o veículo segurado.
+1.1. A cobertura abrangerá também a Garantia de Danos Morais causados a terceiros, desde que estes sejam
+diretamente decorrentes dos riscos cobertos pela Garantia de Danos Materiais previstas na cobertura.",,,,,,"Olha, acho que foi no meio da semana passada, tava uma garoa bem chata e o trânsito tava todo travado porque parece que tinha caído galho de árvore mais pra frente. Eu tava voltando da feira com umas sacolas de verdura no banco de trás e, na hora de frear num cruzamento aqui do bairro, meu pé deu uma escorregada de leve no pedal molhado e acabei dando um totozinho na traseira de um carro prata que tava parado na minha frente. Amassou bastante o para-choque dele e quebrou a lanterna traseira do rapaz. O motorista ficou super chateado, com razão, mas conversamos numa boa e eu passei meus contatos dizendo que meu seguro ia cobrir o conserto do carro dele.",compatible,17:clausula-particular-no-2-contrato-de-aposentados/2,"[17:clausula-particular-no-2-contrato-de-aposentados/2] 2. Ratificam-se todos os termos das Condições Contratuais deste bilhete que não tenham sido alterados por: esta cláusula particular.
+CLÁUSULA PARTICULAR No 4 – COBERTURA EXCLUSIVA PARA GARANTIA DE DANOS
+MATERIAIS COM DANOS MORAIS
+1. Não obstante do disposto nas Condições Especiais da Cobertura Básica 02 (R",,Digressão sobre compras de feira e pista molhada com data imprecisa ('no meio da semana passada'); sinistro compatível com danos materiais involuntários a terceiro.,,,,aprovado,,Y,compatible-006
+sc-compat-18-02,RCF-A,compatible,18,SEGUROS SURA S.A.,15414.614145/2021-31,18:11,11. Responsabilidade Civil do Segurado,"11.1. Quando contratada a presente Cobertura, tem o objetivo de garantir o reembolso
+das quantias pelas quais o Segurado vier a ser responsável civilmente em sentença
+judicial transitada em julgado ou em acordo autorizado de modo expresso pela
+Seguradora, relativas a reparações por Danos Corporais e/ou Danos Materiais
+involuntários ocorridos durante a vigência deste Seguro, causados a terceiros e que
+sejam decorrentes de:
+a) Acidentes relacionados com a condução, pelo Segurado, seu cônjuge ou seus
+filhos menores que estiverem sob sua guarda, de qualquer Equipamento de
+Mobilidade Individual;
+b) Acidentes causados por animais domésticos pelos quais o Segurado seja
+responsável;
+c) Quaisquer acidentes provocados pelo Segurado, seu cônjuge ou seus
+filhos menores que estiverem sob sua guarda, durante sua Mobilidade Individual,
+nos termos definidos no subitem 3.32. destas Condições Gerais.",,,,,,"Olha, aconteceu um imprevisto faz umas duas semanas, era um sábado de manhã bem abafado e eu tinha acabado de sair da padaria com o saco de pão na mão. Eu tava andando de patinete elétrico na ciclovia do bairro, bem devagarzinho, quando um pedestre atravessou na minha frente do nada. Pra não atropelar a pessoa, acabei desviando rápido e bati na lateral de um carro que tava estacionado na rua. Amassou a porta traseira e quebrou o espelho retrovisor do rapaz. O dono do carro apareceu na hora, conversamos com calma e eu disse que ia acionar meu seguro pra cobrir o estrago que causei no carro dele. Meu joelho até ralou um pouco na queda, mas o que me preocupa mesmo é resolver o conserto do veículo dele.",compatible,18:11,"[18:11] 11. Responsabilidade Civil do Segurado: 11.1. Quando contratada a presente Cobertura, tem o objetivo de garantir o reembolso
+das quantias pelas quais o Segurado vier a ser responsável civilmente em sentença
+judicial transitada em julgado ou",,"Ruído: detalhes sobre calor, compra de pão e joelho ralado; data imprecisa ('faz umas duas semanas').",,,,aprovado,,Y,compatible-007
+sc-compat-24-00,ASSIST,compatible,24,MAPFRE SEGUROS GERAIS S.A.,15414.004464/2005-13,24:3/3.1/3.1.2,3.1.2. A Seguradora garantirá ao Segurado até o Limite Máximo de Indenização (LMI) indicado na Apólice/Certificado,"individual, o reparo das partes mecânicas e elétricas, bem como a substituição das respectivas peças, no caso da
+ocorrência de Pane e/ou Avaria (mecânica ou elétrica) decorrentes de falha espontânea de componentes ou conjuntos
+que, mesmo sendo submetidos às manutenções periódicas, venham a apresentar defeito, respeitando-se as condições
+estabelecidas nas coberturas contratadas pelo Segurado.",,,,,,"Faz umas três semanas, acho que era numa quinta-feira bem chuvosa no final da tarde, eu estava voltando pra casa depois de passar na padaria pra comprar um bolo de aniversário pro meu filho. O trânsito estava horrível como sempre. Do nada, sem nenhum aviso, tranco ou barulho esquisito antes, o motor simplesmente apagou no meio da avenida. Acendeu a luz da injeção no painel e o carro morreu de vez, nem dava mais sinal na chave de partida. Sempre fiz todas as revisões periódicas em dia na oficina credenciada, o carro estava impecável até aquele instante. Tive que empurrar pro acostamento debaixo de chuva e chamar o reboque. O mecânico avaliou e disse que foi uma pane elétrica/mecânica com defeito interno e espontâneo na bomba de combustível. Gostaria de acionar o seguro para cobrir o conserto e a substituição dessa peça que quebrou do nada.",compatible,24:3/3.1/3.1.2,"[24:3/3.1/3.1.2] 3.1.2. A Seguradora garantirá ao Segurado até o Limite Máximo de Indenização (LMI) indicado na Apólice/Certificado: individual, o reparo das partes mecânicas e elétricas, bem como a substituição das respectivas peças, no caso da
+ocorrência de Pane e/ou Avaria (mecânica ou elétrica) decorrentes de falha espontânea d",,"Técnicas de ruído: trânsito lento, chuva, compra de bolo de aniversário na padaria; data imprecisa.",,,,aprovado,,Y,compatible-008
+sc-compat-25-01,ASSIST,compatible,25,Too Seguros S.A.,15414.618005/2023-01,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/2/2.1,"2.1. Este seguro garante, observados os Limites Máximos de Indenização","(LMI) fixados para cada cobertura contratada e o Limite Máximo de
+Garantia (LMG) da Apólice, o pagamento e/ou reembolso de despesas
+incorridas no reparo do Defeito identificado pela Seguradora e/ou pelos
+agentes especializados na ocorrência de Sinistros, de acordo com estas
+Condições Gerais, a Apólice e demais condições contratuais aplicáveis.",,,,,,"Olha, deve ter mais ou menos umas três semanas que meu carro deu um defeito do nada. Eu estava voltando do supermercado com as compras derretendo no porta-malas, num dia super quente, e a parte eletrônica simplesmente apagou no meio da avenida e o motor morreu. Tive que empurrar pro acostamento com a ajuda de um rapaz que passava por ali. Mandei guinchar pra oficina e o mecânico constatou um defeito interno no módulo eletrônico que pifou. Como não teve colisão nem nada externo, só essa pane mecânica mesmo, queria pedir o reembolso das despesas do conserto que tive que pagar.",compatible,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/2/2.1,"[25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/2/2.1] 2.1. Este seguro garante, observados os Limites Máximos de Indenização: (LMI) fixados para cada cobertura contratada e o Limite Máximo de
+Garantia (LMG) da Apólice, o pagamento e/ou reembolso de despesas
+incorridas no reparo do Defeito identificado pela Seguradora e/ou pe",,"Ruído: reclamação do calor, compras derretendo no porta-malas e pedestre ajudando a empurrar; data imprecisa ('umas três semanas').",,,,aprovado,,Y,compatible-009
+sc-compat-26-02,ASSIST,compatible,26,USEBENS SEGUROS S.A.,15414.650587/2021-41,26:6,CLÁUSULA 6a - RISCOS COBERTOS,"1. Para fins deste seguro, consideram-se cobertas, até o limite máximo de indenização
+contratado, as despesas expressamente previstas nestas Condições Contratuais e
+comprovadamente incorridas pela empresa locadora em decorrência de evento coberto ocorrido
+com o veículo alugado:
+a) Danos à carroceria.
+b) Roubo, furto qualificado ou vandalismo.
+c) Danos aos para-brisas, vidros laterais e traseiro, espelhos retrovisores, faróis, lanternas e
+demais luzes externas do veículo.
+d) Danos aos pneus e rodas, incluindo as despesas de reparo ou substituição, quando
+decorrentes de evento coberto.
+e) Danos ao teto.
+f) Danos causados por eventos da natureza, tais como granizo, inundação, alagamento,
+vendaval, ciclone, tornado, furacão e queda de raio, observadas as demais
+disposições contratuais.
+g) Custos de reboque e assistência na estrada, quando necessários em decorrência de
+perda, dano físico ou avaria mecânica do veículo alugado, limitados às despesas
+expressamente cobertas por este seguro.
+h) Taxas administrativas cobradas em razão do evento coberto, incluindo taxas de
+administração e outras despesas expressamente relacionadas ao processamento do
+reembolso por danos, tais como taxas de transporte, postais e de acidente, quando
+devidamente comprovadas.
+i) Custos de Devolução/realocação de veículo danificado.
+j) Taxas de perda de uso do veículo, compreendendo os valores cobrados em razão da
+indisponibilidade do veículo durante o período de reparo decorrente de evento coberto.",,,,,,"Olha, foi mais ou menos no começo do mês passado, eu tinha alugado um carro pra viajar a trabalho. No meio da estrada peguei uma chuva horrível, mal dava pra enxergar, e um caminhão que vinha na frente levantou uma pedra enorme que trincou feio o para-brisa e ainda amassou a ponta do capô. Tive que parar num posto, até tomei um café horroroso lá esperando o guincho que a locadora mandou pra levar o carro. Quando entreguei o veículo, a locadora me cobrou o conserto do vidro, a lataria e umas taxas administrativas deles pelo reboque e pelos dias parados. Quero pedir o reembolso dessas despesas todas que paguei pra eles.",compatible,26:6,"[26:6] CLÁUSULA 6a - RISCOS COBERTOS: 1. Para fins deste seguro, consideram-se cobertas, até o limite máximo de indenização
+contratado, as despesas expressamente previstas nestas Condições Contratuais e
+comprovadamente incorridas pela emp",,Ruído com queixa sobre o café do posto e a chuva forte; data imprecisa ('começo do mês passado').,,,,aprovado,,Y,compatible-010
+sc-compat-28-00,GAR.EST,compatible,28,ASSURANT SEGURADORA SA,15414.607840/2025-70,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5,5. O QUE ESTÁ COBERTO,"5.1. Fica entendido e ajustado que, a Seguradora,
+efetuará as seguintes ações pela ocorrência dos
+eventos previstos e cobertos por este contrato de
+seguro, mediante acordo entre as partes:
+a)
+Mandar reparar o bem;
+b)
+Providenciar sua reposição por outro idêntico
+ou com características similares, limitado ao valor
+consignado no Bilhete de Seguro, no caso de
+impossibilidade de reparo do bem; ou
+c)
+Indenizar em espécie o valor consignado no
+Bilhete de Seguro, quando a reposição por bem
+idêntico ou similar não for possível.
+5.2. No caso de reparar o bem, as peças utilizadas,
+não obrigatoriamente, serão da mesma marca do
+fabricante do veículo.
+5.2.1. Quando a reposição por bem idêntico não for
+possível, será dada a opção ao Segurado de
+devolução
+de
+reposição
+por
+características similares, respeitado o Limite Máximo
+de Indenização.
+5.2.2. A Seguradora preferencialmente se utilizará do
+disposto em ""a"" ou ""b"" do item 5.1, observado em
+qualquer caso, o Limite máximo de Indenização, o
+que implicará igualmente o pleno cumprimento de
+suas obrigações junto ao Segurado.
+5.3. Correrão, por conta da Seguradora, até o Limite
+Máximo de Indenização fixada no contrato.
+5.3.1. As
+despesas
+de
+salvamento
+comprovadamente efetuadas pelo Segurado durante
+e/ou após a ocorrência de um sinistro.
+5.3.2. Os valores referentes aos danos materiais
+comprovadamente causados pelo Segurado e/ou por
+terceiros na tentativa de evitar o sinistro, minorar o
+dano ou salvar a coisa.
+bem(ns)
+o(s)
+5.3.3. Eventuais custos de transporte do bem
+sinistrado para reparo ou reposição, observada a
+orientação disposta na garantia do fornecedor do
+bem.",,,,,,"Olha, faz umas duas semanas, acho que era uma quinta-feira bem abafada, meu carro simplesmente parou de engatar a marcha no meio da avenida. Eu estava voltando do trabalho cansado, doido pra chegar logo e jantar, quando o câmbio travou de vez e não saía do lugar. Tive que chamar o guincho pra levar até a oficina de confiança, e o mecânico me disse que foi uma quebra mecânica interna que não teve nada a ver com batida nem mau uso, simplesmente pifou. Como eu contratei a garantia estendida pra não ter essa dor de cabeça, queria ver como a seguradora vai fazer pra cobrir o conserto dessas peças ou o que for necessário, até porque já gastei uma grana com o reboque naquele dia.",compatible,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5,"[28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5] 5. O QUE ESTÁ COBERTO: 5.1. Fica entendido e ajustado que, a Seguradora,
+efetuará as seguintes ações pela ocorrência dos
+eventos previstos e cobertos por este contrato de
+seguro, mediante acordo entre as partes:
+a)
+Mandar r",,"Técnicas de ruído: menção a cansaço do trabalho, fome e clima abafado; data imprecisa ('faz umas duas semanas').",,,,aprovado,,Y,compatible-011
+sc-compat-29-01,GAR.EST,compatible,29,CARDIF DO BRASIL SEGUROS E GARANTIAS S.A.,15414.631153/2019-27,29:25-atualizacao-de-valores/3/3.1,3.1. Riscos Cobertos,"3.1.1 A complementação de garantia contempla coberturas complementares àquelas oferecidas pela
+garantia do fornecedor, limitadas às peças/ componentes descritos abaixo e que não
+estejam cobertas pela garantia do fabricante, conforme constante no Bilhete de Seguro:
+a) Motor: Componentes internos e lubrificados do motor: bloco do motor, cremalheira, volante,
+polias, árvore de manivelas e mancais, pistões, bielas, bronzinas de bielas, bronzinas de
+mancal, anéis, pinos e travas, camisas do cilindro, virabrequim, bomba de óleo, corrente de
+comando e engrenagens, comandos do distribuidor e tensores da correia dentada, coletores de
+admissão e escape.
+Obs.: Selos, buchas internas, juntas, vedadores e consumíveis, terão cobertura somente se os
+danos forem causados em consequência de um reparo coberto.
+b) Cabeçote: Componentes internos e lubrificados do cabeçote: cabeçote, juntas e parafusos do
+cabeçote, árvore de comando de válvulas, mancais, tuchos hidráulicos e mecânicos, balancins,
+eixo dos balancins, tampa de válvulas, válvulas de admissão e escape e guia de válvulas, molas
+das válvulas. Obs.: Selos, buchas internas, juntas, vedadores e consumíveis, terão cobertura
+somente se os danos forem causados em consequência de um reparo coberto.
+c) Caixa de Câmbio Manual: Todos os componentes internos tais como: eixo primário, secundário
+e intermediário, rolamentos, buchas, cubos engrenagens, anéis sincronizadores, garfos
+seletores, guias e calços.
+d) Caixa de Câmbio Automatizado: Todos os componentes internos tais como: eixo primário,
+secundário e intermediário, rolamentos, buchas, cubos engrenagens, anéis sincronizadores,
+garfos seletores, guias, calços, chicote elétrico, acumulador hidráulico, eletro-válvula, motor
+elétrico de acionamento, bomba hidráulica, reservatório de óleo.
+e) Caixa de Câmbio Automática: Todos os componentes internos tais como: módulo eletrônico
+do câmbio automático, conversor de torque, cintas, corpo de válvulas, bomba de óleo,
+planetária, engrenagem, es",,,,,,"Olá, estou abrindo esse chamado porque meu carro começou a fazer um barulho horrível metálico dentro do motor faz uns dez dias. Eu estava voltando do supermercado, com o porta-malas cheio de compras e aquele calor insuportável, quando de repente começou a bater muito forte. Parei na hora e chamei o guincho pra levar na oficina de confiança. O mecânico olhou e disse que quebrou a biela e danificou o virabrequim e a bomba de óleo por desgaste interno. O carro sempre fez as revisões normais e a garantia de fábrica já acabou, por isso contratei essa garantia estendida. Preciso que vocês aprovem o conserto dessas peças do motor pra eu poder usar o carro de novo.",compatible,29:25-atualizacao-de-valores/3/3.1,"[29:25-atualizacao-de-valores/3/3.1] 3.1. Riscos Cobertos: 3.1.1 A complementação de garantia contempla coberturas complementares àquelas oferecidas pela
+garantia do fornecedor, limitadas às peças/ componentes descritos abaixo e que não
+estejam cobertas pela ",,Ruído com compras de supermercado e calor; relato compatível cobrindo quebra de componentes internos lubrificados do motor.,,,,aprovado,,Y,compatible-012
+sc-compat-30-00,CARTA VERDE,compatible,30,HDI SEGUROS S.A.,15414.000861/2006-05,30:1,1. OBEJTIVO DO SEGURO,"O presente seguro tem por objeto, nos termos das presentes condições, indenizar a terceiros ou
+reembolsar o segurado pelos montantes pelos quais seja civilmente responsável, em sentença
+judicial transitada em julgado ou em acordo autorizado de modo expresso pela entidade seguradora,
+por fatos ocorridos durante a vigência do seguro relativos a:
+1.1. Morte e/ou danos pessoais e despesas médico-hospitalares e danos materiais causados a
+terceiros não transportados, e derivados de risco cobertos por este contrato.
+1.2.  O presente seguro garantirá também o pagamento dos honorários do advogado de defesa do
+segurado e as custas judiciais sempre que o mesmo seja escolhido e fixado seus honorários de
+comum acordo com a seguradora.
+Os honorários correrão integralmente por conta de cada uma das partes, segurador e segurado,
+quando cada um designar seu advogado.
+Entende-se por segurado para efeito das responsabilidades cobertas, indistintamente, proprietário do
+veículo segurado e/ou seu condutor, devidamente habilitado.",,,,,,"Olha, faz mais ou menos uns dez dias, acho que era uma quinta-feira à tarde. Eu estava viajando a passeio em Montevidéu e o trânsito na avenida principal estava bem carregado por causa de uma garoa fina que não parava. O GPS do celular ficou recalculando a rota bem na hora e acabei me distraindo por um segundo. Não consegui frear a tempo e bati na traseira de um carro prata local que estava parado na faixa de pedestres. Danificou bastante o para-choque traseiro e a lanterna do rapaz. Ele não se machucou, mas o carro dele precisa de conserto e combinei de acionar a cobertura para pagar o conserto do carro dele.",compatible,30:1,"[30:1] 1. OBEJTIVO DO SEGURO: O presente seguro tem por objeto, nos termos das presentes condições, indenizar a terceiros ou
+reembolsar o segurado pelos montantes pelos quais seja civilmente responsável, em sentença
+judicial trans",,Data imprecisa ('faz mais ou menos uns dez dias') e ruído com chuva/GPS; compatível com cobertura de danos materiais a terceiros (30:1).,,,,aprovado,,Y,compatible-013
+sc-compat-30-01,CARTA VERDE,compatible,30,HDI SEGUROS S.A.,15414.000861/2006-05,30:2,2. RISCO COBERTO,"Considera-se risco coberto a responsabilidade civil do segurado (de acordo com o previsto na
+cláusula 1) proveniente de danos materiais e/ou pessoais a terceiros não transportados pelo veículo
+segurado nesta apólice, como consequência de acidente de trânsito causado:
+2.3.  Por veículo discriminado neste seguro, que terá que ser, necessariamente, um veículo de
+passeio particular ou de aluguel, não licenciado no país de ingresso;
+2.4. Por objetos transportados no veículo em local destinado para tal fim; ou
+2.5. Por reboque discriminado neste seguro quando estiver acoplado ao mesmo veículo segurado,
+desde que autorizada e regulamentada sua utilização por autoridade competente e pago o prêmio
+adicional correspondente.",,,,,,"Aconteceu no começo da semana passada, por volta da hora do almoço. Estava um calor danado e eu estava procurando uma vaga perto do centro em Ciudad del Este com meu carro de passeio. Na hora em que fui manobrar para entrar na vaga, não vi um motociclista que vinha devagar no corredor e acabei encostando a lateral do meu carro na moto dele. A moto caiu e riscou a lateral inteira, e o rapaz acabou ralando o braço na calçada e precisou ir a um posto médico tomar remédio e fazer curativo. Gostaria de reembolso para cobrir esses gastos do rapaz e o conserto da moto dele.",compatible,30:2,"[30:2] 2. RISCO COBERTO: Considera-se risco coberto a responsabilidade civil do segurado (de acordo com o previsto na
+cláusula 1) proveniente de danos materiais e/ou pessoais a terceiros não transportados pelo veículo
+segurad",,Data imprecisa ('no começo da semana passada') e detalhes sobre calor/vaga; compatível com responsabilidade civil por veículo de passeio a terceiro não transportado (30:2).,,,,aprovado,,Y,compatible-014
+sc-incompat-1-00,CASCO,incompatible,1,PORTO SEGURO COMPANHIA DE SEGUROS GERAIS,15414.610650/2024-59,1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/18/18.2,18.2 VALOR DETERMINADO,"Em caso de Indenização Integral do veículo segurado, haverá o pagamento do valor determinado constante no Bilhete de seguro vigente na data do sinistro.",1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/13/13.3,13.3 NA COMUNICAÇÃO DE ALTERAÇÕES:,"13.3.1 Tendo em vista que a vigência do seguro é mensal, não haverá cobertura para
+alterações ocorridas no objeto contratado durante a vigência do seguro.
+O Risco coberto deverá ser exatamente o descrito no início da vigência do Bilhete de
+seguro, sob pena de não ter cobertura em caso de sinistro.",,,"Faz mais ou menos uns dez dias, eu tava indo pra casa dos meus sogros no fim de semana e acabei sofrendo uma colisão bem feia na estrada, o outro motorista freou do nada e não deu tempo de segurar, amassou toda a estrutura e o mecânico do guincho já falou que deu perda total. Eu até tava todo animado porque semana passada mesmo terminei de rebaixar a suspensão e coloquei um kit turbo no motor numa oficina de preparação pra deixar o carro mais forte, gastei uma nota e agora aconteceu essa desgraça. Queria saber como funciona pra receber o valor determinado do veículo.",incompatible,1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/18/18.2;1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/13/13.3,"[1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/18/18.2] 18.2 VALOR DETERMINADO: Em caso de Indenização Integral do veículo segurado, haverá o pagamento do valor determinado constante no Bilhete de seguro vigente na data do sinistro. || [1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/13/13.3] 13.3 NA COMUNICAÇÃO DE ALTERAÇÕES:: 13.3.1 Tendo em vista que a vigência do seguro é mensal, não haverá cobertura para
+alterações ocorridas no objeto contratado durante a vigência do seguro.
+O Risco coberto deverá ser exatamente o descr",,Técnicas de ruído com relato sobre ida aos sogros e frustração pessoal; incompatibilidade gerada pela menção casual a alterações de características estruturais/motor ocorridas no veículo durante a vigência.,,,,aprovado,,Y,incompatible-001
+sc-incompat-2-01,CASCO,incompatible,2,AZUL COMPANHIA DE SEGUROS GERAIS,15414.603040/2022-37,2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6,20.6. A seguradora não estará obrigada a custear:,"a) Despesas de contenção ou salvamento relativas à prevenção ordinária, incluindo
+qualquer tipo de manutenção, as quais são de responsabilidade exclusiva do segurado.
+b) Despesas com medidas notoriamente inadequadas ou desproporcionais ao risco,
+considerando a garantia contratada para o tipo de sinistro iminente ou verificado.
+c) Despesas acima do limite pactuado durante a vigência da apólice.",,,,,,"No comecinho deste mês, começou uma tempestade feia aqui na minha região e a rua começou a empoçar água perto da minha calçada. Como eu fiquei com medo de a água subir até a garagem e estragar o veículo, eu imediatamente contratei uma empresa particular com caminhão-pipa e bombas de alta potência pra drenar a rua toda e evitar que chegasse perto, além de ter aproveitado para mandar fazer uma manutenção preventiva completa nas borrachas, vedações e rolamentos do carro numa oficina particular pra garantir que não entrasse umidade. Foi um gasto alto com esse serviço particular de prevenção e manutenção ordinária que paguei do meu bolso para proteger o patrimônio, então estou enviando todos os comprovantes dessas despesas de contenção e revisão mecânica pra seguradora me pagar o reembolso desse valor.",incompatible,2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6,"[2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6] 20.6. A seguradora não estará obrigada a custear:: a) Despesas de contenção ou salvamento relativas à prevenção ordinária, incluindo
+qualquer tipo de manutenção, as quais são de responsabilidade exclusiva do segurado.
+b) Despesas com medidas notoriame",exclusion_only_fallback,"Uso de despesas de prevenção ordinária, manutenção e medidas desproporcionais/inadequadas (excluídas pela cláusula 20.6).",,,,aprovado,,Y,incompatible-002
+sc-incompat-3-02,CASCO,incompatible,3,AKAD SEGUROS S.A.,15414.630997/2019-51,3:riscos-excluidos-a-seguradora-isenta-se-de-qualquer-obrigacao-nos-seguintes-casos/1,"1. SE O SEGURADO, SEU REPRESENTANTE, SEU CORRETOR DE SEGUROS OU O BENEFICIÁRIO DO SEGURO:","a)
+agir ou praticar atos ilícitos dolosos ou por culpa grave equiparável
+ao dolo;
+Tratando-se de pessoa jurídica, o disposto neste item aplica-se aos sócios
+controladores, aos seus dirigentes e administradores, aos beneficiários e aos
+seus respectivos representantes.
+b)
+não efetuar o pagamento do prêmio da data estipulada, conforme a
+cláusula de ""Pagamento do Prêmio"".",,,,,,"Estou entrando em contato pra resolver o estrago na frente do meu carro. Isso foi no fim do mês passado, num dia em que eu já estava estressadíssimo porque tive que fazer hora extra sem aviso no trabalho. Eu estava voltando pra casa e um motorista num carro prata começou a me fechar e me xingar no trânsito. Eu perdi totalmente a paciência, fiquei cego de raiva, acelerei e joguei o meu carro em cima do dele de propósito pra trancar a passagem e dar um susto nele, só que acabei acertando a lateral dele em cheio e quebrou todo o meu parachoque, farol e amassou o capô. Quero ver como a gente faz pra mandar arrumar.",incompatible,3:riscos-excluidos-a-seguradora-isenta-se-de-qualquer-obrigacao-nos-seguintes-casos/1,"[3:riscos-excluidos-a-seguradora-isenta-se-de-qualquer-obrigacao-nos-seguintes-casos/1] 1. SE O SEGURADO, SEU REPRESENTANTE, SEU CORRETOR DE SEGUROS OU O BENEFICIÁRIO DO SEGURO:: a)
+agir ou praticar atos ilícitos dolosos ou por culpa grave equiparável
+ao dolo;
+Tratando-se de pessoa jurídica, o disposto neste item aplica-se aos sócios
+controladores, aos seus dirigentes e admini",exclusion_only_fallback,Técnicas de ruído: reclamação sobre trabalho/hora extra; data imprecisa ('no fim do mês passado'); relata ato doloso/intencional ao jogar o carro de propósito.,,,,aprovado,,Y,incompatible-003
+sc-incompat-4-03,CASCO,incompatible,4,SEGUROS SURA S.A.,15414.622449/2022-52,4:31,31. Despesas de Salvamento e/ou Contenção,"São as despesas efetivamente incorridas pelo Segurado, ou por terceiros em seu
+nome, destinadas a:
+a) Na ocorrência de um sinistro, conter ou limitar seus efeitos sobre os bens
+segurados (despesas de contenção); e
+b) Proteger, resgatar ou preservar os bens segurados durante ou após a
+ocorrência de um sinistro, visando à redução dos prejuízos (despesas de
+salvamento).
+Tais despesas, quando razoáveis, proporcionais e compatíveis com a natureza do
+risco, serão reembolsadas pela Seguradora até o limite estabelecido na Apólice.
+Para fins de aplicação do limite previsto, as Despesas de Contenção e/ou Salvamento
+são tratadas de forma conjunta, ou seja, o percentual incide sobre o total das duas.
+Não se confundem com despesas de prevenção ordinária, tais como manutenções
+rotineiras ou cuidados regulares de conservação dos bens, que não são objeto de
+reembolso.
+Condições Especiais
+Cobertura Adicional de Acessórios",4:2-2,2. Riscos Excluídos,"Além dos Riscos excluídos constantes no item 6 e dos bens não compreendidos
+pelo Seguro no item 7 destas Condições Gerais, o presente Seguro não garante:
+a) Qualquer tipo de Dano ocasionado aos acessórios quando não estiverem
+em uso juntamente com o Veículo Segurado relacionados na Apólice ou
+Certificado de Seguro;
+b) Extravio dos acessórios deixados em veículos, salvo se o próprio veículo
+for subtraído;
+c) Qualquer outro meio empregado para a subtração que não possua as
+características descritas no subitem 3.51. destas Condições Gerais;
+d) Acessórios não pertencentes ao Segurado;
+e) Acessórios deixados ou guardados ao ar livre ou em edificações
+semiabertas (varandas, terraços, quintais e demais localidades com acesso
+livre sem a necessidade de arrombamento ou rompimento de obstáculo para
+subtração).",,,"Faz umas três semanas, não lembro o dia certinho porque estava uma correria danada com a reforma de casa. Eu tinha tirado o bagageiro fechado e o suporte de teto do meu carro pra limpar e deixei eles guardados ali na varanda aberta da frente, perto do portão. De madrugada deu um temporal feio que destelhou parte da vizinhança, e um pedaço de madeira do beiral caiu com tudo em cima dos equipamentos, trincando o bagageiro e entortando o suporte. Eu ainda gastei comprando uma lona reforçada na manhã seguinte pra cobrir e proteger o resto das coisas que estavam lá, então queria ver se o seguro cobre o estrago dessas peças e essa despesa que tive pra conter o dano.",incompatible,4:31;4:2-2,"[4:31] 31. Despesas de Salvamento e/ou Contenção: São as despesas efetivamente incorridas pelo Segurado, ou por terceiros em seu
+nome, destinadas a:
+a) Na ocorrência de um sinistro, conter ou limitar seus efeitos sobre os bens
+segurados (despesas de  || [4:2-2] 2. Riscos Excluídos: Além dos Riscos excluídos constantes no item 6 e dos bens não compreendidos
+pelo Seguro no item 7 destas Condições Gerais, o presente Seguro não garante:
+a) Qualquer tipo de Dano ocasionado aos acessó",,Ruído: detalhes sobre reforma em casa e tempestade; ativa exclusão 4:2-2(a) e 4:2-2(e) ao relatar acessório desmontado e armazenado em varanda aberta.,,,,aprovado,,Y,incompatible-004
+sc-incompat-16-00,RCF-A,incompatible,16,AKAD SEGUROS S.A.,15414.642930/2025-15,16:condicoes-especiais,CONDIÇÕES ESPECIAIS,Cobertura Básica de Danos Materiais,16:condicoes-especiais-3/2/2.1,"2.1. Além das exclusões previstas na Cláusula 6. RISCOS EXCLUÍDOS das Condições Gerais deste Seguro,","estão excluídas desta cobertura:
+a) as condenações por Danos Morais impostas ao Segurado, em razão de fatos não relacionados ao acidente
+coberto e indenizável;
+b) as condenações aplicadas ao Segurado em razão de sua omissão na condução do processo instaurado
+pelo Terceiro prejudicado.",,,"Preciso de uma orientação de vocês porque chegou uma notificação da justiça aqui em casa. No mês passado me envolvi numa batida na rotatória perto de casa, meu carro pegou a traseira de outro veículo enquanto eu tentava achar uma vaga pra estacionar. O rapaz ficou muito estressado na hora e acabou entrando com uma ação pedindo danos morais. Chegou uma carta do fórum intimando faz um tempo, mas como eu estava cheio de problemas na firma e fazendo reforma em casa, esqueci completamente do prazo, não apresentei defesa e nem compareci na audiência. Aí o juiz me condenou direto por omissão/revelia a pagar esse dano moral, e vim abrir o sinistro pra seguradora pagar esse valor.",incompatible,16:condicoes-especiais;16:condicoes-especiais-3/2/2.1,"[16:condicoes-especiais] CONDIÇÕES ESPECIAIS: Cobertura Básica de Danos Materiais || [16:condicoes-especiais-3/2/2.1] 2.1. Além das exclusões previstas na Cláusula 6. RISCOS EXCLUÍDOS das Condições Gerais deste Seguro,: estão excluídas desta cobertura:
+a) as condenações por Danos Morais impostas ao Segurado, em razão de fatos não relacionados ao acidente
+coberto e indenizável;
+b) as condenações aplicadas ao Segurado ",,Ruído de problemas no trabalho e reforma residencial; menção natural à perda de prazo e omissão processual (exclusão de condenação por omissão na condução do processo).,,,,aprovado,,Y,incompatible-005
+sc-incompat-17-01,RCF-A,incompatible,17,BRADESCO AUTO/RE COMPANHIA DE SEGUROS,15414.902071/2014-68,17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2,"2.  Riscos Cobertos, o seguro de Responsabilidade Civil Facultativa de Veículo (RCF-V) garante o reembolso das","indenizações que o Segurado for obrigado a pagar por danos materiais e/ou danos corporais, causados
+involuntariamente a terceiros causados involuntariamente a terceiros em decorrência de acidente de trânsito
+envolvendo o veículo segurado.",17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/3-2,"3.  Riscos Excluídos - Específicos da Cobertura, além das exclusões previstas no Item 6 (Riscos Excluídos)","das Condições Gerais desta bilhete, esta cobertura não garante quaisquer prejuízos, ônus, perdas, danos ou
+responsabilidades de qualquer natureza, causados direta ou indiretamente por, resultante de, ou para os
+quais tenham contribuído:
+a) Patrimoniais e lucros cessantes não resultantes diretamente da responsabilidade por danos materiais e
+corporais cobertos pelo bilhete;
+b) Relativos a danos a bens de terceiros que estejam sob guarda e/ou custódia, ou estejam sendo utilizados
+pelo Segurado e/ou condutor do veículo segurado para transporte, uso, manipulação ou execução de
+quaisquer trabalhos;
+c) Relativos a danos causados a sócio-dirigentes ou a dirigentes da empresa do Segurado ou do condutor
+do veículo, quando a serviço;
+d) Relativos a danos causados aos empregados ou prepostos do Segurado ou condutor do veículo, quando
+a serviço;
+e) Relativos a danos causados pela queda, deslizamento ou vazamento de carga transportada, salvo
+quando consequentes de um dos riscos cobertos pela apólice;
+f) Relativos a danos causados pelo veículo segurado a pais, filhos, cônjuge e irmãos do Segurado,
+proprietário ou condutor do veículo, bem como a quaisquer pessoas que com ele(s) residam ou dele(s)
+dependam economicamente;
+g) Relativos a danos causados por poluição ou contaminação ao meio ambiente, bem como quaisquer
+despesas incorridas para limpeza e/ou descontaminação;
+h) Relativos a danos estéticos;
+i) Relativos a danos sofridos por pessoas transportadas em locais não especificamente destinados e
+apropriados a esse fim;
+j) Relativos a multas, fianças e despesas de qualquer natureza impostas ao Segurado ou ao condutor do
+veículo segurado, pertinentes a ações ou processos criminais;
+k) Relativos a responsabilidades assumidas pelo Segurado e/ou condutor do veículo segurado, decorrentes
+de contratos ou convenções; e
+l) Resultantes de prestação de serviços especializados de natureza técnico-profissional a que se destine o
+veículo e não relacionados com a sua locomoção.",,,"Faz mais ou menos uma semana, acho que era terça ou quarta de manhã, eu tava numa correria danada porque tinha marcado dentista e odeio me atrasar. Fui tirar meu carro da garagem com pressa, o vidro ainda tava meio embaçado por causa do frio da manhã, e na hora de dar ré acabei não vendo e bati direto na lateral do carro do meu filho, que tinha deixado estacionado logo atrás do meu. Ele mora aqui comigo e a gente sempre divide a vaga, mas dessa vez ele parou meio atravessado. Afundou bem a porta do passageiro do carro dele e ralou o meu para-choque. Queria ver como a gente faz pra vocês cobrirem a lataria do carro dele pelo meu seguro de terceiros.",incompatible,17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2;17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/3-2,"[17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2] 2.  Riscos Cobertos, o seguro de Responsabilidade Civil Facultativa de Veículo (RCF-V) garante o reembolso das: indenizações que o Segurado for obrigado a pagar por danos materiais e/ou danos corporais, causados
+involuntariamente a terceiros causados involuntariamente a terceiros em decorrência de acidente de t || [17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/3-2] 3.  Riscos Excluídos - Específicos da Cobertura, além das exclusões previstas no Item 6 (Riscos Excluídos): das Condições Gerais desta bilhete, esta cobertura não garante quaisquer prejuízos, ônus, perdas, danos ou
+responsabilidades de qualquer natureza, causados direta ou indiretamente por, resultante de, ",,"Inclusão natural da exclusão de danos causados a descendente/coabitante (filho que reside com o segurado), com digressão sobre atraso para consulta médica.",,,,aprovado,,Y,incompatible-006
+sc-incompat-18-02,RCF-A,incompatible,18,SEGUROS SURA S.A.,15414.614145/2021-31,18:8,8. Coberturas,"8.1. Todas as Coberturas poderão ser contratadas de forma independente, não existindo
+nenhuma Cobertura básica de contratação obrigatória.
+8.2. Responsabilidade Civil de Condutores de Veículos
+8.3. Responsabilidade Civil do Segurado",18:6,6. Riscos Excluídos,"O presente Seguro não garante, quaisquer Perdas e Danos decorrentes de:
+a) Lucros Cessantes;
+b) Desgaste natural causado pelo uso, deterioração gradativa, vício próprio,
+defeito latente, desarranjo mecânico, corrosão, incrustação, maresia, mofo,
+ferrugem, umidade ou chuva;
+c) Riscos provenientes de contrabando, descaminho, transporte ou comércio
+ilegais;
+d) Uso inadequado do equipamento, no que se refere ao trânsito em lugar
+indevido ou proibido pelas regras de mobilidade urbanas de tráfego;
+e) Negligência do Segurado, na utilização dos Veículos ou equipamentos de
+mobilidade individual, bem como na adoção de todos os meios razoáveis para
+salvá-los e preservá-los durante ou após a ocorrência de qualquer sinistro;
+f) Danos preexistentes à data de início de vigência do Seguro;
+g) Danos cujas causas, embora possam estar associadas a fatores externos
+ou não sejam perceptíveis no uso do Veículo ou Equipamento de Mobilidade,
+não são súbitas, mas cumulativas e de agravamento ao longo do tempo, como
+por exemplo, mas não se limitando a: corrosão, cavitação, fadiga,
+incrustação, ferrugem ou Oxidação, etc;
+h) Danos aos ou pelos Veículo ou Equipamento de Mobilidade individual que
+necessitem de habilitação específica para sua condução, quando o Segurado
+não estiver devidamente habilitado para conduzi-lo;
+i) Perdas ou Danos causados por atos ilícitos Dolosos, ou culpa grave
+equiparável ao Dolo, praticados pelo Segurado pessoa física, pelo
+beneficiário ou pelo representante, de um ou de outro, inclusive para pessoa
+jurídica, relacionados aos sócios controladores, aos seus dirigentes e
+administradores
+legais,
+aos
+beneficiários
+e
+aos
+seus
+respectivos
+representantes;
+j) Danos e Perdas causados direta ou indiretamente por ato terrorista,
+cabendo à Seguradora comprovar com documentação hábil, acompanhada
+de laudo circunstanciado que caracterize a natureza do atentado,
+independentemente de seu propósito, e desde que este tenha sido
+devidamente reconhecido como atentatório à ordem pública",,,"Eu tava voltando pra casa no começo do mês passado, acho que era uma terça-feira e o trânsito tava um caos total por causa de uma chuva que caiu à tarde. Como a avenida de baixo tava completamente travada, resolvi cortar caminho subindo a rodovia expressa com o meu patinete elétrico, mesmo sabendo que tem aquela placa grande proibindo o trânsito de patinetes e bicicletas naquele trecho. Pensei que não ia dar nada porque era um pedaço curto, mas um carro freou forte na descida e eu não consegui segurar no asfalto molhado, acabei batendo na traseira dele e quebrando o para-choque. Fiquei um tempão esperando resolver tudo na beira da pista e ainda acabei perdendo a hora de um compromisso importante.",incompatible,18:8;18:6,"[18:8] 8. Coberturas: 8.1. Todas as Coberturas poderão ser contratadas de forma independente, não existindo
+nenhuma Cobertura básica de contratação obrigatória.
+8.2. Responsabilidade Civil de Condutores de Veículos
+8.3. Re || [18:6] 6. Riscos Excluídos: O presente Seguro não garante, quaisquer Perdas e Danos decorrentes de:
+a) Lucros Cessantes;
+b) Desgaste natural causado pelo uso, deterioração gradativa, vício próprio,
+defeito latente, desarranjo me",,Ruído: trânsito pós-chuva e perda de compromisso; data imprecisa ('começo do mês passado'); exclusão ativada: trânsito em local proibido pelas regras de mobilidade urbana (18:6 d).,,,,aprovado,,Y,incompatible-007
+sc-incompat-24-00,ASSIST,incompatible,24,MAPFRE SEGUROS GERAIS S.A.,15414.004464/2005-13,24:6/6.1-2/6.3.2,"6.3.2. Os eventuais desembolsos decorrentes das despesas com medidas de salvamento e contenção, ainda","que realizadas por terceiros, serão reembolsados pela Seguradora, desde que devidamente comprovados,
+observando-se sempre o limite aplicável a tais despesas, equivalente a 5% (cinco por cento) do Limite Máximo
+de Indenização garantido aplicável ao tipo de Sinistro iminente ou verificado.",24:6/6.1-2/6.3.3,"6.3.3. A Seguradora não estará obrigada ao pagamento de despesas com medidas notoriamente inadequadas,",observado o Sinistro iminente ou verificado.,,,"No comecinho do mês passado, eu estava indo pro sítio da família num sábado à tarde e o carro começou a deslizar na lama, ficando meio inclinado na beira de um barranco. Fiquei com medo de que ele fosse deslizar pro fundo se a terra cedesse durante a noite. Nisso passou um conhecido operando uma retroescavadeira pesada e eu combinei de pagar pra ele puxar o carro pelo teto. Nós amarramos um cabo de aço grosso direto na coluna da porta e no teto do carro pra tentar suspender e conter o veículo. Na hora que a máquina puxou com força, acabou afundando o teto todo, quebrou o para-brisa e retorceu as colunas das portas, mas segurou o carro no lugar. Paguei quatrocentos reais pro rapaz pela ajuda emergencial e agora queria solicitar o reembolso desse valor que gastei nessa manobra pra conter o veículo, além do conserto da lataria.",incompatible,24:6/6.1-2/6.3.2;24:6/6.1-2/6.3.3,"[24:6/6.1-2/6.3.2] 6.3.2. Os eventuais desembolsos decorrentes das despesas com medidas de salvamento e contenção, ainda: que realizadas por terceiros, serão reembolsados pela Seguradora, desde que devidamente comprovados,
+observando-se sempre o limite aplicável a tais despesas, equivalente a 5% (cinco por cento) do Limi || [24:6/6.1-2/6.3.3] 6.3.3. A Seguradora não estará obrigada ao pagamento de despesas com medidas notoriamente inadequadas,: observado o Sinistro iminente ou verificado.",,"Incompatibilidade: medida de contenção/salvamento notoriamente inadequada (amarrar cabo de aço no teto/coluna com retroescavadeira pesada, agravando os danos); ruído com viagem ao sítio e medo da chuva.",,,,aprovado,,Y,incompatible-008
+sc-incompat-25-01,ASSIST,incompatible,25,Too Seguros S.A.,15414.618005/2023-01,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1,3.1. Estão expressamente excluídos de todas as coberturas deste,"seguro:
+a) danos causados por influências externas, tais como, mas não limitado
+a: acidentes em geral (trânsito, rodoviários etc.), poluição química, chuva
+ácida, poeira, sal, pedras, granizo, maresia, fogo, produtos químicos,
+acidentes causados por falha humana, acidentes naturais e de ordem
+pública (tais como revoluções, greves, guerras, conflitos etc.);
+b) despesas decorrentes da permanência do veículo na Rede
+Referenciada para execução de revisões periódicas, tais como:
+impossibilidade de uso, perda de tempo, combustível, telefonemas,
+viagens, hospedagens e transporte alternativo;
+c) danos pessoais e a propriedades, prejuízos comerciais e lucros
+cessantes;
+d) serviços de manutenção normal, descritos no Plano de Revisões
+Periódicas;
+e) danos a itens decorrentes de uso ou desgaste natural do veículo ou
+exposição ao tempo e às intempéries, tais como, mas não limitados a:
+e.1. juntas e vedações;
+e.2. catalisadores;
+Processo SUSEP No
+(Condições Gerais Seguro Assistência e Outras Coberturas - Auto)
+too
+seguros
+e.3. velas de ignição e de aquecimento;
+e.4. bicos injetores de combustíveis;
+e.5. lâmpadas em geral;
+e.6. buchas e vedadores, retentores, coifas de proteção;
+e.7. filtros e elementos de filtros;
+e.8. pastilhas e lonas de freio;
+e.9. discos e tambores de freio;
+e.10. correias em geral;
+e.11. amortecedores;
+e.12. escovas do alternador e do motor de partida;
+e.13. disco e platô de embreagem;
+e.14. palhetas do limpador de para-brisa;
+e.15. fusíveis;
+e.16. coxins e peças de borracha;
+e.17. tapetes e forrações;
+e.18. estofados e itens de aparência deteriorada.
+f) danos agravados pela não observância e constatação de anomalias,
+evidenciadas pelos indicadores do painel ou outros indicadores, sem a
+necessária parada do veículo, ou pelo uso fora das condições normais.
+Neste caso, o risco coberto ficará restrito ao componente causador da
+anomalia;
+9) regulagens, reapertos e reajustes decorrentes do uso ou manutenção
+normal do veículo;
+h) danos causados por componentes, pe",,,,,,"Faz uns dez dias, mais ou menos, eu estava indo buscar meu filho na natação e comecei a ouvir um chiado forte de ferro raspando na roda toda vez que eu pisava no pedal. Como estava garoando e o trânsito estava bem travado, fiquei com medo e levei direto no mecânico de confiança. Ele olhou e falou que era o desgaste natural das pastilhas e discos de freio que já tinham acabado pelo uso normal da cidade, aí mandei trocar as peças de desgaste e queria o reembolso desse serviço.",incompatible,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1,"[25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1] 3.1. Estão expressamente excluídos de todas as coberturas deste: seguro:
+a) danos causados por influências externas, tais como, mas não limitado
+a: acidentes em geral (trânsito, rodoviários etc.), poluição química, chuva
+ácida, poeira, sal, pedras, granizo, maresia",exclusion_only_fallback,"Ruído: menção à aula de natação do filho, garoa e trânsito lento; ativação de exclusão por desgaste natural de itens de freio (pastilhas e discos).",,,,aprovado,,Y,incompatible-009
+sc-incompat-26-02,ASSIST,incompatible,26,USEBENS SEGUROS S.A.,15414.650587/2021-41,26:3,CLÁUSULA 3a - OBJETIVO DO SEGURO,"1.
+Este seguro tem por objetivo garantir, até o limite máximo de indenização contratado, o
+reembolso das despesas expressamente cobertas e comprovadamente incorridas pela empresa
+locadora, em decorrência de evento coberto previsto nesta apólice, ocorrido com veículo
+segurado de sua propriedade durante o período de locação.",26:1-2,"1. ESTA APÓLICE NÃO RESPONDERÁ PELOS PREJUÍZOS QUE SE VERIFICAREM EM CONSEQUÊNCIA, DIRETA OU INDIRETA, DE:","a) ATOS DE HOSTILIDADE OU DE GUERRA, REBELIÃO, INSURREIÇÃO, REVOLUÇÃO, MOTIM,
+CONFISCO, GREVE, NACIONALIZAÇÃO, DESTRUIÇÃO OU REQUISIÇÃO DECORRENTES DE
+QUALQUER ATO DE AUTORIDADE DE FATO OU DE DIREITO, CIVIL OU MILITAR, E, EM
+GERAL, TODO E QUALQUER ATO OU CONSEQUÊNCIA DESSAS OCORRÊNCIAS, BEM
+COMO ATOS PRATICADOS POR QUALQUER PESSOA AGINDO POR PARTE DE, OU EM
+LIGAÇÃO COM QUALQUER ORGANIZAÇÃO CUJAS ATIVIDADES VISEM A DERRUBAR
+PELA FORÇA O GOVERNO OU INSTIGAR A SUA QUEDA, PELA PERTURBAÇÃO DA ORDEM
+POLÍTICA E SOCIAL DO PAÍS, POR MEIO DE ATOS DE TERRORISMO, GUERRA
+REVOLUCIONÁRIA, SUBVERSÃO E GUERRILHAS;
+b) DOLO OU CULPA GRAVE EQUIPARÁVEL AO DOLO PRATICADO PELO SEGURADO,
+BENEFICIÁRIOS OU SEUS REPRESENTANTES LEGAIS. SE O SEGURADO FOR PESSOA
+JURÍDICA, A EXCLUSÃO SE APLICA AOS SÓCIOS CONTROLADORES DA EMPRESA
+SEGURADA, AOS SEUS DIRIGENTES E ADMINISTRADORES LEGAIS, AOS BENEFICIÁRIOS,
+E TAMBÉM AOS RESPECTIVOS REPRESENTANTES LEGAIS.",,,"Acho que faz umas três semanas, não lembro o dia exato. Eu estava voltando com o carro alugado e o trânsito parou de vez, aí descobri que era uma greve enorme com protesto no centro da cidade. Ficou um tumulto danado, o pessoal começou a quebrar coisas no meio da rua e acabaram jogando pedras e pedaços de pau no carro alugado, amassando a lataria toda e estourando o retrovisor. Eu só queria chegar em casa pra colocar comida pro meu gato, mas acabei ficando preso nessa confusão e agora a locadora quer me cobrar o prejuízo desse quebra-quebra da manifestação.",incompatible,26:3;26:1-2,"[26:3] CLÁUSULA 3a - OBJETIVO DO SEGURO: 1.
+Este seguro tem por objetivo garantir, até o limite máximo de indenização contratado, o
+reembolso das despesas expressamente cobertas e comprovadamente incorridas pela empresa
+locadora, em decorrên || [26:1-2] 1. ESTA APÓLICE NÃO RESPONDERÁ PELOS PREJUÍZOS QUE SE VERIFICAREM EM CONSEQUÊNCIA, DIRETA OU INDIRETA, DE:: a) ATOS DE HOSTILIDADE OU DE GUERRA, REBELIÃO, INSURREIÇÃO, REVOLUÇÃO, MOTIM,
+CONFISCO, GREVE, NACIONALIZAÇÃO, DESTRUIÇÃO OU REQUISIÇÃO DECORRENTES DE
+QUALQUER ATO DE AUTORIDADE DE FATO OU DE DIREITO,",,Ruído com menção ao gato e trânsito parado; data imprecisa ('umas três semanas'); menciona dano causado por greve/tumulto/motim (exclusão 26:1-2 a).,,,,aprovado,,Y,incompatible-010
+sc-incompat-28-00,GAR.EST,incompatible,28,ASSURANT SEGURADORA SA,15414.607840/2025-70,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10,10. ÂMBITO GEOGRÁFICO DA COBERTURA,"A garantia do seguro prevista nesta clausula aplica-se
+para eventos cobertos ocorridos em qualquer parte do
+NO
+território brasileiro.",28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/19,19. PERDA DO DIREITO À INDENIZAÇÃO,"O Segurado perderá o direito à indenização, caso
+haja por parte do mesmo, seus representantes
+legais, seus prepostos ou seus beneficiários:
+a)
+Inobservância
+das
+convencionadas nas condições contratuais, que
+acarretem agravação intencional do risco coberto;
+c)
+Dolo, má fé, fraude ou tentativa de fraude
+comprovada, simulando ou provocando um
+sinistro,
+ou
+ainda,
+agravando
+consequências;
+d)
+Não comunicação à Seguradora, logo que
+saiba, de todo incidente que agravar o risco
+coberto;
+e)
+Reclamação dolosa, sob qualquer ponto
+de vista ou baseado em declarações falsas, ou
+emprego de quaisquer meios culposos ou
+simulações para obter indenização que não for
+devida;
+f)
+Por qualquer meio ilícito, procurar obter
+benefícios do presente contrato.
+O segurado está obrigado a comunicar à
+Seguradora, logo que saiba, qualquer fato
+suscetível de agravar o risco coberto, sob pena de
+perder
+o
+direito à indenização,
+se
+ficar
+comprovado que silenciou de má fé.
+A Seguradora, desde que o faça nos 15 (quinze)
+dias seguintes ao recebimento de aviso de
+agravação de risco, poderá dar-lhe ciência, por
+escrito, de sua decisão de cancelar o contrato ou
+mediante acordo entre as partes restringir a
+cobertura contratada.
+O cancelamento do contrato só se dará eficaz 30
+(trinta) dias após a notificação, devendo ser
+restituída a diferença do prêmio, calculada
+proporcionalmente ao período a decorrer da
+cobertura de risco.
+Na hipótese de continuidade do contrato, a
+Seguradora poderá cobrar a diferença de prêmio
+cabível.
+Sob pena de perder o direito à indenização, o
+segurado participará o sinistro à Seguradora, tão
+logo
+tome
+conhecimento,
+e
+adotará
+as
+providências
+imediatas
+para
+minorar
+suas
+consequências.",,,"Acho que foi no começo do mês passado, eu estava na estrada indo para um churrasco de família e começou a piscar uma luz vermelha de óleo e superaquecimento no painel, fazendo um barulho metálico horrível no motor. Como eu já estava meio atrasado e a cerveja ia esquentar no porta-malas, resolvi não parar no acostamento e continuei acelerando fundo por mais uns cinquenta quilômetros até onde dava, mesmo com o motor saindo fumaça e falhando tudo. Aí no fim das contas deu um estouro e travou o bloco do motor todinho de vez, mas pelo menos cheguei quase no destino.",incompatible,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10;28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/19,"[28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10] 10. ÂMBITO GEOGRÁFICO DA COBERTURA: A garantia do seguro prevista nesta clausula aplica-se
+para eventos cobertos ocorridos em qualquer parte do
+NO
+território brasileiro. || [28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/19] 19. PERDA DO DIREITO À INDENIZAÇÃO: O Segurado perderá o direito à indenização, caso
+haja por parte do mesmo, seus representantes
+legais, seus prepostos ou seus beneficiários:
+a)
+Inobservância
+das
+convencionadas nas condições contratuai",,"Técnicas de ruído: menção a churrasco, cerveja esquentando e atraso; data imprecisa ('começo do mês passado'). Revela agravamento intencional das consequências do dano ao continuar rodando com alerta grave de superaquecimento.",,,,aprovado,,Y,incompatible-011
+sc-incompat-29-01,GAR.EST,incompatible,29,CARDIF DO BRASIL SEGUROS E GARANTIAS S.A.,15414.631153/2019-27,29:12-limite-maximo-de-indenizacao/16.19,"16.19. Em qualquer caso, independentemente do valor dos prejuízos, a indenização não poderá",ultrapassar o Limite Máximo de Indenização fixado Bilhete de Seguro.,29:12-limite-maximo-de-indenizacao/21.1,"21.1 Além dos casos previstos em lei e nas demais cláusulas destas Condições, o Segurado perderá","o direito a qualquer indenização, bem como terá o seguro cancelado, sem direito
+à restituição do prêmio já pago, se:",,,"Olha, precisei encostar o carro faz umas três semanas porque o câmbio simplesmente travou de vez. Eu tinha acabado de pegar o carro de uma oficina de preparação onde mandei fazer um remap de injeção e instalar um kit turbo pra dar uma acelerada mais forte na pista no fim de semana, coisa básica pra dar mais torque. Quando eu tava na estrada testando a velocidade máxima e puxando marcha, fez um estalo seco e a caixa de câmbio parou de engatar. Aquele dia até caiu um temporal danado e fiquei horas esperando o guincho molhado na beira da pista. Quero saber como a gente faz pro seguro pagar a troca das engrenagens e rolamentos do câmbio.",incompatible,29:12-limite-maximo-de-indenizacao/16.19;29:12-limite-maximo-de-indenizacao/21.1,"[29:12-limite-maximo-de-indenizacao/16.19] 16.19. Em qualquer caso, independentemente do valor dos prejuízos, a indenização não poderá: ultrapassar o Limite Máximo de Indenização fixado Bilhete de Seguro. || [29:12-limite-maximo-de-indenizacao/21.1] 21.1 Além dos casos previstos em lei e nas demais cláusulas destas Condições, o Segurado perderá: o direito a qualquer indenização, bem como terá o seguro cancelado, sem direito
+à restituição do prêmio já pago, se:",,Ruído sobre temporal e espera pelo guincho; incompatível por violação/alteração das características originais e agravação de risco (turbinamento/preparação para arrancada/pista).,,,,aprovado,,Y,incompatible-012
+sc-incompat-30-00,CARTA VERDE,incompatible,30,HDI SEGUROS S.A.,15414.000861/2006-05,30:1,1. OBEJTIVO DO SEGURO,"O presente seguro tem por objeto, nos termos das presentes condições, indenizar a terceiros ou
+reembolsar o segurado pelos montantes pelos quais seja civilmente responsável, em sentença
+judicial transitada em julgado ou em acordo autorizado de modo expresso pela entidade seguradora,
+por fatos ocorridos durante a vigência do seguro relativos a:
+1.1. Morte e/ou danos pessoais e despesas médico-hospitalares e danos materiais causados a
+terceiros não transportados, e derivados de risco cobertos por este contrato.
+1.2.  O presente seguro garantirá também o pagamento dos honorários do advogado de defesa do
+segurado e as custas judiciais sempre que o mesmo seja escolhido e fixado seus honorários de
+comum acordo com a seguradora.
+Os honorários correrão integralmente por conta de cada uma das partes, segurador e segurado,
+quando cada um designar seu advogado.
+Entende-se por segurado para efeito das responsabilidades cobertas, indistintamente, proprietário do
+veículo segurado e/ou seu condutor, devidamente habilitado.",30:4,4. RISCOS NÃO COBERTOS,"4.1. O presente contrato não cobre reclamações relativas a responsabilidades provenientes de:
+a) Dolo ou culpa grave do segurado;
+b) Radiações ionizantes ou qualquer outro tipo de emanação surgidas no transporte de materiais de
+fusão ou seus resíduos;
+c) Furto, roubo ou apropriação indevida ou qualquer dano sofrido pelo veículo segurado;
+d) Tentativa do segurado, proprietário ou condutor, de obter benefícios ilícitos do seguro a que este
+contrato se refere;
+e) Atos de hostilidade ou de guerra, rebelião, insurreição, revolução, confisco, nacionalização,
+destruição ou requisição proveniente de qualquer ato de autoridade de fato ou de direito, civil ou
+militar, e em geral todo e qualquer ato ou consequência desses fatos como também atos praticados
+por qualquer pessoa atuando em nome de ou em relação a qualquer organização, cujas atividades
+forem derrubar pela força o governo ou instigar sua derrubada pela perturbação da ordem política ou
+social do país, por meios de atos de terrorismo, guerra revolucionária, subversão ou guerrilha,
+tumulto popular, greve ou lockout;
+f) Multas e/ou fianças;
+g) Despesas e honorários incorridos em ações ou processos criminais;
+h) Danos causados ao segurado, seus ascendentes, descendentes, colaterais ou cônjuge, assim
+como qualquer pessoa que com ele resida ou que dele dependa economicamente;
+i) Condução do veículo por pessoa sem habilitação legal própria para o veículo segurado;
+j) Quando o veículo esteja destinado a fins distintos dos permitidos;
+k) Quando o veículo segurado seja conduzido por uma pessoa em estado de embriaguez ou sob a
+influência de qualquer droga que produza efeitos desinibitórios, alucinógenos ou soníferos. Exclui-se
+também a responsabilidade, assumida quando o condutor se negue a que seja realizado o teste de
+embriaguez, tendo sido este requerido por autoridade competente;
+l) Os danos a pontes, balanças, viadutos, estradas e a tudo o que possa existir sobre ou abaixo dos
+mesmos devido ao peso ou dimensão do veículo, ",,,"Faz umas três semanas, estávamos viajando em dois carros em família pela Argentina. Depois de dirigir o dia todo, chegamos super cansados no hotel e as crianças estavam impacientes no banco de trás pedindo comida. Fui dar uma ré meio rápido no pátio do hotel para ajeitar a vaga e não reparei que o meu irmão vinha logo atrás com o carro dele. Acabei afundando a porta lateral do carro do meu irmão. Como o carro dele é dele e eu que causei a batida, quero acionar o seguro para pagar o funileiro do carro do meu irmão.",incompatible,30:1;30:4,"[30:1] 1. OBEJTIVO DO SEGURO: O presente seguro tem por objeto, nos termos das presentes condições, indenizar a terceiros ou
+reembolsar o segurado pelos montantes pelos quais seja civilmente responsável, em sentença
+judicial trans || [30:4] 4. RISCOS NÃO COBERTOS: 4.1. O presente contrato não cobre reclamações relativas a responsabilidades provenientes de:
+a) Dolo ou culpa grave do segurado;
+b) Radiações ionizantes ou qualquer outro tipo de emanação surgidas no",,Data imprecisa ('faz umas três semanas') e ruído do cansaço da viagem; incompatível com a exclusão 30:4(h) por se tratar de dano a veículo de parente colateral (irmão).,,,,aprovado,,Y,incompatible-013
+sc-insuf-1-00,CASCO,insufficient_information,1,PORTO SEGURO COMPANHIA DE SEGUROS GERAIS,15414.610650/2024-59,1:clausulas-adicionais/1/1.1/1.1.1,1.1.1 Riscos cobertos,"Desde que ratificada no Bilhete de seguro, esta cobertura garante a substituição do para-brisa,
+vidros laterais e traseiro do veículo segurado, em caso de quebras ou trincas, considerando, inclusive, a reposição de película protetora (exceto para-brisa), quando houver. O re-
+paro somente é realizado no vidro para-brisa.",,,,tipo_evento_condicao,Descreva o evento de forma vaga o suficiente para não dar para saber qual das hipóteses previstas na cláusula 1:clausulas-adicionais/1/1.1/1.1.1 de fato ocorreu.,"Eu tava saindo do trabalho faz uns dias, acho que numa quinta-feira bem abafada, e quando cheguei no estacionamento aberto notei um dano bem chato no vidro do carro. Tinha uma marca estranha bem visível, não sei se alguém bateu com alguma coisa ou se caiu algo de uma árvore por perto, fiquei bem chateado porque tinha acabado de mandar lavar o carro no dia anterior. Como uso o carro todo dia pra levar meu filho na escola, preciso ver como a seguradora resolve isso pra mim.",insufficient_information,1:clausulas-adicionais/1/1.1/1.1.1,"[1:clausulas-adicionais/1/1.1/1.1.1] 1.1.1 Riscos cobertos: Desde que ratificada no Bilhete de seguro, esta cobertura garante a substituição do para-brisa,
+vidros laterais e traseiro do veículo segurado, em caso de quebras ou trincas, considerando, inclusive, ",,Técnica de ruído com calor e lavagem do veículo; insuficiente porque omite qual vidro específico foi atingido e a natureza exata do dano (se é quebra/trinca ou apenas risco/avaria superficial).,,,,aprovado,,Y,insufficient_information-001
+sc-insuf-2-01,CASCO,insufficient_information,2,AZUL COMPANHIA DE SEGUROS GERAIS,15414.603040/2022-37,2:12-obrigacoes-do-segurado/12.3/12.3.2,12.3.2. O Risco coberto deverá ser exatamente o descrito no início da vigência do,"Bilhete de seguro, sob pena de não ter cobertura em caso de sinistro.",,,,data_evento_vigencia,Omita a data do evento de forma que não dê para saber se ele ocorreu dentro do prazo/vigência que a cláusula 2:12-obrigacoes-do-segurado/12.3/12.3.2 exige.,"Estou abrindo este sinistro porque bateram na lateral do meu carro enquanto eu tentava fazer uma conversão para entrar no estacionamento. O outro motorista estava tentando ultrapassar pela direita em velocidade alta e pegou em cheio as duas portas do lado do passageiro e quebrou o retrovisor. Minha esposa estava comigo no banco do carona e tomou um susto terrível, até derrubou as coisas da bolsa dela no chão do carro com o impacto. O carro continua andando, mas as portas ficaram bem amassadas e travadas, sem abrir por fora, e preciso levar em uma oficina referenciada para fazerem o reparo da funilaria e pintura.",insufficient_information,2:12-obrigacoes-do-segurado/12.3/12.3.2,"[2:12-obrigacoes-do-segurado/12.3/12.3.2] 12.3.2. O Risco coberto deverá ser exatamente o descrito no início da vigência do: Bilhete de seguro, sob pena de não ter cobertura em caso de sinistro.",,"Data e momento do sinistro totalmente omitidos, impossibilitando verificar se o evento ocorreu durante a vigência válida do seguro conforme a cláusula 12.3.2.",,,,aprovado,,Y,insufficient_information-002
+sc-insuf-3-02,CASCO,insufficient_information,3,AKAD SEGUROS S.A.,15414.630997/2019-51,3:cancelamento-e-rescisao-do-seguro/3,3. O seguro será cancelado nas seguintes situações:,"a)
+se o Segurado, seu(s) preposto(s), seu(s) representantes legais, ou
+seu(s) beneficiário(s) agirem com dolo, cometerem fraude ou tentativa de fraude
+no ato da contratação ou durante toda a vigência do contrato, simulando ou
+provocando sinistro ou ainda agravando as consequências do mesmo para
+obter indenização ou dificultar a sua elucidação, inclusive, se fizerem
+declarações errôneas quanto à caracterização do risco, não cabendo qualquer
+restituição de prêmio e nem o pagamento de indenização;
+b)
+se o Segurado não fizer declarações verdadeiras e completas, ou
+se omitir circunstâncias do seu conhecimento que possam influir na aceitação
+da proposta ou na taxa do risco ou no conhecimento exato do mesmo;
+c)
+na hipótese de qualquer descumprimento das obrigações
+convencionadas no presente contrato;
+d)
+se o Segurado deixar de pagar o prêmio devido;
+e)                  quando houver a Indenização Integral do Veículo segurado.",,,,data_evento_vigencia,Omita a data do evento de forma que não dê para saber se ele ocorreu dentro do prazo/vigência que a cláusula 3:cancelamento-e-rescisao-do-seguro/3 exige.,"Preciso de orientações sobre o conserto do meu automóvel. Minha esposa estava manobrando na garagem do condomínio e acabou esbarrando num pilar de concreto, ralando a lateral inteira, amassando as duas portas do lado direito e quebrando o retrovisor. A iluminação daquele subsolo é horrível, já reclamamos várias vezes na reunião de moradores mas ninguém resolve nada. Já tentei ligar umas três vezes pra central de vocês mas a musiquinha de espera cai toda hora, então resolvi enviar por aqui para agilizar a vistoria.",insufficient_information,3:cancelamento-e-rescisao-do-seguro/3,"[3:cancelamento-e-rescisao-do-seguro/3] 3. O seguro será cancelado nas seguintes situações:: a)
+se o Segurado, seu(s) preposto(s), seu(s) representantes legais, ou
+seu(s) beneficiário(s) agirem com dolo, cometerem fraude ou tentativa de fraude
+no ato da contratação ou durante toda a vigência ",,"Técnicas de ruído: queixas sobre iluminação do prédio e espera no telefone; fato omitido: momento/data da ocorrência, inviabilizando verificar vigência contratual.",,,,aprovado,,Y,insufficient_information-003
+sc-insuf-4-03,CASCO,insufficient_information,4,SEGUROS SURA S.A.,15414.622449/2022-52,4:21,21. Franquia e/ou Participação Obrigatória do Segurado,"Quando aplicadas será definido por cobertura um percentual e/ou valor fixo em relação
+ao Limite Máximo de Indenização contratado ou ainda um percentual dos Prejuízos
+apurados e, em algumas Coberturas, limitado por um montante mínimo.",,,,valor_franquia_limite,Omita o valor estimado do prejuízo -- a cláusula 4:21 depende de comparar esse valor com um limite/franquia.,"Tem mais ou menos uns dez dias, eu estava saindo do estacionamento do supermercado depois de um dia super cansativo no trabalho e, ao fazer uma manobra de ré meio distraído, acabei encostando a traseira num poste baixo de concreto. O para-choque traseiro rachou bem no meio e a lanterna traseira direita quebrou a lente. Fiquei um tempão esperando o atendimento eletrônico de vocês na linha, mas queria saber direitinho como funciona a questão da franquia pra levar o carro na oficina credenciada e fazer os consertos.",insufficient_information,4:21,"[4:21] 21. Franquia e/ou Participação Obrigatória do Segurado: Quando aplicadas será definido por cobertura um percentual e/ou valor fixo em relação
+ao Limite Máximo de Indenização contratado ou ainda um percentual dos Prejuízos
+apurados e, em algumas Coberturas,",,Ruído: reclamação sobre cansaço após o trabalho e espera no atendimento telefônico; fato omitido: valor estimado do conserto/prejuízo dos danos.,,,,aprovado,,Y,insufficient_information-004
+sc-insuf-16-00,RCF-A,insufficient_information,16,AKAD SEGUROS S.A.,15414.642930/2025-15,16:condicoes-especiais-3/1,1. Riscos Cobertos,"1.1. Esta cobertura garante ao Segurado, nos termos da Cláusula 3. OBJETIVO DO SEGURO das Condições
+Gerais, até o Limite Máximo de Indenização contratado, a Indenização das quantias pelas quais o Segurado
+venha a ser responsável civilmente, em razão de danos morais causados involuntariamente a Terceiros por
+veículo segurado e que o Segurado seja obrigado a indenizá-los, por ou em decisão judicial transitada em
+julgado, decisão arbitral ou em acordo pactuado entre o Segurado e os Terceiros prejudicados, desde que
+com anuência prévia e expressa da Seguradora.
+1.1.1. A cobertura aplica-se exclusivamente a danos morais que decorram direta e estritamente de danos
+corporais ou materiais cobertos pelas coberturas básicas do Seguro e indenizados pela Seguradora, originados
+de acidentes de trânsito envolvendo o veículo Segurado.",,,,valor_franquia_limite,Omita o valor estimado do prejuízo -- a cláusula 16:condicoes-especiais-3/1 depende de comparar esse valor com um limite/franquia.,"No comecinho do mês passado me envolvi num acidente bem desgastante quando saía do supermercado carregado de compras. Meu carro acabou colidindo na lateral de um carro de aplicativo, amassou a porta e a passageira dele ficou muito assustada e teve alguns ferimentos leves no braço. O conserto do carro já foi resolvido pela seguradora, mas a passageira ficou com muito trauma e estresse pós-acidente e conversamos para fazer um acordo amigável pelos danos morais que ela sofreu com o ocorrido, sem precisar acionar a justiça. Gostaria de saber como procedo para que vocês analisem e deem o aval para esse acordo de dano moral.",insufficient_information,16:condicoes-especiais-3/1,"[16:condicoes-especiais-3/1] 1. Riscos Cobertos: 1.1. Esta cobertura garante ao Segurado, nos termos da Cláusula 3. OBJETIVO DO SEGURO das Condições
+Gerais, até o Limite Máximo de Indenização contratado, a Indenização das quantias pelas quais o Segu",,Ruído de saída de supermercado com compras; omitido o valor monetário estimado ou pleiteado para o acordo de danos morais.,,,,aprovado,,Y,insufficient_information-005
+sc-insuf-17-01,RCF-A,insufficient_information,17,BRADESCO AUTO/RE COMPANHIA DE SEGUROS,15414.902071/2014-68,17:atualizacao-monetaria,ATUALIZAÇÃO MONETÁRIA,"Regra geral para início da contagem da atualização
+monetária, excetuados os casos abaixo.
+A data da ocorrência do sinistro
+Reembolso.
+A data do efetivo dispêndio pelo Segurado ou
+Beneficiário
+Indenização que consista no pagamento de valores
+correspondentes
+a
+compromissos
+futuros
+do
+Segurado ou Beneficiário.
+A data do efetivo compromisso, desde que
+posterior à data da ocorrência do sinistro.",,,,tipo_evento_condicao,Descreva o evento de forma vaga o suficiente para não dar para saber qual das hipóteses previstas na cláusula 17:atualizacao-monetaria de fato ocorreu.,"Estou tentando abrir isso aqui faz uns três dias porque no telefone só dava ocupado. Foi no fim do mês passado, eu tava indo buscar minha neta na escola e me envolvi numa batida leve com outro veículo aqui no centro. Combinamos um valor com o rapaz pra acertar o prejuízo da lataria dele pra não ter dor de cabeça com briga de trânsito, deu quase dois mil reais o estrago. Só preciso que vocês façam o acerto desses valores com base no que foi combinado pelo acidente pra resolver de vez essa pendência.",insufficient_information,17:atualizacao-monetaria,"[17:atualizacao-monetaria] ATUALIZAÇÃO MONETÁRIA: Regra geral para início da contagem da atualização
+monetária, excetuados os casos abaixo.
+A data da ocorrência do sinistro
+Reembolso.
+A data do efetivo dispêndio pelo Segurado ou
+Beneficiário
+Indeniza",,"Omitido se o valor já foi desembolsado pelo segurado (reembolso), se foi firmado compromisso a pagar futuramente ou se o pagamento direto ainda aguarda liquidação; ruído de reclamação sobre fila telefônica.",,,,aprovado,,Y,insufficient_information-006
+sc-insuf-18-02,RCF-A,insufficient_information,18,SEGUROS SURA S.A.,15414.614145/2021-31,18:14,14. Início de Vigência do Contrato de Seguro,"14.1. As datas e os horários de início e término da vigência do Seguro serão indicados
+nas Apólices, nos certificados de Seguro e nos Endossos.
+14.2. O período de vigência de cada uma das Coberturas disponíveis para contratação,
+será especificado em meses, dias, horas e/ou minutos de acordo com a opção definida
+pelo Corretor/Segurado e aceita pela Seguradora.
+14.3.  Nos casos de interrupção e recomeço, e de inclusão ou exclusão de Coberturas
+dos Riscos não preestabelecidos no início da contratação, os inícios e fins de tais
+Coberturas, fixados em dias, horas, minutos, trechos ou outros critérios passíveis de
+contratação serão estabelecidos no decorrer da vigência de contrato de Seguro, por meio
+de Endosso ou certificado.",,,,data_evento_vigencia,Omita a data do evento de forma que não dê para saber se ele ocorreu dentro do prazo/vigência que a cláusula 18:14 exige.,"Estou enviando este relato porque preciso acionar a cobertura pra pagar o conserto do carro de um rapaz. Eu estava manobrando para entrar na vaga do condomínio depois de chegar muito cansado do trabalho, e acabei dando uma raspada feia na lateral do carro do meu vizinho de vaga. Ficou bem riscado na porta e amassou um pouco o para-lama. A gente conversou na boa, passei meu telefone pra ele e prometi que ia abrir o chamado aqui com vocês pra pagar o prejuízo. Só estou conseguindo mandar isso hoje porque a correria na empresa estava surreal e mal tive tempo de abrir o aplicativo.",insufficient_information,18:14,"[18:14] 14. Início de Vigência do Contrato de Seguro: 14.1. As datas e os horários de início e término da vigência do Seguro serão indicados
+nas Apólices, nos certificados de Seguro e nos Endossos.
+14.2. O período de vigência de cada uma das Coberturas d",,"Ruído: cansaço pós-trabalho e correria no emprego; fato omitido: omissão completa de data/horário em que o acidente aconteceu, impedindo averiguar se ocorreu no período de vigência da cobertura (18:14).",,,,aprovado,,Y,insufficient_information-007
+sc-insuf-24-00,ASSIST,insufficient_information,24,MAPFRE SEGUROS GERAIS S.A.,15414.004464/2005-13,24:1/1.1,1.1. OBJETIVO DO SEGURO,"1.1.1. Pelo presente contrato de seguro, a Seguradora obriga-se, mediante o pagamento do Prêmio equivalente, a
+garantir o interesse legítimo do Segurado ou do Beneficiário indicado na Apólice/Certificado individual, contra Riscos
+predeterminados, desde que cobertos, respeitados os Riscos Excluídos, as hipóteses de Perda de Direito e as demais
+disposições contratuais.
+1.1.2. A garantia consiste no pagamento de Indenização por prejuízos comprovados decorrentes dos Riscos
+contratados, até o Limite Máximo de Indenização (LMI) estabelecidos em cada cobertura em vigor.",,,,valor_franquia_limite,Omita o valor estimado do prejuízo -- a cláusula 24:1/1.1 depende de comparar esse valor com um limite/franquia.,"Já faz quase um mês, não lembro o dia exato da semana, mas era de manhã cedo e eu estava com pressa pra não perder uma consulta no dentista. Fui manobrar pra sair da vaga num supermercado e não vi uma mureta de concreto bem baixa que ficava no ponto cego do retrovisor. Acabei raspando feio toda a lateral do passageiro, amassou a porta dianteira, riscou a de trás e quebrou a capa do espelho retrovisor. O funcionário do mercado até me ajudou a catar os pedaços de plástico da carcaça no chão. O carro ainda roda normalmente, mas a estética ficou bem prejudicada. Gostaria de saber como procedo para abrir o sinistro e fazer o reparo dessa batida.",insufficient_information,24:1/1.1,"[24:1/1.1] 1.1. OBJETIVO DO SEGURO: 1.1.1. Pelo presente contrato de seguro, a Seguradora obriga-se, mediante o pagamento do Prêmio equivalente, a
+garantir o interesse legítimo do Segurado ou do Beneficiário indicado na Apólice/Certific",,Fato omitido: valor estimado do prejuízo/orçamento dos reparos; técnicas de ruído: pressa para consulta no dentista e funcionário recolhendo pedaços de plástico.,,,,aprovado,,Y,insufficient_information-008
+sc-insuf-25-01,ASSIST,insufficient_information,25,Too Seguros S.A.,15414.618005/2023-01,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1,1.1. O presente seguro tem por objetivo garantir ao Segurado o,"pagamento de indenização no caso de ocorrência comprovada dos eventos
+previstos e cobertos nestas Condições Gerais, na Apólice e nas demais
+condições contratuais aplicáveis, observados os Limites Máximos de
+Indenização (LMI) fixados para cada cobertura contratada e o Limite
+Máximo de Garantia (LMG) da Apólice.",,,,valor_franquia_limite,Omita o valor estimado do prejuízo -- a cláusula 25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1 depende de comparar esse valor com um limite/franquia.,"Acho que foi no começo do mês passado, eu tinha acabado de sair do serviço bem cansado e peguei um engarrafamento chato por causa de um caminhão quebrado. Quando a pista finalmente liberou, meu carro começou a engasgar, perdeu a tração e não passava da segunda marcha. Consegui encostar e deixei na oficina, onde me avisaram que quebrou uma engrenagem interna da transmissão mecânica e que precisaria do reparo coberto pela seguradora pra poder liberar o veículo.",insufficient_information,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1,"[25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1] 1.1. O presente seguro tem por objetivo garantir ao Segurado o: pagamento de indenização no caso de ocorrência comprovada dos eventos
+previstos e cobertos nestas Condições Gerais, na Apólice e nas demais
+condições contratuais aplicáveis, observados os Limites Máxi",,"Ruído: cansaço do trabalho, engarrafamento com caminhão quebrado; Fato omitido: valor estimado do prejuízo / orçamento do reparo para checagem de limite/franquia.",,,,aprovado,,Y,insufficient_information-009
+sc-insuf-26-02,ASSIST,insufficient_information,26,USEBENS SEGUROS S.A.,15414.650587/2021-41,26:1-3,"1. Desde que acordado entre as partes, serão aplicadas franquias e/ou participação","obrigatória do Segurado estabelecidas por ocasião da contratação do seguro e expressamente
+indicadas nesta apólice.",,,,valor_franquia_limite,Omita o valor estimado do prejuízo -- a cláusula 26:1-3 depende de comparar esse valor com um limite/franquia.,"Foi no fim do mês passado, eu estava num shopping bem cheio procurando vaga porque precisava comprar com pressa o presente de aniversário do meu sobrinho. Na hora de manobrar o carro que aluguei, acabei raspando a lateral numa daquelas colunas de concreto do estacionamento subterrâneo. A porta traseira ficou bem ralada e deu uma leve amassada no paralama. Devolvi o carro na locadora e eles avisaram que iam passar o caso pro setor de avarias pra fazer a cobrança, então já estou abrindo o chamado aqui pra ver como funciona a cobertura.",insufficient_information,26:1-3,"[26:1-3] 1. Desde que acordado entre as partes, serão aplicadas franquias e/ou participação: obrigatória do Segurado estabelecidas por ocasião da contratação do seguro e expressamente
+indicadas nesta apólice.",,Fato omitido: valor estimado do prejuízo/orçamento para cálculo da franquia (26:1-3); ruído com compra de presente do sobrinho; data imprecisa ('fim do mês passado').,,,,aprovado,,Y,insufficient_information-010
+sc-insuf-28-00,GAR.EST,insufficient_information,28,ASSURANT SEGURADORA SA,15414.607840/2025-70,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10,10. ÂMBITO GEOGRÁFICO DA COBERTURA,"A garantia do seguro prevista nesta clausula aplica-se
+para eventos cobertos ocorridos em qualquer parte do
+NO
+território brasileiro.",,,,ambito_geografico,"Omita em que país/local o evento ocorreu -- a cláusula 28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10 só se aplica dentro de um âmbito geográfico específico, e sem essa informação não dá para saber se o evento está dentro dele.","Faz quase um mês, não anotei o dia exato porque a gente estava em plena viagem de férias com as crianças brigando no banco de trás e comendo salgadinho. Do nada, numa reta da rodovia, o motor começou a perder força, engasgou e apagou completamente, sem dar mais partida nenhuma. Ficamos um tempão esperando o guincho no acostamento sem sinal bom de celular, e agora o carro está parado aguardando a autorização da garantia pra arrumar o sistema de injeção que pifou.",insufficient_information,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10,"[28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/10] 10. ÂMBITO GEOGRÁFICO DA COBERTURA: A garantia do seguro prevista nesta clausula aplica-se
+para eventos cobertos ocorridos em qualquer parte do
+NO
+território brasileiro.",,"Técnicas de ruído: briga das crianças, salgadinhos e sinal ruim de celular; data imprecisa ('faz quase um mês'). Fato omitido: localização geográfica do sinistro (não informa país ou localidade para verificar se ocorreu em território brasileiro).",,,,aprovado,,Y,insufficient_information-011
+sc-insuf-29-01,GAR.EST,insufficient_information,29,CARDIF DO BRASIL SEGUROS E GARANTIAS S.A.,15414.631153/2019-27,29:10-obrigacoes-do-segurado/10.2,"10.2 Além das obrigações prevista no subitem 10.1, o Segurado, em caso de sinistro, deverá cumprir","as instruções determinadas nas condições específicas de cada cobertura.
+11  PAGAMENTO DO PRÊMIO
+11.1
+A forma e a periodicidade de pagamento do prêmio de seguro serão fixadas no Bilhete de Seguro.
+11.2
+O prêmio pago ao Representante de Seguro considera-se feito a Seguradora.
+11.3
+Este seguro poderá ser pago de forma única ou fracionado, conforme estabelecido no Bilhete de
+Seguro.
+11.3.1
+A data limite para pagamento do prêmio será a contida no respectivo documento de cobrança
+do Seguro.
+11.3.2
+Se ocorrer um sinistro dentro do prazo de pagamento do prêmio à vista ou de qualquer uma
+de suas parcelas, sem que o pagamento tenha sido efetuado, o direito à indenização não
+ficará prejudicado. Quando o pagamento da indenização acarretar o cancelamento do Bilhete
+de seguro, as parcelas vincendas do prêmio serão ser deduzidas do valor da indenização,
+excluído o adicional de fracionamento.
+11.3.3
+Nos prêmios fracionados com incidência de juros, é facultado ao Segurado antecipar o
+pagamento do prêmio fracionado, total ou parcialmente, mediante redução proporcional dos
+juros pactuados.
+11.4
+O inadimplemento relativo à prestação única ou à primeira parcela do Prêmio, até a data de seu
+vencimento, caracteriza o não aperfeiçoamento da contratação do seguro, independente de
+notificação da Seguradora ao Segurado.
+11.5
+Ocorrendo a falta de pagamento de qualquer parcela do Prêmio, exceto a prestação única ou a
+primeira parcela, a Seguradora encaminhará ao Segurado, por meio idôneo que comprove o
+recebimento, uma notificação concedendo o prazo de 15 (quinze) dias para regularização, sob pena
+de suspensão de cobertura e resolução do contrato após 90 (noventa) dias de inadimplemento. Caso
+10
+o pagamento não seja efetuado dentro desse prazo, contado a partir do recebimento da notificação
+pelo Segurado, a cobertura será suspensa desde a data de vencimento da parcela original não paga.
+11.6
+Na hipótese de recusa do recebimento da notificação ou, por qualquer motivo, o Segurado não seja
+encontr",,,,data_evento_vigencia,Omita a data do evento de forma que não dê para saber se ele ocorreu dentro do prazo/vigência que a cláusula 29:10-obrigacoes-do-segurado/10.2 exige.,"Meu carro apresentou um defeito grave no cabeçote e nas válvulas, o motor falhou e apagou do nada enquanto eu estava indo pro trabalho. Eu estava super atrasado pra uma reunião importante e meu celular estava quase sem bateria, foi um estresse danado pra conseguir falar com alguém. Acabei mandando guinchar o carro direto pra garagem aqui de casa e deixei ele parado lá, pois na época tive outros imprevistos pessoais pra resolver. Agora que as coisas acalmaram, quero acionar a cobertura de garantia estendida para que façam a avaliação e o conserto dessas peças do cabeçote.",insufficient_information,29:10-obrigacoes-do-segurado/10.2,"[29:10-obrigacoes-do-segurado/10.2] 10.2 Além das obrigações prevista no subitem 10.1, o Segurado, em caso de sinistro, deverá cumprir: as instruções determinadas nas condições específicas de cada cobertura.
+11  PAGAMENTO DO PRÊMIO
+11.1
+A forma e a periodicidade de pagamento do prêmio de seguro serão fixadas no Bilhete de Seguro.
+11.2",,"Ruído sobre atraso em reunião e bateria do celular; omitida qualquer referência de data/época do ocorrido, impedindo averiguar vigência e situação de pagamento do prêmio.",,,,aprovado,,Y,insufficient_information-012
+sc-insuf-30-00,CARTA VERDE,insufficient_information,30,HDI SEGUROS S.A.,15414.000861/2006-05,30:1,1. OBEJTIVO DO SEGURO,"O presente seguro tem por objeto, nos termos das presentes condições, indenizar a terceiros ou
+reembolsar o segurado pelos montantes pelos quais seja civilmente responsável, em sentença
+judicial transitada em julgado ou em acordo autorizado de modo expresso pela entidade seguradora,
+por fatos ocorridos durante a vigência do seguro relativos a:
+1.1. Morte e/ou danos pessoais e despesas médico-hospitalares e danos materiais causados a
+terceiros não transportados, e derivados de risco cobertos por este contrato.
+1.2.  O presente seguro garantirá também o pagamento dos honorários do advogado de defesa do
+segurado e as custas judiciais sempre que o mesmo seja escolhido e fixado seus honorários de
+comum acordo com a seguradora.
+Os honorários correrão integralmente por conta de cada uma das partes, segurador e segurado,
+quando cada um designar seu advogado.
+Entende-se por segurado para efeito das responsabilidades cobertas, indistintamente, proprietário do
+veículo segurado e/ou seu condutor, devidamente habilitado.",,,,data_evento_vigencia,Omita a data do evento de forma que não dê para saber se ele ocorreu dentro do prazo/vigência que a cláusula 30:1 exige.,"Estou enviando este relato porque me envolvi em um acidente durante o passeio que fiz de carro pelo Uruguai. Eu estava saindo de um posto de gasolina e um rapaz num carrinho sedan veio na preferencial e acabamos colidindo. A lateral do carro dele ficou bem amassada e quebrou o retrovisor. A gente conversou no local, trocamos contatos amigavelmente e eu assumi a responsabilidade de consertar o veículo dele pela cobertura de terceiros. Preciso das orientações de vocês para dar andamento no pagamento da oficina dele.",insufficient_information,30:1,"[30:1] 1. OBEJTIVO DO SEGURO: O presente seguro tem por objeto, nos termos das presentes condições, indenizar a terceiros ou
+reembolsar o segurado pelos montantes pelos quais seja civilmente responsável, em sentença
+judicial trans",,"Omissão total de qualquer elemento temporal ou data do ocorrido, tornando impossível verificar se o fato ocorreu durante a vigência do seguro (30:1).",,,,aprovado,,Y,insufficient_information-013

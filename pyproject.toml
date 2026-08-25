@@ -21,6 +21,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ipykernel>=7.3.0",
+    "langchain-anthropic>=0.3",
     "mypy>=2.3.0",
     "nbstripout>=0.9.1",
     "pre-commit>=4.6.1",
@@ -118,6 +119,31 @@ module = [
     "pyarrow.*",
     "pytesseract.*",
     "langchain_core.*",
+    "langchain_anthropic.*",
     "tqdm.*",
+]
+ignore_missing_imports = true
+
+# scripts/draft_golden_questions_casco.py and
+# scripts/finalize_golden_set_from_review.py import these sibling script
+# modules by bare name (matching how `python scripts/<name>.py` resolves
+# them at runtime -- see each script's import block) rather than via the
+# `scripts.` package path tests use; mypy has no path-based sibling-import
+# resolution, so this only silences that path mismatch. Both modules are
+# still fully type-checked in their own right via the `scripts` entry in
+# [tool.mypy]'s `files` above.
+[[tool.mypy.overrides]]
+module = [
+    "adversarial_clause_selection",
+    "casco_clause_selection",
+    "find_candidate_clauses",
+    "validate_golden_set",
+    "pii_safety_net",
+    "synthetic_claims_selection",
+    "validate_synthetic_claims",
+    "product_claim_mismatch_selection",
+    "unanswerable_question_selection",
+    "validate_product_claim_mismatch",
+    "review_sample_selection",
 ]
 ignore_missing_imports = true
