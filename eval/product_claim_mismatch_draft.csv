@@ -1,0 +1,92 @@
+row_id,product_line,document_id,insurer,susep_process,primary_clause_id,primary_clause_title,primary_clause_text,narrative,expected_verdict,reference_clause_ids,reference_clause_texts,selection_notes,draft_notes,pii_flag,authored_at,review_verdict,review_correction,approved,finalized_claim_id
+mismatch-16-02,RCF-A,16,AKAD SEGUROS S.A.,15414.642930/2025-15,16:condicoes-especiais-2/1,1. Riscos Cobertos,"1.1. Esta cobertura garante ao Segurado, nos termos da Cláusula 3. OBJETIVO DO SEGURO das Condições
+Gerais, até o Limite Máximo de Indenização contratado, a indenização das quantias pelas quais o Segurado
+seja responsável civilmente, por danos corporais involuntários causados a Terceiros por veículo segurado e
+que o Segurado seja obrigado a indenizá-los, por ou em decisão judicial transitada em julgado, decisão arbitral
+ou em acordo pactuado entre o Segurado e os Terceiros prejudicados, desde que com anuência prévia e
+expressa da Seguradora.
+1.1.1. Também estão garantidos os danos corporais involuntários causados a Terceiros pela carga
+transportada e pelo reboque ou semirreboque atrelado ao veículo segurado no momento do acidente de
+trânsito.","Boa tarde, preciso abrir o aviso de roubo do meu carro. Aconteceu faz umas duas semanas, era uma terça ou quarta à noite, acho que por volta das nove horas. Eu estava voltando da padaria com umas compras pra janta e quando reduzi no cruzamento dois rapazes armados me renderam e mandaram descer na hora. Levaram o veículo com a minha jaqueta, os pães e até a chave reserva do portão de casa que ficava no porta-luvas, tive que gastar uma nota trocando o miolo da fechadura no dia seguinte por segurança. Já fiz o boletim de ocorrência na delegacia logo na manhã seguinte. Como faço agora pra vocês liberarem a indenização do carro?",incompatible,16:condicoes-especiais-2/1,"[16:condicoes-especiais-2/1] 1. Riscos Cobertos: 1.1. Esta cobertura garante ao Segurado, nos termos da Cláusula 3. OBJETIVO DO SEGURO das Condições
+Gerais, até o Limite Máximo de Indenização contratado, a indenização das quantias pelas quais o Segu",,Roubo do veículo à mão armada ao voltar da padaria; ruído sobre compras de pão e troca de fechadura de casa.,,,,,Y,mismatch-001
+mismatch-17-03,RCF-A,17,BRADESCO AUTO/RE COMPANHIA DE SEGUROS,15414.902071/2014-68,17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2,"2.  Riscos Cobertos, o seguro de Responsabilidade Civil Facultativa de Veículo (RCF-V) garante o reembolso das","indenizações que o Segurado for obrigado a pagar por danos materiais e/ou danos corporais, causados
+involuntariamente a terceiros causados involuntariamente a terceiros em decorrência de acidente de trânsito
+envolvendo o veículo segurado.","Olha, preciso dar entrada no seguro porque meu carro pegou fogo. Acho que foi numa terça-feira, faz umas duas semanas mais ou menos, eu tinha acabado de sair do supermercado com as compras do mês, inclusive perdi tudo que era congelado na correria. Eu estava dirigindo tranquilo e do nada começou a sair uma fumaça preta com cheiro horrível de queimado debaixo do capô. Parei no acostamento correndo e logo começou a subir labareda do motor. Algumas pessoas tentaram ajudar com extintor mas não deu conta, queimou a frente toda do carro, derreteu o painel por dentro e acabou com a lataria. Queria saber como funciona pra vocês avaliarem o estrago e liberar a indenização do meu veículo.",incompatible,17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2,"[17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2] 2.  Riscos Cobertos, o seguro de Responsabilidade Civil Facultativa de Veículo (RCF-V) garante o reembolso das: indenizações que o Segurado for obrigado a pagar por danos materiais e/ou danos corporais, causados
+involuntariamente a terceiros causados involuntariamente a terceiros em decorrência de acidente de t",,Incêndio no motor e interior do próprio veículo com ruído sobre perda de compras de supermercado congeladas.,,,,,Y,mismatch-002
+mismatch-18-04,RCF-A,18,SEGUROS SURA S.A.,15414.614145/2021-31,18:5,5. Âmbito Geográfico,"5.1. As disposições deste contrato de Seguro aplicam-se exclusivamente a Danos
+ocorridos e reclamados no Território Brasileiro, salvo estipulação expressa em cláusula
+específica.","Olha, faz umas duas semanas, acho que era numa terça ou quarta-feira de manhã bem cedo, eu estava pegando a estrada pra levar meu filho na natação e um caminhão na minha frente espirrou uma pedrinha da pista. Na hora deu um estalo muito alto e fez uma trinca no para-brisa do meu carro. O trânsito estava bem travado e o tempo meio nublado, tomei um susto danado. No começo achei que era só uma lasquinha à toa, mas com o calor e a trepidação a rachadura foi abrindo e agora tá atravessando quase o vidro todo na frente do volante. Gostaria de saber como faço pra acionar e trocar o meu para-brisa.",incompatible,18:5,"[18:5] 5. Âmbito Geográfico: 5.1. As disposições deste contrato de Seguro aplicam-se exclusivamente a Danos
+ocorridos e reclamados no Território Brasileiro, salvo estipulação expressa em cláusula
+específica.",,Quebra de para-brisa próprio por pedrisco na estrada; ruído sobre trânsito travado e ida à natação.,,,,,Y,mismatch-003
+mismatch-21-00,RCF-A,21,HDI GLOBAL SEGUROS S.A,15414.634764/2024-94,21:cobertura-danos-corporais/1,1. Riscos Cobertos,"1.1. Respeitados os Limites máximos de Indenização por Cobertura e o Limite Máximo de Garantia da Apólice, a Seguradora
+garante a Indenização da quantia que o Segurado for legalmente obrigado a pagar a Terceiros em razão da
+responsabilidade civil pelos Danos Corporais  cobertos por esta Apólice, ocorridos em todos os lugares indicados na
+Especificação da Apólice como Âmbito Geográfico, durante o período de Vigência e decorrentes do Risco da circulação de
+Veículos de transporte rodoviário de carga que o Segurado esteja conduzindo.
+1.2. Estipula-se, através da presente Cobertura, um Limite Máximo de Indenização, indicado na Especificação da Apólice,
+para a Cobertura contratada para Eventos de Danos Materiais, mediante o respectivo pagamento de Prêmio.","Olha, estou abrindo o chamado porque bateram no meu carro faz uns dez dias, mais ou menos numa terça ou quarta-feira, não anotei o dia exato. Eu estava voltando do supermercado com as compras da semana no porta-malas, o trânsito estava horrível por causa de uma chuva fraca que começou do nada, e quando parei no semáforo um carro prata não conseguiu frear e acertou em cheio a traseira do meu carro. Amassou todo o para-choque traseiro, quebrou a lanterna e a tampa da mala nem fecha direito. Tentei ligar antes mas a linha de vocês demorou demais para atender, então estou registrando por aqui para levar na oficina e arrumar logo meu carro.",incompatible,21:cobertura-danos-corporais/1,"[21:cobertura-danos-corporais/1] 1. Riscos Cobertos: 1.1. Respeitados os Limites máximos de Indenização por Cobertura e o Limite Máximo de Garantia da Apólice, a Seguradora
+garante a Indenização da quantia que o Segurado for legalmente obrigado a pagar ",,"Colisão traseira com danos ao próprio veículo; ruído sobre compras de supermercado, chuva fraca e espera no telefone.",,,,,Y,mismatch-004
+mismatch-22-01,RCF-A,22,ARCA SEGURADORA S.A,15414.620201/2024-19,22:2,2. OBJETIVO DO SEGURO,"2.1. O presente seguro tem por objetivo garantir até o limite máximo de indenização,
+sob estas Condições Gerais, e de acordo com Condições Especiais e Particulares
+expressas e obrigatoriamente convencionadas na apólice, indenização por
+prejuízos decorrentes de riscos cobertos, enquanto permanecerem inalteradas
+as informações prestadas na proposta e no questionário ou ficha de informações
+que serviram de base à emissão da apólice, da qual tais documentos passam a
+fazer parte integrante.","Olha, estou entrando em contato porque levaram o meu carro e preciso acionar o seguro. Foi ali pelo meio da semana passada, numa quarta ou quinta se não me engano, eu tinha ido no centro resolver umas coisas e estacionei numa rua perto de uma praça. Estava uma garoa chata e o trânsito bem travado aquele dia, então preferi parar e ir a pé tomar um café e comprar umas coisas numa padaria. Não devo ter ficado nem uma hora fora, mas quando voltei pro local o carro tinha sumido. Até achei que tinha me confundido de esquina, procurei em volta, mas não estava em lugar nenhum, levaram mesmo. Já fiz o boletim de ocorrência certinho e queria ver como faço pra dar andamento no processo do veículo.",incompatible,22:2,"[22:2] 2. OBJETIVO DO SEGURO: 2.1. O presente seguro tem por objetivo garantir até o limite máximo de indenização,
+sob estas Condições Gerais, e de acordo com Condições Especiais e Particulares
+expressas e obrigatoriamente convenc",,"Furto do veículo próprio estacionado na rua; ruído sobre garoa, trânsito e ida à padaria.",,,,,Y,mismatch-005
+mismatch-24-00,ASSIST,24,MAPFRE SEGUROS GERAIS S.A.,15414.004464/2005-13,24:1/1.1,1.1. OBJETIVO DO SEGURO,"1.1.1. Pelo presente contrato de seguro, a Seguradora obriga-se, mediante o pagamento do Prêmio equivalente, a
+garantir o interesse legítimo do Segurado ou do Beneficiário indicado na Apólice/Certificado individual, contra Riscos
+predeterminados, desde que cobertos, respeitados os Riscos Excluídos, as hipóteses de Perda de Direito e as demais
+disposições contratuais.
+1.1.2. A garantia consiste no pagamento de Indenização por prejuízos comprovados decorrentes dos Riscos
+contratados, até o Limite Máximo de Indenização (LMI) estabelecidos em cada cobertura em vigor.","Olha, estou abrindo esse chamado porque bati meu carro num muro baixo faz uns dias, acho que foi na quinta-feira passada de noite. Estava chovendo bastante e eu vinha cansado voltando do trabalho depois de um dia super puxado, a visibilidade na rua estava horrível. Na hora de manobrar para entrar numa subida, o carro escorregou no asfalto molhado e acertou em cheio a quina do muro. Amassou bem a lateral da frente, quebrou o farol direito e o para-choque ficou solto. Queria ver como faço para dar entrada no conserto do meu carro pela oficina.",incompatible,24:1/1.1,"[24:1/1.1] 1.1. OBJETIVO DO SEGURO: 1.1.1. Pelo presente contrato de seguro, a Seguradora obriga-se, mediante o pagamento do Prêmio equivalente, a
+garantir o interesse legítimo do Segurado ou do Beneficiário indicado na Apólice/Certific",,Colisão contra muro com danos na frente e farol; ruído de cansaço após dia de trabalho e chuva forte.,,,,,Y,mismatch-006
+mismatch-25-01,ASSIST,25,Too Seguros S.A.,15414.618005/2023-01,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1,1.1. O presente seguro tem por objetivo garantir ao Segurado o,"pagamento de indenização no caso de ocorrência comprovada dos eventos
+previstos e cobertos nestas Condições Gerais, na Apólice e nas demais
+condições contratuais aplicáveis, observados os Limites Máximos de
+Indenização (LMI) fixados para cada cobertura contratada e o Limite
+Máximo de Garantia (LMG) da Apólice.","Olha, queria abrir o chamado porque caiu uma chuva de granizo terrível aqui na cidade faz mais ou menos uma semana e meia, acho que era numa quinta-feira à tarde. O céu escureceu do nada enquanto eu estava voltando do mercado com as compras no banco de trás, e nem deu tempo de achar um posto com cobertura para me abrigar. As pedras de gelo eram enormes e amassaram todo o capô e o teto do meu carro, ficou cheio de marcas parecendo uma casca de ovo. Como o estrago na lataria ficou bem feio, preciso ver como faço para mandar fazer o conserto por aqui.",incompatible,25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1,"[25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/1/1.1] 1.1. O presente seguro tem por objetivo garantir ao Segurado o: pagamento de indenização no caso de ocorrência comprovada dos eventos
+previstos e cobertos nestas Condições Gerais, na Apólice e nas demais
+condições contratuais aplicáveis, observados os Limites Máxi",,Granizo que danificou o capô e teto; ruído de retorno do mercado e tempo fechando de repente.,,,,,Y,mismatch-007
+mismatch-26-02,ASSIST,26,USEBENS SEGUROS S.A.,15414.650587/2021-41,26:3,CLÁUSULA 3a - OBJETIVO DO SEGURO,"1.
+Este seguro tem por objetivo garantir, até o limite máximo de indenização contratado, o
+reembolso das despesas expressamente cobertas e comprovadamente incorridas pela empresa
+locadora, em decorrência de evento coberto previsto nesta apólice, ocorrido com veículo
+segurado de sua propriedade durante o período de locação.","Olha, preciso abrir o sinistro porque meu carro acabou sendo atingido por uma enchente feia. Acho que foi numa terça-feira no meio do mês passado, tava um calor danado de tarde e de repente caiu um temporal absurdo. Eu tinha acabado de sair do mercado com as compras da semana e a água começou a subir super rápido na avenida, não deu tempo de tirar o carro do lugar mais baixo. A água entrou e passou da altura dos bancos, molhou todo o carpete, o painel e estragou a parte elétrica toda, o motor nem gira mais e ficou um cheiro horrível de lama por dentro. Preciso que vejam a cobertura pra arrumar meu carro ou dar perda total, porque o prejuízo foi enorme.",incompatible,26:3,"[26:3] CLÁUSULA 3a - OBJETIVO DO SEGURO: 1.
+Este seguro tem por objetivo garantir, até o limite máximo de indenização contratado, o
+reembolso das despesas expressamente cobertas e comprovadamente incorridas pela empresa
+locadora, em decorrên",,Alagamento atingindo o interior e parte elétrica do próprio carro; ruído sobre calor repentino e compras de mercado.,,,,,Y,mismatch-008
+mismatch-28-00,GAR.EST,28,ASSURANT SEGURADORA SA,15414.607840/2025-70,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/3,3. OBJETIVO DO SEGURO,"O presente contrato de seguro tem por objetivo
+propiciar ao Segurado, facultativamente e mediante o
+pagamento de prêmio, a extensão temporal da
+garantia
+do
+fornecedor
+para
+garantido(s), discriminado(s) no Bilhete de Seguro.","Olha, aconteceu uma batida faz uns dez dias, mais ou menos, eu estava voltando do mercado bem no horário de pico e o trânsito tava horrível por causa da chuva. Um carro prata freou do nada na minha frente e eu não consegui parar a tempo, acabou batendo a frente do meu carro na traseira dele. Amassou bastante o capô e quebrou o farol dianteiro direito do meu carro, além de riscar o para-choque todo. Tive que ficar parado no acostamento um tempão esperando a chuva passar pra poder ver o estrago direito. Quero abrir o sinistro pra consertar a lataria e o farol do meu carro.",incompatible,28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/3,"[28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/3] 3. OBJETIVO DO SEGURO: O presente contrato de seguro tem por objetivo
+propiciar ao Segurado, facultativamente e mediante o
+pagamento de prêmio, a extensão temporal da
+garantia
+do
+fornecedor
+para
+garantido(s), discriminado(s",,Colisão com outro veículo causando danos frontais ao próprio carro; ruído sobre chuva forte e espera no acostamento.,,,,,Y,mismatch-009
+mismatch-29-01,GAR.EST,29,CARDIF DO BRASIL SEGUROS E GARANTIAS S.A.,15414.631153/2019-27,29:2,2. OBJETIVO DO SEGURO,"1.1
+O presente contrato de seguro tem por objetivo garantir ao Segurado, facultativamente e mediante
+pagamento de prêmio, a extensão temporal da garantia do fornecedor do bem segurado discriminado
+no Bilhete de Seguro e, quando prevista, sua complementação.","Olha, estou abrindo este chamado porque furtaram o meu carro. Foi na semana passada, acho que numa quinta ou sexta à noite, não me recordo bem o dia exato. Eu tinha parado na rua rapidinho pra passar na farmácia comprar um remédio pra minha mãe e acabei demorando um pouco porque a fila do caixa tava gigante. Quando saí com as sacolas e fui até o lugar onde tinha deixado o carro, ele simplesmente não tava mais lá. Fiquei um tempão procurando na rua de trás achando que tava ficando maluco e tinha esquecido onde estacionei, mas levaram mesmo. Já fiz o boletim na delegacia e preciso resolver isso logo pra receber o valor do carro, pois dependo dele pra tudo.",incompatible,29:2,"[29:2] 2. OBJETIVO DO SEGURO: 1.1
+O presente contrato de seguro tem por objetivo garantir ao Segurado, facultativamente e mediante
+pagamento de prêmio, a extensão temporal da garantia do fornecedor do bem segurado discriminado
+no ",,Furto total do veículo estacionado na rua; ruído sobre fila de farmácia e compra de remédio para a mãe.,,,,,Y,mismatch-010
+mismatch-30-00,CARTA VERDE,30,HDI SEGUROS S.A.,15414.000861/2006-05,30:2,2. RISCO COBERTO,"Considera-se risco coberto a responsabilidade civil do segurado (de acordo com o previsto na
+cláusula 1) proveniente de danos materiais e/ou pessoais a terceiros não transportados pelo veículo
+segurado nesta apólice, como consequência de acidente de trânsito causado:
+2.3.  Por veículo discriminado neste seguro, que terá que ser, necessariamente, um veículo de
+passeio particular ou de aluguel, não licenciado no país de ingresso;
+2.4. Por objetos transportados no veículo em local destinado para tal fim; ou
+2.5. Por reboque discriminado neste seguro quando estiver acoplado ao mesmo veículo segurado,
+desde que autorizada e regulamentada sua utilização por autoridade competente e pago o prêmio
+adicional correspondente.","Olha, estou entrando em contato porque infelizmente roubaram o meu carro e preciso dar entrada no seguro. Acho que foi no meio da semana passada, não lembro se era quarta ou quinta, por volta das oito da noite. O tempo estava horrível, caindo um temporal e o trânsito todo travado. Eu tinha acabado de parar rapidinho perto de uma padaria para pegar um café e um lanche antes de ir para casa. Quando eu estava voltando pro carro, dois rapazes armados me renderam, pediram a chave e levaram o carro embora, com todas as minhas coisas dentro, até uma jaqueta nova que eu tinha comprado. Já registrei o boletim na delegacia e agora preciso ver como a gente faz para resolver essa questão e liberar o valor do carro, porque dependo dele todo dia pra trabalhar e estou completamente a pé.",incompatible,30:2,"[30:2] 2. RISCO COBERTO: Considera-se risco coberto a responsabilidade civil do segurado (de acordo com o previsto na
+cláusula 1) proveniente de danos materiais e/ou pessoais a terceiros não transportados pelo veículo
+segurad",,"Roubo à mão armada do próprio veículo; ruído sobre a chuva forte, trânsito travado e a compra de lanche/jaqueta nova.",,,,,Y,mismatch-011

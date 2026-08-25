@@ -52,7 +52,7 @@ is cleared.
 | --------- | -------------------------- | ----------- |
 | M0        | Foundations                | done |
 | M1        | Policy parsing              | done        |
-| M2        | Ground truth                | todo        |
+| M2        | Ground truth                | done        |
 | M3        | Retrieval                   | todo        |
 | M4        | Agent graph                 | todo        |
 | M5        | Service and hardening       | todo        |
@@ -252,6 +252,22 @@ answers and builds the system.
   reference value ≥90% — if below, the cause is documented; disagreements
   resolved and recorded regardless of the rate.
 - `docs/EVALUATION.md` complete; golden set tagged `golden-set-v1`.
+
+**[M2-07] amendment (2026-08-25).** The blind-relabelling criterion above
+(delay-based, same author, ≥90% reference) was replaced during authoring by
+an independent second-reviewer pass — see `docs/EVALUATION.md`'s
+"Independent second-reviewer pass" and "What this evaluation cannot
+establish" sections for the full rationale and what the replacement does
+and does not establish. Measured full-agreement rate: 75.0% (27/36) —
+below the ≥90% reference value carried over from the criterion it replaced.
+The cause is documented, not hidden: every disagreement in the sample was a
+near-miss clause addition or omission on an already-largely-correct answer,
+never a verdict-level or unanswerable-mislabelling error, and the review
+sample is small enough (per-`question_type` strata as low as `n=3`-`4`)
+that a single disagreement swings the stratum rate by ±25-33 points. The
+reference value is not relaxed; the number stands next to its cause per
+this file's own rule above. 140 golden questions authored, tagged
+`golden-set-v1` in git. **M2 closes.**
 
 ## M3 — Retrieval
 
