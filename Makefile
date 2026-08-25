@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions
+.PHONY: install lint format format-check typecheck test test-integration test-eval check extract-text remove-boilerplate build-clause-tree parse sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval
 
 help:
 	@echo "Available targets:"
@@ -11,6 +11,7 @@ help:
 	@echo "  typecheck         - Run type checker"
 	@echo "  test              - Run unit tests"
 	@echo "  test-integration  - Run integration tests"
+	@echo "  test-eval         - Run the eval-marked pytest suite (requires build/parsed_clauses.jsonl; run fetch-corpus-artifacts or parse first)"
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
 	@echo "  extract-text      - Extract and cache text from the policy corpus"
 	@echo "  remove-boilerplate - Remove boilerplate from the cached extraction"
@@ -37,6 +38,7 @@ help:
 	@echo "  validate-product-claim-mismatch - Validate data/synthetic_claims/product_claim_mismatch.jsonl against the schema and the parsed corpus"
 	@echo "  draft-unanswerable-questions - M2-05: draft candidate unanswerable golden questions into eval/unanswerable_draft.csv for review (--dry-run prints selection counts, no LLM calls)"
 	@echo "  finalize-unanswerable-questions - M2-05: promote approved rows from eval/unanswerable_draft.csv into data/golden_set/unanswerable.jsonl"
+	@echo "  eval-retrieval    - M2-06: score Recall@{1,5,10}/MRR/nDCG@10 against the golden set, broken down by question_type/product_line/extraction_mode, plus exclusion-clause recall (built-in random-retriever self-test; writes eval/runs/retrieval_eval_random.{md,json})"
 
 install:
 	uv sync
@@ -54,10 +56,13 @@ typecheck:
 	uv run mypy --strict app/src
 
 test:
-	PYTHONPATH=app/src uv run pytest -m "not integration"
+	PYTHONPATH=app/src uv run pytest -m "not integration and not eval"
 
 test-integration:
 	PYTHONPATH=app/src uv run pytest -m integration
+
+test-eval:
+	PYTHONPATH=app/src uv run pytest -m eval
 
 check: lint format-check typecheck test
 
@@ -151,3 +156,6 @@ draft-unanswerable-questions:
 finalize-unanswerable-questions:
 	PYTHONPATH=app/src uv run python scripts/finalize_golden_set_from_review.py \
 		--csv eval/unanswerable_draft.csv
+
+eval-retrieval:
+	PYTHONPATH=app/src uv run python scripts/eval_retrieval.py
