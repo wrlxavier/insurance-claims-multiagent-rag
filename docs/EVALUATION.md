@@ -99,3 +99,81 @@ unambiguous checks — not part of the authoring judgment above — and are
 enforced in code: `scripts/validate_golden_set.py` (`make
 validate-golden-set`), run in CI so a corpus re-parse that breaks a
 `clause_id` fails visibly.
+
+## Independent second-reviewer pass (golden-set-v1)
+
+Every golden question above was authored, labelled, and verified by the
+same person who builds the system being evaluated — the self-bias problem
+this section exists to disclose. [M2-01] originally planned to mitigate it
+with a same-author blind re-labelling pass after a delay (`authored_at`'s
+purpose, above). This section amends that plan: a delay is a proxy for
+forgetting, and only guards against a lapse in recall — it says nothing
+about whether the authoring rules themselves are clear enough for someone
+else to apply. What follows replaces it with an **independent second
+reviewer**, on a sample, checking exactly that.
+
+**Sampling frame.** The sample is drawn only from golden-set-v1's five
+`question_type` files under `data/golden_set/` — sourced from [M2-02]'s
+`direct_lookup` questions and [M2-03]'s `coverage_with_exclusion`,
+`cross_document`, and `definition` questions, plus [M2-05]'s `unanswerable`
+questions. [M2-04]'s synthetic claims and [M2-05]'s product/claim-mismatch
+claims are explicitly out of scope for this pass: neither carries a
+`reference_clause_ids`/`expected_verdict` pair of the kind this check
+tests against.
+
+**Sample size and stratification.** Every stratum is sampled at ~20%
+(rounded to the nearest question), except `unanswerable`, which is sampled
+at a higher, independent rate (~50%). This is not a second mechanism: the
+distribution doc's "additional targeted review" of the unanswerable subset
+and the general 20% pass are the same review task, just applied to a
+larger share of that one stratum, because a wrongly-labelled `unanswerable`
+question is the one error that silently miscalibrates the
+insufficient-context gate downstream ([M3-07]). The `cross_document`
+stratum's draw is topped up, if needed, to guarantee at least one
+HDI-brand-collision question (the only `cross_document` rows targeting a
+HDI-branded document among this set) and at least one `bundle_section`
+question (a reference clause whose parsed record carries a non-null
+`bundle_section`), so neither trap case is missed by chance. Selection is
+deterministic and seeded (`scripts/review_sample_selection.py`).
+
+**Review packet.** For each sampled question, the reviewer receives exactly
+two things: the question text, and the target document's full clause list
+(clause id, title, and text, in document order) from
+`build/parsed_clauses.jsonl`. `reference_clause_ids`, `notes`, and
+`expected_verdict` are withheld — a reviewer who can see the author's
+answer is doing review, not independent labelling.
+
+**Adjudication rule — fixed here, before any review result is seen.** On
+any disagreement between the author's original label and the reviewer's
+independent label, the author's original label is retained in
+golden-set-v1 unchanged. No question is dropped from the set on account of
+a disagreement, and no further justification is required to keep the
+author's label. The disagreement itself is still recorded in full — see
+Results, below — not silently discarded.
+
+**Results.** Sample size: 36 questions (29 general stratified + 7
+`unanswerable` top-up), across all five `question_type` strata.
+`reference_clause_ids` exact-match rate: 75.0% (mean Jaccard 0.84, mean F1
+0.87). `expected_verdict` agreement (the 16 questions where one applies —
+`coverage_with_exclusion` and `unanswerable`): 100%. Combining both
+dimensions, the full agreement rate is 75.0% (27/36) — at this sample size,
+a single disagreement moves that rate by ±2.8 percentage points; the
+smaller per-`question_type` strata swing considerably more (e.g.
+`coverage_with_exclusion`, n=4, swings ±25pp per disagreement). See
+`eval/runs/golden_set_review_v1.md` for the full per-`question_type`
+breakdown and `data/golden_set/review/review_v1.jsonl` /
+`eval/runs/golden_set_review_v1.md`'s disagreement table for every
+individual disagreement (question id, the author's label, the reviewer's
+label, and the resolution each one received under the adjudication rule
+above — the author's original label, unchanged, in every case).
+
+This number should not be read as "the golden set is 75% correct." Every
+disagreement inspected here was the reviewer omitting or adding one clause
+adjacent to an already-largely-correct answer (or, in one `unanswerable`
+case, citing a clause it simultaneously judged did not answer the
+question) — not the reviewer finding a wrong `expected_verdict` or an
+actually-answerable question mislabelled `unanswerable`. What this pass
+does and does not establish — including how much weight a non-domain-expert
+reviewer's disagreement should carry on `coverage_with_exclusion`'s
+completeness judgments specifically — is covered in full when [M2-07]
+freezes `golden-set-v1`.

@@ -144,5 +144,6 @@ module = [
     "product_claim_mismatch_selection",
     "unanswerable_question_selection",
     "validate_product_claim_mismatch",
+    "review_sample_selection",
 ]
 ignore_missing_imports = true
