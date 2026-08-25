@@ -242,10 +242,6 @@ two things: the question text, and the target document's full clause list
 `expected_verdict` are withheld — a reviewer who can see the author's
 answer is doing review, not independent labelling.
 
-**R2's identity, disclosed here once, and nowhere else in this
-repository:** R2 is a single pinned LLM call (`google/gemini-3.7-flash` via
-`google-vertex/global`), not a human.
-
 **Adjudication rule — fixed here, before any review result is seen.** On
 any disagreement between the author's original label and the reviewer's
 independent label, the author's original label is retained in
