@@ -240,6 +240,35 @@ class ParsingSettings(BaseSettings):
     )
 
 
+class ChunkingSettings(BaseSettings):
+    """Settings used by [M3-01] clause-aware chunking."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    # Real-corpus evidence (4925 clauses / 30 docs, build/parsed_clauses.jsonl):
+    # p25=102, p50=290 chars; 1066 clauses sit under 80 chars.
+    chunk_min_char_count: int = Field(alias="CHUNK_MIN_CHAR_COUNT", default=150)
+
+    # p75=915, p90=2143 -- a consistent split-piece size between the two.
+    chunk_target_char_count: int = Field(alias="CHUNK_TARGET_CHAR_COUNT", default=1800)
+
+    # 332/4925 clauses sit over 3000 chars -- the split rule engages for
+    # exactly that evidenced tail.
+    chunk_max_char_count: int = Field(alias="CHUNK_MAX_CHAR_COUNT", default=3000)
+
+    # ~15-20% of target_char_count, a conventional RAG overlap ratio; only
+    # engaged by the last-resort sliding-window rule (35/4925 clauses over
+    # 8000 chars in the real corpus).
+    chunk_sliding_window_overlap_chars: int = Field(
+        alias="CHUNK_SLIDING_WINDOW_OVERLAP_CHARS", default=300
+    )
+
+
 class Settings(DatabaseSettings, LlmSettings):
     """Application settings loaded from environment variables."""
 
@@ -271,3 +300,9 @@ def get_settings() -> Settings:
 def get_parsing_settings() -> ParsingSettings:
     """Get cached settings used by the text-extraction pipeline."""
     return ParsingSettings()
+
+
+@lru_cache
+def get_chunking_settings() -> ChunkingSettings:
+    """Get cached settings used by clause-aware chunking."""
+    return ChunkingSettings()
