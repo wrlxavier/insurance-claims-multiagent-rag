@@ -285,6 +285,17 @@ def get_observability_settings() -> ObservabilitySettings:
 
 
 @lru_cache
+def get_database_settings() -> DatabaseSettings:
+    """Get cached database-only settings.
+
+    Separate from ``get_settings`` so database tooling -- Alembic, the
+    integration-test path -- does not require the LLM credentials the full
+    ``Settings`` object demands.
+    """
+    return DatabaseSettings()
+
+
+@lru_cache
 def get_llm_settings() -> LlmSettings:
     """Get cached runtime settings used by LLMs and RAG."""
     return LlmSettings()

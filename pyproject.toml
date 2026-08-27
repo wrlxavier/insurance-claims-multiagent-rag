@@ -16,6 +16,9 @@ dependencies = [
     "langchain-openai>=1.5.1",
     "python-dotenv>=1.2.2",
     "tqdm>=4.67",
+    "sqlalchemy>=2.0.52",
+    "alembic>=1.19.1",
+    "psycopg[binary]>=3.3.4",
 ]
 
 [dependency-groups]

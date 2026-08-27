@@ -27,6 +27,10 @@ FORBIDDEN_ROOTS = frozenset(
     {
         "fastapi",
         "sqlalchemy",
+        # [M0-08] brought the database in; alembic and psycopg are the two new
+        # importable roots it added, and neither belongs above infrastructure.
+        "alembic",
+        "psycopg",
         "pydantic",
         "langgraph",
         "langchain",

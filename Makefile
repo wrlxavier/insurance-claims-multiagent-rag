@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check extract-text remove-boilerplate build-clause-tree parse build-chunks sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -10,9 +10,11 @@ help:
 	@echo "  format-check      - Check code formatting"
 	@echo "  typecheck         - Run type checker"
 	@echo "  test              - Run unit tests"
-	@echo "  test-integration  - Run integration tests"
+	@echo "  test-integration  - Apply migrations, then run the database-backed tests in tests/integration (needs TEST_DATABASE_URL)"
 	@echo "  test-eval         - Run the eval-marked pytest suite (requires build/parsed_clauses.jsonl; run fetch-corpus-artifacts or parse first)"
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
+	@echo "  migrate           - Apply Alembic migrations to the configured database"
+	@echo "  migrate-down      - Roll back the latest Alembic migration"
 	@echo "  extract-text      - Extract and cache text from the policy corpus"
 	@echo "  remove-boilerplate - Remove boilerplate from the cached extraction"
 	@echo "  build-clause-tree - Recover the clause tree from the cleaned corpus"
@@ -61,12 +63,18 @@ test:
 	PYTHONPATH=app/src uv run pytest -m "not integration and not eval"
 
 test-integration:
-	PYTHONPATH=app/src uv run pytest -m integration
+	bash scripts/run_integration_tests.sh
 
 test-eval:
 	PYTHONPATH=app/src uv run pytest -m eval
 
 check: lint format-check typecheck test
+
+migrate:
+	PYTHONPATH=app/src uv run alembic upgrade head
+
+migrate-down:
+	PYTHONPATH=app/src uv run alembic downgrade -1
 
 extract-text:
 	PYTHONPATH=app/src uv run python scripts/extract_text.py
