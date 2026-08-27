@@ -52,6 +52,35 @@ Copy the example file and fill in the values for your environment:
 cp .env.example .env
 ```
 
+### Database (Postgres + pgvector)
+
+Postgres is required by the retrieval index, the LangGraph checkpointer and
+the audit trail. Bring it up locally, in this order, on a clean clone:
+
+```bash
+cp .env.example .env
+docker compose up -d postgres
+make migrate
+```
+
+The `.env.example` defaults match the Compose service, so the sequence works
+as written without editing anything first. `make migrate` applies the Alembic
+migrations (the first one enables the `vector` extension); `make migrate-down`
+rolls the latest one back.
+
+Run the database-backed tests with:
+
+```bash
+make test-integration
+```
+
+This applies migrations to the `insurance_claims_test` database — created by
+the Compose service on first boot — before running `pytest -m integration`.
+
+See [`docs/DATABASE.md`](docs/DATABASE.md) for the pinned pgvector version and
+why, how `CREATE EXTENSION vector` is executed and what privilege it needs,
+and the sync-vs-async engine decision.
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):
