@@ -5,6 +5,8 @@ integration.
 """
 
 from infrastructure.database.base import Base
+from infrastructure.database.chunk_repository import upsert_chunks
+from infrastructure.database.models import ChunkRow
 from infrastructure.database.session import (
     create_engine_from_database_url,
     create_engine_from_settings,
@@ -14,8 +16,10 @@ from infrastructure.database.session import (
 
 __all__ = [
     "Base",
+    "ChunkRow",
     "create_engine_from_database_url",
     "create_engine_from_settings",
     "create_session_factory",
     "is_database_reachable",
+    "upsert_chunks",
 ]

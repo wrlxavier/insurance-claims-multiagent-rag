@@ -6,8 +6,12 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, MetaData
+from sqlalchemy.orm import Session, sessionmaker
 
-from infrastructure.database import create_engine_from_database_url
+from infrastructure.database import (
+    create_engine_from_database_url,
+    create_session_factory,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,6 +49,18 @@ def postgres_engine(postgres_database_url: str) -> Iterator[Engine]:
 @pytest.fixture(scope="session")
 def alembic_config(postgres_database_url: str) -> Config:
     return build_alembic_config(postgres_database_url)
+
+
+@pytest.fixture
+def session_factory(postgres_engine: Engine) -> sessionmaker[Session]:
+    return create_session_factory(engine=postgres_engine)
+
+
+@pytest.fixture
+def db_session(session_factory: sessionmaker[Session]) -> Iterator[Session]:
+    with session_factory() as session:
+        yield session
+        session.rollback()
 
 
 @pytest.fixture(autouse=True)
