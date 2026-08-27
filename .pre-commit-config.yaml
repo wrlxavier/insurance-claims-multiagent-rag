@@ -22,6 +22,7 @@ repos:
           - langchain-anthropic>=0.3
           - sqlalchemy>=2.0.52
           - alembic>=1.19.1
+          - tokenizers>=0.20
   - repo: https://github.com/kynan/nbstripout
     rev: 0.9.1
     hooks:

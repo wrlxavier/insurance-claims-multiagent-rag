@@ -160,11 +160,13 @@ representation of the M3-01 chunk corpus (`build/chunks.jsonl`), indexed in
 Postgres for retrieval. It is the first ORM model in the project.
 
 **This is [M3-02]'s schema half only.** The `embedding` vector column and its
-ANN index are deferred to the embedding-pipeline half: the vector dimension
-depends on the embedding-model choice (a separate DoD item), so they land
-later via `ALTER TABLE chunk ADD COLUMN embedding halfvec(N)` plus the
-`pgvector` Python dependency. No vector column, no ANN index, no `pgvector`
-package yet.
+ANN index are deferred to the embedding-pipeline half. The embedding model is
+now chosen and pinned — `Alibaba-NLP/gte-multilingual-base`, 768 dimensions,
+cosine distance, L2-normalised (see `docs/EMBEDDINGS.md` and
+`app/src/infrastructure/rag/embedding_config.py`) — so the column will be
+`halfvec(768)` with a `halfvec_cosine_ops` index. It still lands later, via
+`ALTER TABLE chunk ADD COLUMN embedding halfvec(768)` plus the `pgvector`
+Python dependency. No vector column, no ANN index, no `pgvector` package yet.
 
 - **Columns** mirror `infrastructure.rag.chunk_schema.ChunkRecord` field for
   field (except `text` → `embedded_text`), so the write path is a direct
