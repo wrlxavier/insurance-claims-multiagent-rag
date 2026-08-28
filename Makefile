@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -21,6 +21,7 @@ help:
 	@echo "  parse             - Rebuild the parsed-clause corpus under build/"
 	@echo "  build-chunks      - M3-01: chunk the clause tree into build/chunks.{parquet,jsonl} + docs/CHUNKING_REPORT.md"
 	@echo "  check-embedding-input-length - M3-02: tokenise build/chunks.jsonl with the pinned embedding model and check every chunk fits its input window"
+	@echo "  benchmark-ann-index - M3-02: build the HNSW index against TEST_DATABASE_URL and measure build time, size, exact-vs-ANN latency and filtered result counts (synthetic vectors; writes eval/runs/ann_index_benchmark.{md,json})"
 	@echo "  sample-parsing-quality - Draw the M1-08 stratified 50-clause sample"
 	@echo "  validate-parsing-quality-sample - Automated LLM validation of the M1-08b sample (fills judgment columns)"
 	@echo "  score-parsing-quality  - Score the annotated M1-08 sample and write eval/parsing_quality_results.md"
@@ -94,6 +95,9 @@ build-chunks:
 
 check-embedding-input-length:
 	PYTHONPATH=app/src uv run python scripts/check_embedding_input_length.py
+
+benchmark-ann-index:
+	PYTHONPATH=app/src uv run python scripts/benchmark_ann_index.py
 
 sample-parsing-quality:
 	PYTHONPATH=app/src uv run python scripts/sample_parsing_quality.py

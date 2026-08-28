@@ -95,9 +95,11 @@ def test_embedding_is_a_nullable_halfvec_of_the_pinned_dimension() -> None:
 
 
 @pytest.mark.unit
-def test_embedding_column_is_not_indexed_yet() -> None:
-    # The ANN index over `embedding` is a later M3-02 slice; until then exact
-    # `<=>` ordering runs on the bare column.
+def test_embedding_column_is_not_indexed_on_the_model() -> None:
+    # The HNSW ANN index over `embedding` is created imperatively by
+    # `infrastructure.rag.ann_index`, never declared on the model -- M3-02's
+    # benchmark chose exact `<=>` over the metadata-filtered partition as the
+    # default path (docs/EMBEDDINGS.md).
     indexed_columns = {
         column.name for index in _CHUNK_TABLE.indexes for column in index.columns
     }

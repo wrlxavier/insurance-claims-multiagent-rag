@@ -138,8 +138,10 @@ means:
 
 - **Index side:** the `embedding halfvec(768)` column. Ordering queries use
   `ChunkRow.embedding.cosine_distance(...)` — the `<=>` (cosine distance)
-  operator. The ANN index that would take `halfvec_cosine_ops` is still
-  deferred (see below); until it lands, `<=>` runs as an exact scan.
+  operator. The HNSW ANN index (`halfvec_cosine_ops`) is defined in
+  `infrastructure.rag.ann_index` — **not** an Alembic migration; the measured
+  default retrieval path is exact `<=>` over the metadata-filtered partition
+  (see "ANN index vs. exact search" below).
 - **Query side** ([M3-04]): the retriever orders by the same `<=>`.
 
 `halfvec` (not `vector`) for storage follows [M0-08]'s decision in
@@ -234,10 +236,122 @@ touches `embedding`, so that row is never handed to the embedder — cache or no
 cache. Closing that gap needs a pipeline/schema change (a stored content hash,
 or nulling the vector when the text changes), and it stays deferred.
 
+## The HNSW ANN index over `chunk.embedding`
+
+`infrastructure.rag.ann_index` holds the index definition — `CREATE INDEX ...
+USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 64)` —
+plus `HNSW_EF_SEARCH = 40` and the `hnsw.iterative_scan` default, and the
+`create_hnsw_index` / `drop_hnsw_index` / `apply_ann_search_gucs` helpers.
+
+**It is deliberately not an Alembic migration.** An ANN index is a
+retrieval-tuning artifact, not schema: exact `<=>` cosine search works without
+it, its `m` / `ef_construction` are [M3-08]'s to tune, and the autouse
+`migrated_database` fixture would rebuild it on every integration test. The
+measurement below shows it does not earn a place in the default schema at this
+corpus size. [M3-08]'s `make build-index` calls `create_hnsw_index` *iff* the
+verdict here says to; [M3-04]'s retriever calls `apply_ann_search_gucs` on any
+query that does route through the index.
+
+`make benchmark-ann-index` (`scripts/benchmark_ann_index.py`) builds the index
+against `TEST_DATABASE_URL` and measures it. `tests/integration/test_ann_index.py`
+is the committed proof of the filtered-search behaviour below.
+
+## Does the ANN index earn its place at 4,540 chunks? (2026-08-28, synthetic vectors)
+
+**What synthetic vectors establish and do not.** No real embedder exists yet
+(a separate, still-deferred slice), so `chunk.embedding` is filled with
+deterministic pseudo-random unit vectors. Build time, index size and *latency*
+are structural — they depend on the row count, dimensionality, `halfvec`
+storage and the index parameters, not on what the vectors mean — so they
+transfer to real embeddings. ANN **recall vs. exact does not** transfer (random
+vectors have no cluster structure, which is close to the worst case for HNSW);
+the real recall number is [M3-08]'s to measure on real embeddings, and the
+verdict here rests on latency and cost, not recall.
+
+**Pre-registered prediction** (written in the plan before the benchmark ran,
+left unedited): exact full-corpus scan low-single-digit ms; single-partition
+sub-millisecond; HNSW build < 0.5 s; index ~8–16 MB; verdict — exact search is
+competitive, HNSW does not earn its place at this scale.
+
+**Outcome** (`eval/runs/ann_index_benchmark.{md,json}`, regenerable; figures
+below from the 2026-08-28 run, stable to ~5% across re-runs):
+
+| measurement | value |
+| --- | --- |
+| `CREATE INDEX` wall time | ~0.8 s *(predicted < 0.5 s — missed, still trivial)* |
+| index size | ~9 MB (0.69× the table) *(predicted 8–16 MB — held)* |
+| exact `<=>`, full corpus, no index | p50 **~11.4 ms**, p95 ~12.4 ms (seq scan) *(predicted low-single-digit — missed)* |
+| exact `<=>`, single partition, no index | p50 **~0.6 ms** (btree bitmap scan) *(predicted sub-ms — held)* |
+| HNSW, full corpus | p50 **~0.8 ms** (index scan) |
+| HNSW available, single partition | p50 **~0.6 ms** — planner still chose the **btree bitmap scan**, not the HNSW index |
+| plain HNSW recall@10 vs. exact | ~0.45 — synthetic, does **not** transfer; [M3-08] measures the real one |
+
+50 query vectors × 10 iterations; end-to-end from the Python client on a shared
+host, so read the millisecond figures as directional, not a tuned benchmark.
+
+**Verdict: the HNSW index does not earn its place at 4,540 chunks.** [M3-04]'s
+default retrieval path filters by SUSEP process + CNPJ — one document, 19–726
+chunks — and there the planner reads the partition by btree and sorts it
+exactly in ~0.6 ms; it does not touch the HNSW index even when the index
+exists. The index only changes the *unfiltered* full-corpus number (11.4 → 0.8
+ms), which is not the default path and is already far inside any budget the
+downstream LLM call dominates. Against that: 9 MB, a 0.8 s build, and a recall
+penalty that has to be measured and tuned. The definition stays in
+`infrastructure.rag.ann_index` so [M3-08] can A/B it on real embeddings and so it
+is one call away when the corpus grows (~10× is where exact scan starts to
+hurt); it does not go into the schema now.
+
+## Filtered search and the fewer-than-`k` question
+
+Whether a metadata-filtered vector search can return fewer than `k` rows, and
+how that is handled — settled here so [M3-04] does not meet it as an
+unexplained recall regression. Measured counts (`k = 10`, smallest partition =
+19 chunks):
+
+| filter | exact | planner default | HNSW forced, no iter. scan | HNSW forced, `strict_order` |
+| --- | ---: | ---: | ---: | ---: |
+| SUSEP process + CNPJ (19 chunks) | 10 | 10 (btree) | **0** (HNSW) | 10 |
+| + `clause_type = 'exclusion'` (2 chunks) | 2 | 2 (btree) | 0 (HNSW) | 2 |
+
+1. **Exact search + the default filter cannot return fewer than `k`.** It
+   returns exactly `min(k, |partition|)`. Every SUSEP-process partition in the
+   corpus has ≥ 19 chunks, so the default path always fills `k`.
+2. **Exact search + a *stacked* filter can return fewer than `k`** — the
+   `clause_type = 'exclusion'` row above returns 2 because the partition holds
+   only 2 such chunks. That is a true insufficient-context signal, not an
+   artifact: the `Retriever` contract already returns "up to `k`", the shortfall
+   is surfaced rather than padded, and [M3-07]'s gate is the downstream handler.
+3. **An HNSW index scan under any selective filter can silently return fewer
+   than `k`** — even 0 — because pgvector filters the `hnsw.ef_search` (40)
+   candidate list *after* the index scan, and a filter admitting a few percent
+   of rows discards all of them. The "HNSW forced" column (btree filter indexes
+   dropped, seq scan disabled) shows 0 rows for a partition that has 19.
+4. **The planner does not choose the HNSW scan for a filtered query at this
+   scale** — with the metadata btree indexes present it always reads the
+   partition by btree and sorts exactly (the "planner default" column). So case
+   3 is latent, not active, on the default path today — but it must not be left
+   to the planner's cost model.
+5. **Mitigation: `SET LOCAL hnsw.iterative_scan = strict_order`**
+   (`apply_ann_search_gucs`, pgvector ≥ 0.8.0, pinned 0.8.6). The index keeps
+   scanning past `ef_search` until `k` post-filter matches are found, in exact
+   distance order — the "HNSW forced, `strict_order`" column returns the full
+   10 (and the honest 2 for the genuinely-2-row filter). `hnsw.max_scan_tuples`
+   (20000) exceeds the whole corpus, so at this scale an iterative scan
+   degrades gracefully to a full filtered scan. Residual: it can still
+   under-return if `max_scan_tuples` is exhausted first — unreachable here, a
+   knob for a ~10×-larger corpus.
+
+**Decision for [M3-04] / [M3-08]:** the default filtered retrieval path uses
+exact `<=>` over the pre-filtered partition (sub-millisecond, always returns
+`k` when `k` rows exist). If [M3-08] benchmarks an HNSW configuration, it MUST
+set `hnsw.iterative_scan` for every filtered run, or the recall number is an
+index artifact rather than a property of the retriever. See
+`docs/DATABASE.md`'s "Minimum pgvector version" section for the version gate.
+
 ## Still deferred in [M3-02]
 
-The ANN index plus its build-time/size record; the ANN-vs-exact-search
-measurement at ~4,540 chunks; the filtered-search-returns-fewer-than-`k`
-question; the corpus embedding cost report and any dated price constant; the
-real `SentenceTransformerEmbedder`; the stale-vector-on-changed-text gap above;
-and the `make` target composable into [M3-08]'s `make build-index`.
+The corpus embedding cost report and any dated price constant; the [M1-09]
+per-constant pass over the model / dimensionality / batch size / worker count /
+index parameters, with `.env.example` parity; the real
+`SentenceTransformerEmbedder`; the stale-vector-on-changed-text gap above; and
+the pipeline `make` target composable into [M3-08]'s `make build-index`.

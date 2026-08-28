@@ -47,7 +47,10 @@ ANN index combined with a restrictive pre-filter can return fewer than *k*
 rows, because the index scan exhausts its candidate list on rows the filter
 then discards; iterative scans make the index keep scanning until enough
 results are found. Without them, that shows up as a recall regression nobody
-can explain rather than as a configuration decision.
+can explain rather than as a configuration decision. [M3-02] measured this
+(`docs/EMBEDDINGS.md`, "Filtered search and the fewer-than-`k` question") and
+`tests/integration/test_ann_index.py` proves both the shortfall and the
+`hnsw.iterative_scan = strict_order` fix.
 
 Indexable dimension limits, which constrain the embedding model [M3-02] may
 choose:
@@ -163,11 +166,13 @@ The `embedding halfvec(768)` column landed in migration `20260827_03`
 (`ALTER TABLE chunk ADD COLUMN`, plus the `pgvector` Python dependency). Its
 width, half-precision storage and cosine metric follow the pinned model
 contract — `Alibaba-NLP/gte-multilingual-base` (see `docs/EMBEDDINGS.md` and
-`app/src/infrastructure/rag/embedding_config.py`). Still deferred to a later
-[M3-02] slice: the ANN index over the column (`halfvec_cosine_ops` HNSW), its
-build-time/size record, and the ANN-vs-exact-search measurement at this corpus
-size (~4,540 chunks). Until then, exact `<=>` cosine ordering runs on the bare
-column.
+`app/src/infrastructure/rag/embedding_config.py`). The `halfvec_cosine_ops`
+HNSW index over the column is defined in `app/src/infrastructure/rag/ann_index.py`
+— **not** a migration: the benchmark (`docs/EMBEDDINGS.md`, "Does the ANN index
+earn its place") measured it at ~4,540 chunks and the chosen default retrieval
+path is exact `<=>` over the metadata-filtered partition, so the index does not
+belong in the schema. `tests/integration/test_ann_index.py` is the committed
+proof of its filtered-search behaviour and the `hnsw.iterative_scan` fix.
 
 - **Columns** mirror `infrastructure.rag.chunk_schema.ChunkRecord` field for
   field (except `text` → `embedded_text`), so the write path is a direct
@@ -223,7 +228,10 @@ column.
   `(susep_process, cnpj)` for M3-04's *default* retrieval path. `insurer` is
   not indexed — M3-04 filters insurers by CNPJ, never by name. All of these
   are forward-looking: at ~4,900 chunks Postgres seq-scans in well under a
-  millisecond regardless.
+  millisecond regardless. The `embedding` column has **no** index in the
+  migrations — the HNSW definition lives in `infrastructure.rag.ann_index` and
+  [M3-02]'s benchmark found the composite `(susep_process, cnpj)` btree +
+  exact sort is what the planner picks for the default path anyway (~0.6 ms).
 
 ## Integration tests
 

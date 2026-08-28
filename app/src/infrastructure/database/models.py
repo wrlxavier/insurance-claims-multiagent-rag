@@ -9,8 +9,9 @@ pydantic ``ChunkRecord`` is the ``build/`` serialization row, and this is the
 table.
 
 Scope note: the ``embedding`` column is the ``halfvec(768)`` vector the [M3-02]
-embedding pipeline fills; its ANN index and the ANN-vs-exact measurement are a
-later slice of the same issue. See docs/DATABASE.md.
+embedding pipeline fills. Its HNSW ANN index is defined in
+``infrastructure.rag.ann_index`` -- deliberately not a migration; the
+ANN-vs-exact measurement and the verdict are in docs/EMBEDDINGS.md.
 """
 
 from collections.abc import Iterable
@@ -95,8 +96,9 @@ class ChunkRow(Base):
     # decision. Genuinely nullable: an un-embedded chunk is `NULL`, and
     # `WHERE embedding IS NULL` is the embedding pipeline's resumable cursor.
     # `upsert_chunks` (the metadata write path) deliberately never writes this
-    # column -- see `chunk_repository._UPDATE_COLUMNS`. The ANN index over it is
-    # a later [M3-02] slice.
+    # column -- see `chunk_repository._UPDATE_COLUMNS`. The HNSW ANN index over
+    # it is defined in `infrastructure.rag.ann_index`, not a migration -- see
+    # its docstring and docs/EMBEDDINGS.md.
     embedding: Mapped[list[float] | None] = mapped_column(
         HALFVEC(EMBEDDING_DIMENSIONS), nullable=True
     )
