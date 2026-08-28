@@ -1,6 +1,4 @@
-"""Write paths for the chunk table -- [M3-02].
-
-Two sinks, deliberately separate:
+"""Read and write paths for the chunk table -- [M3-02], [M3-04].
 
 * ``upsert_chunks`` -- the metadata write path. ``chunk_id`` is deterministic
   upstream ([M3-01]/[M1-07]), so writing the chunk corpus is an upsert on that
@@ -10,17 +8,20 @@ Two sinks, deliberately separate:
 * ``fetch_chunks_missing_embedding`` / ``write_chunk_embeddings`` -- the
   embedding pipeline's read cursor and vector sink. The pipeline owns the
   ``embedding`` column exclusively.
+* ``search_chunks_by_vector`` -- [M3-04]'s dense-retrieval read path: exact
+  ``<=>`` cosine search over the metadata-filtered partition.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
 from itertools import batched
 
-from sqlalchemy import select, text, update
+from sqlalchemy import ColumnElement, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from infrastructure.database.models import ChunkRow
 from infrastructure.rag.chunk_schema import ChunkRecord
+from infrastructure.rag.retrieval_filter import RetrievalFilter
 
 # Every column except the conflict key and ``embedding`` is refreshed from the
 # incoming row, so a changed chunk (new text, new type) overwrites the stored
@@ -133,3 +134,69 @@ def write_chunk_embeddings(
     )
     session.flush()
     return len(vectors)
+
+
+def _metadata_filter_clauses(
+    metadata_filter: RetrievalFilter,
+) -> list[ColumnElement[bool]]:
+    """Translate a [RetrievalFilter] into ``WHERE`` clauses over ``ChunkRow``.
+
+    Insurers are matched by CNPJ, never by the ``insurer`` name column ([M1-05]:
+    HDI Seguros and HDI Global share a brand). ``bundle_section`` is lenient by
+    default -- ``= :x OR IS NULL`` -- so an unknown-bundle chunk is not silently
+    dropped ([M1-06] cross-note in [M3-04]); ``strict_bundle`` makes it exact.
+    """
+    clauses: list[ColumnElement[bool]] = []
+    if metadata_filter.susep_process is not None:
+        clauses.append(ChunkRow.susep_process == metadata_filter.susep_process)
+    if metadata_filter.cnpj is not None:
+        clauses.append(ChunkRow.cnpj == metadata_filter.cnpj)
+    if metadata_filter.product_line is not None:
+        clauses.append(ChunkRow.product_line == metadata_filter.product_line)
+    if metadata_filter.clause_type is not None:
+        clauses.append(ChunkRow.clause_type == metadata_filter.clause_type.value)
+    if metadata_filter.bundle_section is not None:
+        if metadata_filter.strict_bundle:
+            clauses.append(ChunkRow.bundle_section == metadata_filter.bundle_section)
+        else:
+            clauses.append(
+                or_(
+                    ChunkRow.bundle_section == metadata_filter.bundle_section,
+                    ChunkRow.bundle_section.is_(None),
+                )
+            )
+    return clauses
+
+
+def search_chunks_by_vector(
+    session: Session,
+    query_vector: Sequence[float],
+    *,
+    k: int,
+    metadata_filter: RetrievalFilter | None = None,
+) -> list[tuple[str, list[str], float]]:
+    """Top-``k`` ``(chunk_id, source_clause_ids, cosine_distance)`` for the query.
+
+    Exact ``<=>`` search over the metadata-filtered partition -- [M3-04]'s
+    default path, per ``docs/EMBEDDINGS.md``'s verdict that the HNSW index does
+    not earn its place at this corpus size and the composite
+    ``(susep_process, cnpj)`` btree + exact sort is what the planner picks
+    anyway. ``embedding IS NULL`` rows are excluded. Rows come back in ascending
+    distance order (nearest first). Returns up to ``k`` rows -- fewer when the
+    filter admits fewer, which is a real insufficient-context signal ([M3-07]),
+    never padded.
+    """
+    if k <= 0:
+        return []
+    distance = ChunkRow.embedding.cosine_distance(list(query_vector)).label("distance")
+    statement = select(ChunkRow.chunk_id, ChunkRow.source_clause_ids, distance).where(
+        ChunkRow.embedding.is_not(None)
+    )
+    if metadata_filter is not None:
+        statement = statement.where(*_metadata_filter_clauses(metadata_filter))
+    statement = statement.order_by(distance).limit(k)
+    rows = session.execute(statement).all()
+    return [
+        (chunk_id, list(source_clause_ids), float(chunk_distance))
+        for chunk_id, source_clause_ids, chunk_distance in rows
+    ]

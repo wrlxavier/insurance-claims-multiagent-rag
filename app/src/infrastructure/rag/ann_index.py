@@ -7,8 +7,11 @@ it (``docs/EMBEDDINGS.md`` measures the difference and records the verdict), its
 ``migrated_database`` fixture in ``tests/integration/conftest.py`` would rebuild
 it on every integration test. [M3-08]'s ``make build-index`` calls
 :func:`create_hnsw_index` (iff the recorded verdict says the index earns its
-place); [M3-04]'s retriever calls :func:`apply_ann_search_gucs` on every filtered
-query.
+place); a retriever calls :func:`apply_ann_search_gucs` only on a query that
+routes through the index. [M3-04]'s dense retriever does **not** -- its default
+path is exact ``<=>`` over the pre-filtered partition (``docs/EMBEDDINGS.md``,
+"Filtered search and the fewer-than-``k`` question"), so this helper is
+currently reached only by ``benchmark_ann_index`` and [M3-08]'s future matrix.
 
 The parameters are module constants, not ``.env`` knobs: ``m`` / ``ef_construction``
 change the index (and therefore any published Recall@k), and ``ef_search`` /

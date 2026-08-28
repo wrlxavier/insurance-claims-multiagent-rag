@@ -9,15 +9,17 @@ larger report dict both the JSON and Markdown outputs render from (see
 a frozen schema, since its shape is expected to grow with new breakdowns.
 
 ``v2`` [M3-03]: the lexical retriever adds the chunk-corpus identity and its
-BM25/analyzer contract. Every added field is optional -- the ``random``
-retriever leaves them ``None`` and its report is byte-identical to ``v1``.
+BM25/analyzer contract. ``v3`` [M3-04]: the dense and hybrid retrievers add the
+metadata-filter mode, the fusion strategy and its constants, and the embedding /
+hybrid config fingerprints. Every added field is optional -- ``random`` and
+``lexical`` leave the new ones ``None``.
 """
 
 from datetime import datetime
 
 from pydantic import BaseModel
 
-SCHEMA_VERSION = "v2"
+SCHEMA_VERSION = "v3"
 
 
 class RetrievalRunConfig(BaseModel):
@@ -34,7 +36,8 @@ class RetrievalRunConfig(BaseModel):
     seed: int | None
     run_at_utc: datetime
 
-    # [M3-03] lexical retriever only; None for `random`.
+    # [M3-03] lexical retriever (and the lexical leg of `hybrid`); None for
+    # `random` and `dense`.
     chunk_corpus_path: str | None = None
     chunk_corpus_chunk_count: int | None = None
     lexical_analyzer_version: str | None = None
@@ -44,3 +47,19 @@ class RetrievalRunConfig(BaseModel):
     lexical_index_text_field: str | None = None
     stemming_exception_count: int | None = None
     lexical_config_fingerprint: str | None = None
+
+    # [M3-04] metadata pre-filter: `none` or `default` (per-question SUSEP
+    # process + CNPJ from the manifest join). None for pre-M3-04 runs.
+    filter_mode: str | None = None
+
+    # [M3-04] dense retriever (and the dense leg of `hybrid`); None otherwise.
+    dense_model_id: str | None = None
+    dense_model_revision: str | None = None
+    embedding_config_fingerprint: str | None = None
+
+    # [M3-04] `hybrid` only; None otherwise.
+    fusion_strategy: str | None = None
+    rrf_k: int | None = None
+    fusion_weights: list[float] | None = None
+    candidate_depth: int | None = None
+    hybrid_config_fingerprint: str | None = None

@@ -7,10 +7,13 @@ from scripts.eval_retrieval import (
     K_VALUES,
     NDCG_K,
     ScoredQuestion,
+    _build_filter_for,
+    _output_stem,
     _parse_args,
     aggregate,
     build_lexical_retriever,
     compute_exclusion_clause_recall,
+    compute_foreign_document_rate,
     evaluate_questions,
     load_golden_questions,
     render_markdown_report,
@@ -20,6 +23,7 @@ from scripts.eval_retrieval import (
 from infrastructure.evaluation.golden_set_schema import GoldenQuestion
 from infrastructure.parsing.clause_schema import ParsedClauseRecord
 from infrastructure.rag.chunk_schema import ChunkRecord
+from infrastructure.rag.retrieval_filter import RetrievalFilter
 
 
 def make_question(**overrides: object) -> GoldenQuestion:
@@ -73,9 +77,17 @@ class FakeRetriever:
 
     def __init__(self, result: list[str]) -> None:
         self._result = result
+        self.seen_filters: list[RetrievalFilter | None] = []
 
-    def retrieve(self, question: str, *, k: int) -> list[str]:
+    def retrieve(
+        self,
+        question: str,
+        *,
+        k: int,
+        metadata_filter: RetrievalFilter | None = None,
+    ) -> list[str]:
         del question
+        self.seen_filters.append(metadata_filter)
         return self._result[:k]
 
 
@@ -135,11 +147,76 @@ def test_evaluate_questions_skips_unanswerable_and_scores_others() -> None:
     assert len(rows) == 1
     row = rows[0]
     assert row.question_id == "direct_lookup-001"
+    assert row.document_id == "1"
     assert row.product_line == "CASCO"
     assert row.extraction_mode == "text"
     assert row.recall == {1: 1.0, 5: 1.0, 10: 1.0}
     assert row.mrr == 1.0
     assert row.ndcg == 1.0
+    assert retriever.seen_filters == [None]  # no filter_for -> unfiltered path
+
+
+@pytest.mark.unit
+def test_evaluate_questions_threads_a_per_question_filter() -> None:
+    question = make_question()
+    document_meta = {
+        "1": {
+            "product_line": "CASCO",
+            "extraction_mode": "text",
+            "susep_process": "P1",
+            "cnpj": "C1",
+        }
+    }
+    retriever = FakeRetriever(["1:a"])
+
+    evaluate_questions(
+        [question],
+        retriever,
+        document_meta,
+        filter_for=_build_filter_for("default", document_meta),
+    )
+
+    assert retriever.seen_filters == [RetrievalFilter(susep_process="P1", cnpj="C1")]
+
+
+@pytest.mark.unit
+def test_compute_foreign_document_rate_pools_wrong_document_hits() -> None:
+    row = ScoredQuestion(
+        question_id="cross_document-001",
+        question_type="cross_document",
+        document_id="10",
+        product_line="CASCO",
+        extraction_mode="text",
+        reference_clause_ids=("10:x",),
+        retrieved=("10:x", "17:y", "10:z", "17:w"),
+        recall={1: 1.0, 5: 1.0, 10: 1.0},
+        mrr=1.0,
+        ndcg=1.0,
+    )
+
+    result = compute_foreign_document_rate([row], k=10)
+
+    assert result == {"k": 10, "hits": 2, "total": 4, "rate": 0.5}
+
+
+@pytest.mark.unit
+def test_output_stem_keeps_random_and_lexical_names_and_tags_the_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def stem_for(*argv: str) -> str:
+        monkeypatch.setattr("sys.argv", ["eval_retrieval.py", *argv])
+        return _output_stem(_parse_args())
+
+    assert stem_for("--retriever", "lexical") == "retrieval_eval_lexical"
+    assert stem_for("--retriever", "random") == "retrieval_eval_random"
+    assert stem_for("--retriever", "dense") == "retrieval_eval_dense"
+    assert stem_for("--retriever", "lexical", "--filter", "default") == (
+        "retrieval_eval_lexical_filter-default"
+    )
+    assert (
+        stem_for("--retriever", "hybrid", "--fusion", "weighted", "--filter", "default")
+        == "retrieval_eval_hybrid_weighted_filter-default"
+    )
 
 
 @pytest.mark.unit
@@ -147,6 +224,7 @@ def test_aggregate_computes_mean_across_rows() -> None:
     row_hit = ScoredQuestion(
         question_id="q1",
         question_type="direct_lookup",
+        document_id="1",
         product_line="CASCO",
         extraction_mode="text",
         reference_clause_ids=("1:a",),
@@ -158,6 +236,7 @@ def test_aggregate_computes_mean_across_rows() -> None:
     row_miss = ScoredQuestion(
         question_id="q2",
         question_type="direct_lookup",
+        document_id="1",
         product_line="CASCO",
         extraction_mode="text",
         reference_clause_ids=("1:b",),
@@ -194,6 +273,7 @@ def test_compute_exclusion_clause_recall_counts_only_exclusion_type() -> None:
     row_hit = ScoredQuestion(
         question_id="q1",
         question_type="coverage_with_exclusion",
+        document_id="1",
         product_line="CASCO",
         extraction_mode="text",
         reference_clause_ids=("1:a", "1:b"),
@@ -205,6 +285,7 @@ def test_compute_exclusion_clause_recall_counts_only_exclusion_type() -> None:
     row_miss = ScoredQuestion(
         question_id="q2",
         question_type="coverage_with_exclusion",
+        document_id="1",
         product_line="CASCO",
         extraction_mode="text",
         reference_clause_ids=("1:c",),
@@ -229,6 +310,7 @@ def test_compute_exclusion_clause_recall_returns_none_without_exclusion_refs() -
     row = ScoredQuestion(
         question_id="q1",
         question_type="direct_lookup",
+        document_id="1",
         product_line="CASCO",
         extraction_mode="text",
         reference_clause_ids=("1:b",),
@@ -275,6 +357,7 @@ def test_render_markdown_report_includes_config_and_all_sections() -> None:
         "by_product_line": {"CASCO": metrics_row},
         "by_extraction_mode": {"text": metrics_row},
         "exclusion_clause_recall": {"k": 10, "hits": 1, "total": 27, "recall": 0.037},
+        "foreign_document_rate": {"k": 10, "hits": 0, "total": 90, "rate": 0.0},
     }
 
     markdown = render_markdown_report(report)
@@ -288,10 +371,12 @@ def test_render_markdown_report_includes_config_and_all_sections() -> None:
         "## By product line",
         "## By extraction mode",
         "## Exclusion-clause recall",
+        "## Foreign-document rate",
         "## Summary",
     ):
         assert header in markdown
     assert "Chunk corpus" not in markdown  # lexical block absent for `random`
+    assert "Dense model" not in markdown  # dense block absent for `random`
 
 
 def _chunk(chunk_id: str, clause_id: str, text: str) -> ChunkRecord:
@@ -325,14 +410,28 @@ def _chunk(chunk_id: str, clause_id: str, text: str) -> ChunkRecord:
 
 
 @pytest.mark.unit
-def test_parse_args_defaults_to_random_and_accepts_lexical(
+def test_parse_args_defaults_and_choices(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.argv", ["eval_retrieval.py"])
+    args = _parse_args()
+    assert (args.retriever, args.filter_mode, args.fusion) == ("random", "none", "rrf")
+
+    for retriever in ("lexical", "dense", "hybrid"):
+        monkeypatch.setattr("sys.argv", ["eval_retrieval.py", "--retriever", retriever])
+        assert _parse_args().retriever == retriever
+
+    monkeypatch.setattr("sys.argv", ["eval_retrieval.py", "--retriever", "nope"])
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+@pytest.mark.unit
+def test_parse_args_rejects_default_filter_with_the_random_retriever(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("sys.argv", ["eval_retrieval.py"])
-    assert _parse_args().retriever == "random"
-    monkeypatch.setattr("sys.argv", ["eval_retrieval.py", "--retriever", "lexical"])
-    assert _parse_args().retriever == "lexical"
-    monkeypatch.setattr("sys.argv", ["eval_retrieval.py", "--retriever", "nope"])
+    monkeypatch.setattr(
+        "sys.argv",
+        ["eval_retrieval.py", "--retriever", "random", "--filter", "default"],
+    )
     with pytest.raises(SystemExit):
         _parse_args()
 
@@ -388,6 +487,7 @@ def test_render_markdown_report_includes_the_lexical_config_block() -> None:
         "by_product_line": {"CASCO": metrics_row},
         "by_extraction_mode": {"text": metrics_row},
         "exclusion_clause_recall": {"k": 10, "hits": 1, "total": 27, "recall": 0.037},
+        "foreign_document_rate": {"k": 10, "hits": 0, "total": 90, "rate": 0.0},
     }
 
     markdown = render_markdown_report(report)
