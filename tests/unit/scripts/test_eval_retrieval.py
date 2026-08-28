@@ -7,7 +7,9 @@ from scripts.eval_retrieval import (
     K_VALUES,
     NDCG_K,
     ScoredQuestion,
+    _parse_args,
     aggregate,
+    build_lexical_retriever,
     compute_exclusion_clause_recall,
     evaluate_questions,
     load_golden_questions,
@@ -17,6 +19,7 @@ from scripts.eval_retrieval import (
 
 from infrastructure.evaluation.golden_set_schema import GoldenQuestion
 from infrastructure.parsing.clause_schema import ParsedClauseRecord
+from infrastructure.rag.chunk_schema import ChunkRecord
 
 
 def make_question(**overrides: object) -> GoldenQuestion:
@@ -288,3 +291,107 @@ def test_render_markdown_report_includes_config_and_all_sections() -> None:
         "## Summary",
     ):
         assert header in markdown
+    assert "Chunk corpus" not in markdown  # lexical block absent for `random`
+
+
+def _chunk(chunk_id: str, clause_id: str, text: str) -> ChunkRecord:
+    return ChunkRecord.model_validate(
+        {
+            "schema_version": "v1",
+            "chunk_id": chunk_id,
+            "document_id": "1",
+            "clause_id": clause_id,
+            "source_clause_ids": [clause_id],
+            "chunk_index": 0,
+            "chunk_count": 1,
+            "parent_path": "",
+            "text": text,
+            "display_text": text,
+            "char_count": len(text),
+            "rule": "single",
+            "clause_type": "coverage",
+            "type_source": "rule",
+            "confidence": 1.0,
+            "bundle_section": None,
+            "source": "text",
+            "susep_process": "123",
+            "insurer": "Insurer",
+            "cnpj": "123",
+            "product_line": "CASCO",
+            "indemnity_regime": "VD",
+            "filing_year": "2020",
+        }
+    )
+
+
+@pytest.mark.unit
+def test_parse_args_defaults_to_random_and_accepts_lexical(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("sys.argv", ["eval_retrieval.py"])
+    assert _parse_args().retriever == "random"
+    monkeypatch.setattr("sys.argv", ["eval_retrieval.py", "--retriever", "lexical"])
+    assert _parse_args().retriever == "lexical"
+    monkeypatch.setattr("sys.argv", ["eval_retrieval.py", "--retriever", "nope"])
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+@pytest.mark.unit
+def test_build_lexical_retriever_ranks_an_exact_term_clause_first() -> None:
+    # Thin integration: real analyzer + the real committed exception CSV.
+    chunks = [
+        _chunk("1:franquia", "1:franquia", "A franquia reduzida para vidros."),
+        _chunk("1:reboque", "1:reboque", "Servico de reboque e guincho na pane."),
+    ]
+    retriever = build_lexical_retriever(chunks)
+    assert retriever.retrieve("Qual o valor da franquia?", k=2)[0] == "1:franquia"
+
+
+@pytest.mark.unit
+def test_render_markdown_report_includes_the_lexical_config_block() -> None:
+    metrics_row = {
+        "n": 1.0,
+        "recall@1": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0,
+    }
+    report = {
+        "config": {
+            "schema_version": "v2",
+            "retriever_name": "lexical",
+            "k_values": [1, 5, 10],
+            "ndcg_k": 10,
+            "golden_set_dir": "data/golden_set",
+            "golden_set_question_count": 140,
+            "corpus_path": "build/parsed_clauses.jsonl",
+            "corpus_clause_count": 4925,
+            "seed": None,
+            "run_at_utc": "2026-08-28T00:00:00+00:00",
+            "chunk_corpus_path": "build/chunks.jsonl",
+            "chunk_corpus_chunk_count": 4540,
+            "lexical_analyzer_version": "v1",
+            "bm25_k1": 1.5,
+            "bm25_b": 0.75,
+            "lexical_idf_variant": "lucene_plus_one",
+            "lexical_index_text_field": "text",
+            "stemming_exception_count": 5,
+            "lexical_config_fingerprint": "deadbeefdeadbeef",
+        },
+        "overall": metrics_row,
+        "by_question_type": {
+            "direct_lookup": metrics_row,
+            "unanswerable": {"n": 23, "excluded_from_scoring": True},
+        },
+        "by_product_line": {"CASCO": metrics_row},
+        "by_extraction_mode": {"text": metrics_row},
+        "exclusion_clause_recall": {"k": 10, "hits": 1, "total": 27, "recall": 0.037},
+    }
+
+    markdown = render_markdown_report(report)
+
+    assert "Chunk corpus (BM25-indexed): `build/chunks.jsonl` (4540 chunks)" in markdown
+    assert "BM25 k1=1.5, b=0.75" in markdown
+    assert "deadbeefdeadbeef" in markdown

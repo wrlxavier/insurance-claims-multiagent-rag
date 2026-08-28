@@ -146,10 +146,14 @@ validate-golden-set`), run in CI so a corpus re-parse that breaks a
 
 Implemented in `app/src/infrastructure/evaluation/retrieval_metrics.py`
 (pure functions, no I/O) and orchestrated by `scripts/eval_retrieval.py`
-(`make eval-retrieval`) — the [M2-06] retrieval evaluation harness, built
-before any real retriever exists so the measuring instrument itself is
-proven first (validated against a deliberately broken random retriever
-whose metrics collapse to ~0%, per that issue's own DoD).
+— the [M2-06] retrieval evaluation harness, built before any real
+retriever exists so the measuring instrument itself is proven first
+(`make eval-retrieval`, validated against a deliberately broken random
+retriever whose metrics collapse to ~0%, per that issue's own DoD).
+`make eval-retrieval-lexical` (`--retriever lexical`) scores the [M3-03]
+BM25 lexical retriever through the same harness; its standalone
+`golden-set-v1` numbers and the verdict on which question types it wins
+live in `docs/LEXICAL_RETRIEVAL.md`.
 
 - **Recall@k** (k = 1, 5, 10): the fraction of `reference_clause_ids`
   present in the top-k retrieved ids. Chosen over precision because

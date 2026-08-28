@@ -1,0 +1,6 @@
+term,note
+nao,"Negation. The Snowball Portuguese stemmer maps 'não' -> 'na', which collides with the ubiquitous preposition 'na' (em+a): in the corpus the stem 'na' covers 'não' x6656 and 'na' x4481, so 'não' inherits a near-zero IDF and negation drops out of BM25 scoring. Kept verbatim so 'bens NAO compreendidos' / 'prejuizos NAO indenizaveis' stay retrievable -- the M3 exclusion-clause hard case. Added after measurement, not assumed."
+casco,"SUSEP product-line identifier (own-damage auto cover). A join key, not a lexical target -- kept verbatim so the stemmer never conflates it (stems to 'casc'). Retrieval-neutral on golden-set-v1; kept on principle per the repo's 'SUSEP identifiers are join keys, not interface text' convention."
+rcf,"SUSEP identifier: Responsabilidade Civil Facultativa (third-party liability). Join key, kept verbatim (same principle as 'casco')."
+vmr,"SUSEP indemnity-regime identifier: Valor de Mercado Referenciado. Kept verbatim."
+vd,"SUSEP indemnity-regime identifier: Valor Determinado. Kept verbatim."

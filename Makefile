@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -46,6 +46,7 @@ help:
 	@echo "  draft-unanswerable-questions - M2-05: draft candidate unanswerable golden questions into eval/unanswerable_draft.csv for review (--dry-run prints selection counts, no LLM calls)"
 	@echo "  finalize-unanswerable-questions - M2-05: promote approved rows from eval/unanswerable_draft.csv into data/golden_set/unanswerable.jsonl"
 	@echo "  eval-retrieval    - M2-06: score Recall@{1,5,10}/MRR/nDCG@10 against the golden set, broken down by question_type/product_line/extraction_mode, plus exclusion-clause recall (built-in random-retriever self-test; writes eval/runs/retrieval_eval_random.{md,json})"
+	@echo "  eval-retrieval-lexical - M3-03: score the BM25 lexical retriever (Portuguese tokenisation + Snowball stemming over build/chunks.jsonl, no metadata filter) on the golden set; writes eval/runs/retrieval_eval_lexical.{md,json}"
 	@echo "  review-golden-set-sample - Independent second-reviewer pass over a stratified golden-set-v1 sample (--dry-run prints the sample composition, no model calls); writes data/golden_set/review/review_v1.jsonl and eval/runs/golden_set_review_v1.{md,json}"
 
 install:
@@ -188,6 +189,9 @@ finalize-unanswerable-questions:
 
 eval-retrieval:
 	PYTHONPATH=app/src uv run python scripts/eval_retrieval.py
+
+eval-retrieval-lexical:
+	PYTHONPATH=app/src uv run python scripts/eval_retrieval.py --retriever lexical
 
 review-golden-set-sample:
 	PYTHONPATH=app/src uv run python scripts/review_golden_set_sample.py

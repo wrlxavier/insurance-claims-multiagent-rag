@@ -21,6 +21,7 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "tokenizers>=0.20",
     "pgvector>=0.5.0",
+    "snowballstemmer>=2.2",
 ]
 
 [dependency-groups]
@@ -153,6 +154,9 @@ module = [
     # `embed` group's transformers pin holds it at 0.20.x. scripts/*.py duck-type
     # it via a local Protocol regardless.
     "tokenizers.*",
+    # snowballstemmer ships no py.typed marker; infrastructure.rag.lexical_analyzer
+    # duck-types it via a local `_Stemmer` Protocol regardless ([M3-03]).
+    "snowballstemmer.*",
 ]
 ignore_missing_imports = true
 
