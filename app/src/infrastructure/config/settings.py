@@ -269,6 +269,26 @@ class ChunkingSettings(BaseSettings):
     )
 
 
+class EmbeddingSettings(BaseSettings):
+    """Settings used by the [M3-02] embedding pipeline."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    # Chunks handed to the embedder (and committed) per batch by
+    # `make embed-chunks`. A pure throughput / memory lever -- no effect on the
+    # stored vectors, and deliberately excluded from
+    # embedding_config.config_fingerprint(). Classified as a `.env` knob (not a
+    # code constant) per the [M1-09] per-constant table in docs/EMBEDDINGS.md --
+    # the direct analog of LLM_CLASSIFICATION_MAX_WORKERS. 64 is the module
+    # default in infrastructure.rag.embedding_pipeline.
+    embedding_batch_size: int = Field(alias="EMBEDDING_BATCH_SIZE", default=64)
+
+
 class Settings(DatabaseSettings, LlmSettings):
     """Application settings loaded from environment variables."""
 
@@ -317,3 +337,9 @@ def get_parsing_settings() -> ParsingSettings:
 def get_chunking_settings() -> ChunkingSettings:
     """Get cached settings used by clause-aware chunking."""
     return ChunkingSettings()
+
+
+@lru_cache
+def get_embedding_settings() -> EmbeddingSettings:
+    """Get cached settings used by the embedding pipeline."""
+    return EmbeddingSettings()

@@ -29,10 +29,14 @@ from enum import StrEnum
 EMBEDDING_MODEL_ID = "Alibaba-NLP/gte-multilingual-base"
 
 # Pinned by Hub commit -- NOT the floating ``main`` alias -- so a provider-side
-# update cannot silently change the vectors behind an already-published
-# number. This revision also pins the ``trust_remote_code`` modelling files
-# (``scripts/gte_embedding.py`` in the repo), which are fetched at the same
-# revision. Commit last modified 2025-07-05; re-confirm before bumping.
+# re-upload cannot silently change the model weights behind an already-published
+# number. Commit last modified 2025-07-05; re-confirm before bumping.
+#
+# Caveat (found when the real embedder landed, see docs/EMBEDDINGS.md): the
+# ``trust_remote_code`` modelling code is loaded from ``Alibaba-NLP/new-impl`` at
+# *its* ``main`` -- HF's ``repo--module`` auto_map form does not pin it to this
+# revision. The pinned ``transformers`` version (the ``embed`` group holds it to
+# the 4.4x line) is what actually stabilises that RoPE code path today.
 EMBEDDING_MODEL_REVISION = "9bbca17d9273fd0d03d5725c7a4b0f6b45142062"
 
 # Model card: 768-dim output, 8192-token context window.

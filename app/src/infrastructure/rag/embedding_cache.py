@@ -17,12 +17,12 @@ Location and format follow the repo convention
 appended on every miss. See docs/EMBEDDINGS.md for why the ~4,540-chunk corpus's
 volume does not justify departing from it.
 
-This module ships the mechanism; wiring it in -- ``CachingEmbedder`` wrapping the
-real ``sentence-transformers`` embedder, passed to
-[infrastructure.rag.embedding_pipeline.embed_missing_chunks] -- lands with
-``scripts/embed_chunks.py``, mirroring how ``scripts/build_corpus.py`` wraps its
-classifier in [infrastructure.parsing.llm_classification_cache.
-CachingClauseClassifier].
+``scripts/embed_chunks.py`` / ``make embed-chunks`` wrap the real
+[infrastructure.rag.sentence_transformer_embedder.SentenceTransformerEmbedder] in
+a ``CachingEmbedder`` and pass it to
+[infrastructure.rag.embedding_pipeline.embed_missing_chunks], mirroring how
+``scripts/build_corpus.py`` wraps its classifier in
+[infrastructure.parsing.llm_classification_cache.CachingClauseClassifier].
 """
 
 import hashlib
@@ -49,6 +49,12 @@ class CachingEmbedder:
         self._cache_path = cache_path
         self._lock = threading.Lock()
         self._cache: dict[str, list[float]] = self._load()
+        # Per-instance tallies over every text passed to :meth:`embed`, so
+        # ``scripts/embed_chunks.py`` can report a cold run's cache behaviour
+        # (cold: hits == 0, misses == chunk count). ``hits + misses`` always
+        # equals the number of texts seen.
+        self.hits = 0
+        self.misses = 0
 
     def _key(self, text: str) -> str:
         payload = f"{self._fingerprint}\x00{text}".encode()
@@ -80,6 +86,10 @@ class CachingEmbedder:
         keys = [self._key(text) for text in texts]
         with self._lock:
             resolved = {key: self._cache[key] for key in keys if key in self._cache}
+
+        cached_keys = set(resolved)
+        self.hits += sum(1 for key in keys if key in cached_keys)
+        self.misses += sum(1 for key in keys if key not in cached_keys)
 
         pending: dict[str, str] = {}  # key -> text, duplicates collapsed
         for text, key in zip(texts, keys, strict=True):

@@ -153,10 +153,11 @@ index limit too, but half-precision storage is the project default.
 `infrastructure.rag.embedding_pipeline.embed_missing_chunks` fills
 `chunk.embedding` for every chunk that has no vector yet.
 
-- **Batched.** Chunks are embedded `EMBEDDING_BATCH_SIZE` at a time; each
-  chunk's `embedded_text` is run through `format_passage` first (identity for
-  this model), so the string embedded on the index side is exactly the one
-  `check_embedding_input_length` tokenised.
+- **Batched.** Chunks are embedded `EMBEDDING_BATCH_SIZE` at a time (64 by
+  default; `.env`-backed via `EmbeddingSettings` — see the per-constant table
+  below); each chunk's `embedded_text` is run through `format_passage` first
+  (identity for this model), so the string embedded on the index side is exactly
+  the one `check_embedding_input_length` tokenised.
 - **Resumable cursor.** The cursor is `WHERE embedding IS NULL`
   (`chunk_repository.fetch_chunks_missing_embedding`), and each finished batch
   is committed. A run killed part-way keeps every batch it completed; re-running
@@ -175,9 +176,67 @@ index limit too, but half-precision storage is the project default.
   actually makes an interrupted run safe is the resumable cursor, not the
   retry.
 - **No live model in tests.** Unit and integration tests drive the pipeline
-  with a deterministic `FakeEmbedder`, per the [M1-05b]/[M1-04d] precedent. The
-  real `Embedder` (`sentence-transformers` loading the pinned model) is a later
-  slice.
+  with a deterministic `FakeEmbedder`, per the [M1-05b]/[M1-04d] precedent — no
+  live model call anywhere in the suite.
+
+### The real embedder
+
+`infrastructure.rag.sentence_transformer_embedder.SentenceTransformerEmbedder`
+loads the pinned model with `sentence-transformers` and embeds in-process:
+`SentenceTransformer(EMBEDDING_MODEL_ID, revision=EMBEDDING_MODEL_REVISION,
+trust_remote_code=True)`, then `model.encode(..., normalize_embeddings=True)`.
+
+`sentence-transformers` (and its `torch` / `transformers` dependencies) is the
+optional **`embed`** dependency group in `pyproject.toml`, deliberately kept out
+of `[tool.uv] default-groups` so a plain `uv sync` and CI stay torch-free. The
+module imports without the group installed (the heavy import is deferred to the
+constructor); only `make embed-chunks` needs it, and runs `uv run --group embed`.
+
+Two Make targets, composable into [M3-08]'s `make build-index`:
+
+- `make load-chunks` upserts `build/chunks.jsonl` into the `chunk` table
+  (`upsert_chunks` — idempotent on the deterministic `chunk_id`, and it never
+  writes `embedding`).
+- `make embed-chunks` (depends on `load-chunks`) composes
+  `CachingEmbedder(SentenceTransformerEmbedder(...))`, runs `embed_missing_chunks`,
+  and writes the cost report below. If no chunk is missing a vector it exits
+  before loading the model, so chaining it into `build-index` is cheap.
+
+**`trust_remote_code` and the `transformers` pin.** On the first run the model's
+`configuration.py` / `modeling.py` are fetched and executed from
+`Alibaba-NLP/new-impl` — and HF's `repo--module` auto-map form loads that at
+*its* `main`, **not** at `EMBEDDING_MODEL_REVISION` (which pins only the
+`gte-multilingual-base` weights). That code's RoPE path raises `IndexError` on
+`transformers >= 5` / `sentence-transformers >= 4`; the `embed` group holds both
+to the tested 4.4x / 3.x line, and the lockfile is the exact pin. An offline
+machine needs a warm Hugging Face cache to reproduce at all.
+
+## Corpus embedding cost (2026-08-28, AMD Ryzen 5 5600H)
+
+**Dollar cost: $0.00 as of 2026-08-28.** `Alibaba-NLP/gte-multilingual-base`
+runs locally via `sentence-transformers` — no API, no per-token charge — so
+[M3-02] introduces **no price constant**, and per [M1-09]'s stale-pricing lesson
+there is nothing to date-stamp beyond this sentence. The cost that answers "what
+does it take to reproduce the index" is machine time.
+
+Cold run (empty `data/cache/embeddings/`, `embed_chunks.py --device cpu`, single
+process, `EMBEDDING_BATCH_SIZE=64`), figures from
+`eval/runs/embedding_cost_report.{md,json}`:
+
+| measurement | value |
+| --- | --- |
+| chunks | 4,540 (71 batches of 64) |
+| total passage tokens | 1,240,900 (`format_passage`, special tokens included; max 1,015 in one chunk) |
+| wall-clock, cold | **41.2 min** (2,472 s) — `sentence-transformers` 3.4.1 / `torch` 2.13.0, CPU |
+| throughput | ~500 passage tokens/s |
+| forward passes | 4,524 (16 chunks share an `embedded_text` with an earlier chunk and hit the in-run cache) |
+| one-time model download | ~1.2 GB weights + the `trust_remote_code` files, network-bound, not counted above |
+| warm re-run | 0 forward passes — every vector served from `cache.jsonl` |
+| **dollar cost** | **$0.00** (local model) |
+
+On the RTX 3050 Laptop GPU the same pass is a few minutes; CPU is the
+conservative headline since a reproducer is not assumed to have a GPU. The
+report file also records the resolved library / pgvector / Postgres versions.
 
 ## The embedding cache
 
@@ -212,8 +271,8 @@ cache's volume justifies" it; it does not, quite:
 - Every `data/cache/*` subdirectory is gitignored (each has its own
   `.gitignore` line), so the file never enters version control whatever its
   size.
-- The full ~4,540-chunk corpus is ≈ 55–70 MB on disk and loads once per run
-  into a ~4,540-entry dict (~110 MB RAM). That is well within the existing
+- The full 4,540-chunk corpus is 74 MB on disk (measured) and loads once per run
+  into a 4,540-entry dict (~110 MB RAM). That is well within the existing
   cache footprint — `data/cache/boundary_escalation_pages/` is 257 MB — and it
   is a batch-script cost, not a service cost.
 - One format across every cache (greppable, inspectable, no new dependency) is
@@ -223,10 +282,13 @@ cache's volume justifies" it; it does not, quite:
 ### Wiring
 
 `CachingEmbedder` is applied at composition time, not inside the pipeline:
-`scripts/embed_chunks.py` (a later slice) will pass
-`CachingEmbedder(SentenceTransformerEmbedder(...))` to `embed_missing_chunks`,
-exactly as `scripts/build_corpus.py` wraps `LangchainClauseClassifier` in
-`CachingClauseClassifier`.
+`scripts/embed_chunks.py` passes `CachingEmbedder(SentenceTransformerEmbedder(...))`
+to `embed_missing_chunks`, exactly as `scripts/build_corpus.py` wraps
+`LangchainClauseClassifier` in `CachingClauseClassifier`. On a database reset
+(`make migrate` from scratch, then `make load-chunks`) every vector is `NULL`
+again, but the on-disk cache still holds them — so a re-`embed-chunks` refills
+`chunk.embedding` with **zero** model forward passes (measured: 2.6 s from the
+74 MB `cache.jsonl`, against 41 min cold).
 
 ### What it does *not* fix
 
@@ -235,6 +297,33 @@ pipeline's cursor is `WHERE embedding IS NULL`, and `upsert_chunks` never
 touches `embedding`, so that row is never handed to the embedder — cache or no
 cache. Closing that gap needs a pipeline/schema change (a stored content hash,
 or nulling the vector when the text changes), and it stays deferred.
+
+## [M1-09] per-constant decisions for [M3-02]
+
+Every constant this issue introduces, classified per [M1-09]'s rule: a value
+stays a **code constant** when it changes the vectors or a published retrieval
+number (it is experimental design, like `SEED` / `SAMPLE_SIZE` in
+`scripts/sample_parsing_quality.py`); it moves to **`.env`** only when it is a
+pure operational lever with no effect on any published number. Operational test:
+anything folded into `config_fingerprint()` is design and stays in code.
+
+| constant | location | decision | why |
+| --- | --- | --- | --- |
+| `EMBEDDING_MODEL_ID`, `EMBEDDING_MODEL_REVISION`, `EMBEDDING_DIMENSIONS`, `DISTANCE_METRIC`, `NORMALIZE_EMBEDDINGS`, `QUERY_PREFIX` / `PASSAGE_PREFIX` | `embedding_config.py` | code constant | in the fingerprint; determine the exact vectors |
+| `EMBEDDING_MAX_INPUT_TOKENS` | `embedding_config.py` | code constant | model capability fact; drives the input-length check |
+| `EMBEDDING_TRUST_REMOTE_CODE` | `embedding_config.py` | code constant | security-sensitive, bound to the revision — must not be `.env`-flippable |
+| **`EMBEDDING_BATCH_SIZE`** | was `embedding_pipeline.py`; now **`.env`** via `EmbeddingSettings` (default 64) | **`.env` knob** | pure throughput / memory lever, excluded from the fingerprint; the direct analog of `LLM_CLASSIFICATION_MAX_WORKERS` |
+| embedding worker count | — | no knob | the pipeline is single-threaded in-process; `sentence-transformers` owns its own intra-op parallelism. The only levers are `EMBEDDING_BATCH_SIZE` and the device (`SentenceTransformerEmbedder(device=...)`, auto cuda/cpu) |
+| `EMBEDDING_RETRY_MAX_ATTEMPTS` / `_DELAY_SECONDS` | alias of `llm_retry_defaults` | code constant (shared) | repo-wide shared policy; an in-process model has no rate limit to tune against |
+| `EMBEDDING_CACHE_PATH` | `embedding_cache.py` | code constant | path convention, gitignored, not environment-varying |
+| `HNSW_M`, `HNSW_EF_CONSTRUCTION` | `ann_index.py` | code constant | change the index and therefore any published Recall@k; [M3-08]'s to tune |
+| `HNSW_EF_SEARCH`, `HNSW_ITERATIVE_SCAN` | `ann_index.py` | code constant | change what a filtered search *returns*; `strict_order` is a correctness default that must not be weakened from `.env` |
+| `INDEX_NAME` | `ann_index.py` | code constant | an identifier, not a tunable |
+
+Net: exactly one constant moved (`EMBEDDING_BATCH_SIZE`). `.env` and `.env.example`
+carry that one new key in exact parity (a `skipif`-guarded parity test in
+`tests/unit/infrastructure/config/test_settings.py` checks it locally; CI has no
+`.env`).
 
 ## The HNSW ANN index over `chunk.embedding`
 
@@ -258,9 +347,10 @@ is the committed proof of the filtered-search behaviour below.
 
 ## Does the ANN index earn its place at 4,540 chunks? (2026-08-28, synthetic vectors)
 
-**What synthetic vectors establish and do not.** No real embedder exists yet
-(a separate, still-deferred slice), so `chunk.embedding` is filled with
-deterministic pseudo-random unit vectors. Build time, index size and *latency*
+**What synthetic vectors establish and do not.** `make benchmark-ann-index`
+fills `chunk.embedding` with deterministic pseudo-random unit vectors rather than
+running the real embedder (which now exists — `make embed-chunks`), so the
+benchmark stays a one-command, DB-only run. Build time, index size and *latency*
 are structural — they depend on the row count, dimensionality, `halfvec`
 storage and the index parameters, not on what the vectors mean — so they
 transfer to real embeddings. ANN **recall vs. exact does not** transfer (random
@@ -350,8 +440,12 @@ index artifact rather than a property of the retriever. See
 
 ## Still deferred in [M3-02]
 
-The corpus embedding cost report and any dated price constant; the [M1-09]
-per-constant pass over the model / dimensionality / batch size / worker count /
-index parameters, with `.env.example` parity; the real
-`SentenceTransformerEmbedder`; the stale-vector-on-changed-text gap above; and
-the pipeline `make` target composable into [M3-08]'s `make build-index`.
+Two items remain open:
+
+- **Stale vector on a changed `embedded_text`** ("What it does *not* fix" above)
+  — a chunk whose text changes under a stable `chunk_id` keeps its old vector.
+  Needs a stored content hash or a null-on-change step.
+- **The ANN-earns-its-place check on *real* embeddings** — the verdict above
+  rests on latency and synthetic vectors. [M3-08]'s benchmark matrix re-runs it
+  on the real embeddings and settles whether `make build-index` should call
+  `create_hnsw_index`.

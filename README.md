@@ -81,6 +81,22 @@ See [`docs/DATABASE.md`](docs/DATABASE.md) for the pinned pgvector version and
 why, how `CREATE EXTENSION vector` is executed and what privilege it needs,
 and the sync-vs-async engine decision.
 
+### Index the corpus
+
+With the database migrated and `build/chunks.jsonl` in place (from `make
+build-chunks`, or `make fetch-corpus-artifacts` for the pre-built corpus):
+
+```bash
+make load-chunks     # upsert the chunk corpus into Postgres
+make embed-chunks    # embed the chunks; installs the optional `embed` group on first run
+```
+
+The embedding model (`Alibaba-NLP/gte-multilingual-base`) runs locally, so the
+dollar cost is **$0.00** — no API key needed. A cold pass over the ~4,540-chunk
+corpus is ~41 min of CPU time on an AMD Ryzen 5 5600H (a few minutes on a GPU);
+re-runs are served from an on-disk cache and do zero inference. See
+[`docs/EMBEDDINGS.md`](docs/EMBEDDINGS.md).
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):

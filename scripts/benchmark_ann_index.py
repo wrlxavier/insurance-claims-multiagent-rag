@@ -57,6 +57,7 @@ from infrastructure.database import (
     create_session_factory,
 )
 from infrastructure.database.chunk_repository import (
+    assert_chunk_table_ready,
     upsert_chunks,
     write_chunk_embeddings,
 )
@@ -237,21 +238,6 @@ def assert_target_is_test_db(url: str, *, allow_nontest: bool) -> None:
             f"refusing to run against database {name!r}: the name has no "
             "'test' in it and this benchmark truncates the `chunk` table. Pass "
             "--allow-nontest-db to override."
-        )
-
-
-def assert_chunk_table_ready(session: Session) -> None:
-    """Fail loudly with the fix command if the ``chunk`` table is not migrated."""
-    ready = session.execute(
-        text(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name = 'chunk' AND column_name = 'embedding'"
-        )
-    ).first()
-    if ready is None:
-        raise RuntimeError(
-            "`chunk` table (with the `embedding` column) not found. Run: "
-            "DATABASE_URL=$TEST_DATABASE_URL make migrate"
         )
 
 

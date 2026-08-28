@@ -6,10 +6,11 @@ column), so there is no application use case to hang an
 ``application/ports/`` port off. [M3-04]'s query side will embed queries
 through the same contract.
 
-The real implementation (``sentence-transformers`` loading the pinned
-[infrastructure.rag.embedding_config] model) is a later [M3-02] slice; the test
-suite drives the pipeline with a fake, per the [M1-05b]/[M1-04d] no-live-calls
-precedent.
+The real implementation is
+[infrastructure.rag.sentence_transformer_embedder.SentenceTransformerEmbedder]
+(``sentence-transformers`` loading the pinned [infrastructure.rag.embedding_config]
+model, from the optional ``embed`` dependency group). The test suite drives the
+pipeline with a fake, per the [M1-05b]/[M1-04d] no-live-calls precedent.
 """
 
 from collections.abc import Sequence

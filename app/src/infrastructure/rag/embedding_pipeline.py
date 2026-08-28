@@ -19,9 +19,12 @@ for uniformity with every other batch job in the repo, and as thin cover for a
 transient local failure (a first-call model load, an OOM that clears). What
 actually makes an interrupted run safe is the resumable cursor, not the retry.
 
-The real ``Embedder`` (``sentence-transformers`` loading the pinned model), the
-``make`` target, and the cost report are a later [M3-02] slice; the test suite
-drives this with a fake per the [M1-05b]/[M1-04d] no-live-calls precedent.
+The real ``Embedder`` is
+[infrastructure.rag.sentence_transformer_embedder.SentenceTransformerEmbedder]
+(the optional ``embed`` dependency group); ``scripts/embed_chunks.py`` /
+``make embed-chunks`` compose it with the cache and run this pipeline, and record
+the corpus embedding cost. The test suite drives this module with a fake per the
+[M1-05b]/[M1-04d] no-live-calls precedent.
 """
 
 import time
@@ -46,11 +49,12 @@ from infrastructure.database.models import ChunkRow
 from infrastructure.rag.embedder import Embedder
 from infrastructure.rag.embedding_config import format_passage
 
-# Pure throughput knob: how many chunks are handed to ``Embedder.embed`` at once
-# and committed together. No effect on the stored vectors. Kept a module
-# constant here; promoting it (with the rest of M3-02's operational constants)
-# to ``.env`` under the [M1-09] per-constant rule, with ``.env.example`` parity,
-# is a separate M3-02 DoD item.
+# Pure throughput / memory knob: how many chunks are handed to ``Embedder.embed``
+# at once and committed together. No effect on the stored vectors. This is the
+# pure-function default; ``scripts/embed_chunks.py`` overrides it from
+# ``EmbeddingSettings.embedding_batch_size`` (``.env``'s ``EMBEDDING_BATCH_SIZE``).
+# Classified as a ``.env`` knob per the [M1-09] per-constant table in
+# docs/EMBEDDINGS.md -- the analog of ``LLM_CLASSIFICATION_MAX_WORKERS``.
 EMBEDDING_BATCH_SIZE = 64
 
 

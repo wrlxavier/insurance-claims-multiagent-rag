@@ -99,6 +99,21 @@ def test_duplicate_texts_in_one_call_embed_once(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_hit_and_miss_counters_track_every_text(tmp_path: Path) -> None:
+    cache_path = tmp_path / "cache.jsonl"
+
+    cold = CachingEmbedder(CountingEmbedder(), cache_path=cache_path)
+    cold.embed(["a", "b", "c"])
+    # Cold: nothing cached, so every text is a miss. hits + misses == texts seen.
+    assert (cold.hits, cold.misses) == (0, 3)
+
+    warm = CachingEmbedder(CountingEmbedder(), cache_path=cache_path)
+    warm.embed(["a", "b", "new"])
+    warm.embed(["c"])
+    assert (warm.hits, warm.misses) == (3, 1)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
     ("attr", "value"),
     [

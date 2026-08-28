@@ -15,7 +15,7 @@ Two sinks, deliberately separate:
 from collections.abc import Iterable, Mapping, Sequence
 from itertools import batched
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -70,6 +70,28 @@ def upsert_chunks(
         session.flush()
         written += len(batch)
     return written
+
+
+def assert_chunk_table_ready(session: Session) -> None:
+    """Fail loudly with the fix command if the ``chunk`` table is not migrated.
+
+    Checks for the ``embedding`` column specifically, so it also catches a
+    database migrated to before ``20260827_03``. Shared by every script that
+    reads or writes ``chunk`` (``load_chunks``, ``embed_chunks``,
+    ``benchmark_ann_index``).
+    """
+    ready = session.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'chunk' AND column_name = 'embedding'"
+        )
+    ).first()
+    if ready is None:
+        raise RuntimeError(
+            "`chunk` table (with the `embedding` column) not found. Run "
+            "`make migrate` (or `DATABASE_URL=$TEST_DATABASE_URL make migrate` "
+            "for the test database)."
+        )
 
 
 def fetch_chunks_missing_embedding(session: Session) -> list[tuple[str, str]]:

@@ -12,10 +12,10 @@ query.
 
 The parameters are module constants, not ``.env`` knobs: ``m`` / ``ef_construction``
 change the index (and therefore any published Recall@k), and ``ef_search`` /
-``iterative_scan`` change what a filtered search *returns*. Formally classifying
-them under [M1-09]'s per-constant rule, with ``.env.example`` parity, is a
-separate still-deferred [M3-02] DoD item -- the same holding pattern
-``embedding_pipeline.EMBEDDING_BATCH_SIZE`` carries.
+``iterative_scan`` change what a filtered search *returns*. Under [M1-09]'s
+per-constant rule they are experimental design, not operational knobs -- see the
+per-constant decision table in ``docs/EMBEDDINGS.md``. (``EMBEDDING_BATCH_SIZE``
+was the one M3-02 constant that rule moved to ``.env``.)
 """
 
 from typing import Literal, get_args

@@ -6,6 +6,7 @@ integration.
 
 from infrastructure.database.base import Base
 from infrastructure.database.chunk_repository import (
+    assert_chunk_table_ready,
     fetch_chunks_missing_embedding,
     upsert_chunks,
     write_chunk_embeddings,
@@ -21,6 +22,7 @@ from infrastructure.database.session import (
 __all__ = [
     "Base",
     "ChunkRow",
+    "assert_chunk_table_ready",
     "create_engine_from_database_url",
     "create_engine_from_settings",
     "create_session_factory",
