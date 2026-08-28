@@ -19,6 +19,8 @@ dependencies = [
     "sqlalchemy>=2.0.52",
     "alembic>=1.19.1",
     "psycopg[binary]>=3.3.4",
+    "tokenizers>=0.20",
+    "pgvector>=0.5.0",
 ]
 
 [dependency-groups]
@@ -31,6 +33,26 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.0",
 ]
+
+# Real local embedder for `make embed-chunks` only (sentence-transformers pulls
+# torch + transformers). Deliberately excluded from [tool.uv] default-groups, so
+# `uv sync` and CI stay torch-free; opt in with `uv run --group embed` (the
+# Makefile does) or `uv sync --group embed`.
+#
+# transformers is held in the 4.4x line: gte-multilingual-base's config.json
+# declares transformers_version 4.39.1, and its `trust_remote_code` RoPE
+# modelling code (Alibaba-NLP/new-impl) raises IndexError on transformers >=5 /
+# sentence-transformers >=4. Pinned to a tested-compatible window; the lockfile
+# is the exact pin.
+embed = [
+    "sentence-transformers>=3.0,<3.5",
+    "transformers>=4.39,<4.46",
+]
+
+[tool.uv]
+# `dev` is already uv's default group; naming it here makes it explicit that the
+# heavy `embed` group is opt-in only and never installed by a plain `uv sync`.
+default-groups = ["dev"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -124,6 +146,13 @@ module = [
     "langchain_core.*",
     "langchain_anthropic.*",
     "tqdm.*",
+    # Optional `embed` dependency group -- not installed in the default env that
+    # `make typecheck` / CI run against.
+    "sentence_transformers.*",
+    # The Rust `tokenizers` package ships py.typed only in some releases; the
+    # `embed` group's transformers pin holds it at 0.20.x. scripts/*.py duck-type
+    # it via a local Protocol regardless.
+    "tokenizers.*",
 ]
 ignore_missing_imports = true
 

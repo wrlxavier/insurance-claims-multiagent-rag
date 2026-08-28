@@ -2,8 +2,10 @@
 
 Postgres with pgvector, Alembic migrations, and the integration-test path.
 Landed by [M0-08], which creates the database *capability* — the schema
-belongs to the issues that need it: the chunk and vector table to [M3-02],
-the checkpointer tables to [M4-09], the domain and audit tables to [M5-03].
+belongs to the issues that need it: the `chunk` table to [M3-02] (its
+`embedding` vector column follows in the same issue's embedding-pipeline
+half), the checkpointer tables to [M4-09], the domain and audit tables to
+[M5-03].
 
 The initial migration creates the `vector` extension and nothing else.
 
@@ -45,7 +47,10 @@ ANN index combined with a restrictive pre-filter can return fewer than *k*
 rows, because the index scan exhausts its candidate list on rows the filter
 then discards; iterative scans make the index keep scanning until enough
 results are found. Without them, that shows up as a recall regression nobody
-can explain rather than as a configuration decision.
+can explain rather than as a configuration decision. [M3-02] measured this
+(`docs/EMBEDDINGS.md`, "Filtered search and the fewer-than-`k` question") and
+`tests/integration/test_ann_index.py` proves both the shortfall and the
+`hnsw.iterative_scan = strict_order` fix.
 
 Indexable dimension limits, which constrain the embedding model [M3-02] may
 choose:
@@ -145,6 +150,88 @@ foreign key and primary key gets a deterministic name. Without it Postgres
 names them itself, and a later migration that has to drop one is reduced to
 guessing what it was called. Set on the metadata rather than per-table so it
 holds from the first table [M3-02] adds onwards.
+
+Migrations pass the **bare** constraint name (`name="rule_valid"`, not
+`name="ck_chunk_rule_valid"`) — Alembic's `op` context applies the same
+convention the model does, and passing the already-expanded name gets it
+expanded a second time (`ck_chunk_ck_chunk_rule_valid`).
+
+## The chunk table ([M3-02])
+
+`app/src/infrastructure/database/models.py` — `ChunkRow` — is the persistence
+representation of the M3-01 chunk corpus (`build/chunks.jsonl`), indexed in
+Postgres for retrieval. It is the first ORM model in the project.
+
+The `embedding halfvec(768)` column landed in migration `20260827_03`
+(`ALTER TABLE chunk ADD COLUMN`, plus the `pgvector` Python dependency). Its
+width, half-precision storage and cosine metric follow the pinned model
+contract — `Alibaba-NLP/gte-multilingual-base` (see `docs/EMBEDDINGS.md` and
+`app/src/infrastructure/rag/embedding_config.py`). The `halfvec_cosine_ops`
+HNSW index over the column is defined in `app/src/infrastructure/rag/ann_index.py`
+— **not** a migration: the benchmark (`docs/EMBEDDINGS.md`, "Does the ANN index
+earn its place") measured it at ~4,540 chunks and the chosen default retrieval
+path is exact `<=>` over the metadata-filtered partition, so the index does not
+belong in the schema. `tests/integration/test_ann_index.py` is the committed
+proof of its filtered-search behaviour and the `hnsw.iterative_scan` fix.
+
+- **Columns** mirror `infrastructure.rag.chunk_schema.ChunkRecord` field for
+  field (except `text` → `embedded_text`), so the write path is a direct
+  mapping and "carry the full [M1-05] provenance" is auditable column by
+  column. The enum-valued columns (`rule`, `clause_type`, `type_source`,
+  `source`) are `TEXT` + a named `CHECK`, not native PG enums: there is no
+  enum precedent in the project, `ALTER TYPE` is transaction-hostile and
+  values cannot be removed, and the `ck_` naming convention already exists
+  for exactly this. A unit test keeps each `CHECK` value set in step with its
+  domain enum.
+
+- **`chunk_id` is the primary key and is deterministic upstream.** [M3-01]
+  sets it to the anchor `clause_id` for a one-chunk clause and
+  `f"{clause_id}#{index}"` for a split; `clause_id = f"{document_id}:{path}"`
+  is [M1-07]'s structural-path id, not a hash. Same input, same id. The write
+  path (`infrastructure.database.chunk_repository.upsert_chunks`) is therefore
+  `INSERT ... ON CONFLICT (chunk_id) DO UPDATE`, refreshing every non-key
+  column *except `embedding`* — a re-run over the same corpus neither
+  duplicates rows nor needs a wipe, and refreshing chunk metadata never
+  discards vectors already computed. It flushes but never commits; the caller
+  owns the transaction.
+
+- **`bundle_section` is a genuinely nullable column** — no server default, no
+  sentinel. A strict M3-04 filter `WHERE bundle_section = :x` then silently
+  excludes unknown-bundle chunks, and that exclusion is expressible and
+  testable in plain SQL (M3-04's cross-note from [M1-06]: ~40% of a
+  multi-product document's clauses land in the `None` bucket). Contrast
+  `infrastructure/parsing/clause_tree_caching.py`, which collapses `None ↔ ""`
+  — but only for the Parquet clause-tree cache, never for a value that
+  reaches the table.
+
+- **`embedded_text` vs `display_text`.** `embedded_text` is the exact string
+  the embedding model sees — the clause body with its [M3-01] ancestor-path
+  breadcrumb prepended. `display_text` is the same clause with only that
+  injected breadcrumb removed, keeping its own heading line: the quoted
+  excerpt [M4-01]'s citation type needs, which is not the string the model
+  should have seen. `char_count` measures `embedded_text`.
+
+- **`embedding` is genuinely nullable, and the embedding pipeline owns it.**
+  An un-embedded chunk carries `NULL`; `WHERE embedding IS NULL` is the
+  pipeline's resumable cursor
+  (`infrastructure.rag.embedding_pipeline.embed_missing_chunks`), which
+  batches, retries the shared 3-attempt/5s policy around each embed call, and
+  commits per batch so an interrupted run resumes on exactly the remaining
+  rows. Query code orders by `ChunkRow.embedding.cosine_distance(...)` — the
+  `<=>` operator, matching `embedding_config.DISTANCE_METRIC`. Known gap: a
+  chunk whose `embedded_text` changes but whose deterministic `chunk_id` does
+  not keeps its stale vector — re-embedding on content change is the deferred
+  content-hash-cache item's job.
+
+- **Indexes:** one per field M3-04 filters by (`clause_type`,
+  `bundle_section`, `susep_process`, `cnpj`, `product_line`) plus a composite
+  `(susep_process, cnpj)` for M3-04's *default* retrieval path. `insurer` is
+  not indexed — M3-04 filters insurers by CNPJ, never by name. All of these
+  are forward-looking: at ~4,900 chunks Postgres seq-scans in well under a
+  millisecond regardless. The `embedding` column has **no** index in the
+  migrations — the HNSW definition lives in `infrastructure.rag.ann_index` and
+  [M3-02]'s benchmark found the composite `(susep_process, cnpj)` btree +
+  exact sort is what the planner picks for the default path anyway (~0.6 ms).
 
 ## Integration tests
 
