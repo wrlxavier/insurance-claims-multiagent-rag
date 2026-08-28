@@ -8,14 +8,14 @@ domain/application, see tests/architecture/test_layer_boundaries.py), the
 pydantic ``ChunkRecord`` is the ``build/`` serialization row, and this is the
 table.
 
-Scope note: this model covers [M3-02]'s schema half only. The ``embedding``
-vector column and its ANN index are deferred to the embedding-pipeline PR --
-the vector dimension depends on the embedding-model choice, which is a separate
-DoD item. See docs/DATABASE.md.
+Scope note: the ``embedding`` column is the ``halfvec(768)`` vector the [M3-02]
+embedding pipeline fills; its ANN index and the ANN-vs-exact measurement are a
+later slice of the same issue. See docs/DATABASE.md.
 """
 
 from collections.abc import Iterable
 
+from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import CheckConstraint, Float, Index, Integer, Text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from domain.chunk import ChunkRule
 from domain.clause_classification import ClauseType, TypeSource
 from infrastructure.database.base import Base
+from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS
 
 _SOURCE_VALUES = ("text", "ocr")
 
@@ -87,6 +88,18 @@ class ChunkRow(Base):
     product_line: Mapped[str] = mapped_column(Text, nullable=False)
     indemnity_regime: Mapped[str] = mapped_column(Text, nullable=False)
     filing_year: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # The dense-retrieval vector for `embedded_text`, per the pinned model
+    # contract in `infrastructure.rag.embedding_config` (768-dim, cosine,
+    # L2-normalised). `halfvec` half-precision storage follows [M0-08]'s
+    # decision. Genuinely nullable: an un-embedded chunk is `NULL`, and
+    # `WHERE embedding IS NULL` is the embedding pipeline's resumable cursor.
+    # `upsert_chunks` (the metadata write path) deliberately never writes this
+    # column -- see `chunk_repository._UPDATE_COLUMNS`. The ANN index over it is
+    # a later [M3-02] slice.
+    embedding: Mapped[list[float] | None] = mapped_column(
+        HALFVEC(EMBEDDING_DIMENSIONS), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

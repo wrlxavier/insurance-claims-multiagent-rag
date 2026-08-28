@@ -3,11 +3,13 @@
 import re
 
 import pytest
+from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import CheckConstraint
 
 from domain.chunk import ChunkRule
 from domain.clause_classification import ClauseType, TypeSource
 from infrastructure.database.models import ChunkRow
+from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS
 
 # A properly-typed Table handle (``ChunkRow.__table__`` is typed as a bare
 # FromClause).
@@ -75,6 +77,31 @@ def test_provenance_and_attribution_columns_are_present_and_not_null() -> None:
 def test_embedded_and_display_text_are_separate_columns() -> None:
     assert "embedded_text" in _CHUNK_TABLE.c
     assert "display_text" in _CHUNK_TABLE.c
+
+
+@pytest.mark.unit
+def test_embedding_is_a_nullable_halfvec_of_the_pinned_dimension() -> None:
+    column = _CHUNK_TABLE.c.embedding
+
+    # Width comes from the pinned model contract, not a literal here -- the
+    # migration's literal `768` is caught by `alembic check` if it drifts.
+    assert isinstance(column.type, HALFVEC)
+    assert column.type.dim == EMBEDDING_DIMENSIONS
+    # An un-embedded chunk is `NULL`; that is the pipeline's resumable cursor,
+    # so no server_default / Python default may fill it in.
+    assert column.nullable is True
+    assert column.server_default is None
+    assert column.default is None
+
+
+@pytest.mark.unit
+def test_embedding_column_is_not_indexed_yet() -> None:
+    # The ANN index over `embedding` is a later M3-02 slice; until then exact
+    # `<=>` ordering runs on the bare column.
+    indexed_columns = {
+        column.name for index in _CHUNK_TABLE.indexes for column in index.columns
+    }
+    assert "embedding" not in indexed_columns
 
 
 @pytest.mark.unit

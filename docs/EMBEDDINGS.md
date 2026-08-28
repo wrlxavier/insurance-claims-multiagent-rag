@@ -1,8 +1,8 @@
 # Embeddings
 
 The dense-retrieval embedding model for [M3-02], its version pin, and the
-distance / normalisation / prefix decisions that [M3-04] and the deferred
-embedding-pipeline PR both depend on. The contract lives in code at
+distance / normalisation / prefix decisions that [M3-04] and the embedding
+pipeline both depend on. The contract lives in code at
 `app/src/infrastructure/rag/embedding_config.py`; this document is the
 rationale and the evidence.
 
@@ -136,20 +136,52 @@ Fixed once, in `embedding_config.py`, and used identically on both sides:
 This is recorded here for [M3-04] rather than in a comment. Concretely it
 means:
 
-- **Index side** (deferred embedding-pipeline PR): the `embedding
-  halfvec(768)` column's ANN index takes `halfvec_cosine_ops`, and any
-  ordering query uses the `<=>` (cosine distance) operator.
+- **Index side:** the `embedding halfvec(768)` column. Ordering queries use
+  `ChunkRow.embedding.cosine_distance(...)` — the `<=>` (cosine distance)
+  operator. The ANN index that would take `halfvec_cosine_ops` is still
+  deferred (see below); until it lands, `<=>` runs as an exact scan.
 - **Query side** ([M3-04]): the retriever orders by the same `<=>`.
 
 `halfvec` (not `vector`) for storage follows [M0-08]'s decision in
 `docs/DATABASE.md`; at 768 dimensions the column is within the plain-`vector`
 index limit too, but half-precision storage is the project default.
 
-## Deferred to the embedding-pipeline PR
+## The embedding pipeline
 
-Still open in [M3-02] after this change: the `embedding halfvec(768)` column
-and its migration, `uv add pgvector`, batched embedding with retry and a
-resumable cursor, the content-hash embedding cache, the ANN index plus its
-build-time/size record, the ANN-vs-exact-search measurement, the
-filtered-search-returns-fewer-than-k question, the corpus embedding cost
-report, and the `make` target composable into [M3-08]'s `make build-index`.
+`infrastructure.rag.embedding_pipeline.embed_missing_chunks` fills
+`chunk.embedding` for every chunk that has no vector yet.
+
+- **Batched.** Chunks are embedded `EMBEDDING_BATCH_SIZE` at a time; each
+  chunk's `embedded_text` is run through `format_passage` first (identity for
+  this model), so the string embedded on the index side is exactly the one
+  `check_embedding_input_length` tokenised.
+- **Resumable cursor.** The cursor is `WHERE embedding IS NULL`
+  (`chunk_repository.fetch_chunks_missing_embedding`), and each finished batch
+  is committed. A run killed part-way keeps every batch it completed; re-running
+  embeds exactly the remainder — nothing duplicated, nothing skipped
+  (`tests/integration/test_chunk_embedding.py::test_interrupt_mid_corpus_then_resume`).
+  `upsert_chunks` deliberately never writes `embedding`, so a metadata refresh
+  does not reset the cursor.
+- **Retry policy — reused, with a caveat.** Each embed call is wrapped in the
+  shared 3-attempt / 5s policy (`application.use_cases.llm_retry_defaults`),
+  re-raising on exhaustion. The [M3-02] DoD allows a different policy "if
+  embedding rate limits justify" one: they do not, because the pinned model
+  runs **in-process** — there is no API and no rate limit. The policy is kept
+  unchanged anyway, for uniformity with every other batch job and as thin cover
+  for a transient local failure (a first-call model load, an OOM that clears),
+  and so nothing changes if a remote embedding API is swapped in later. What
+  actually makes an interrupted run safe is the resumable cursor, not the
+  retry.
+- **No live model in tests.** Unit and integration tests drive the pipeline
+  with a deterministic `FakeEmbedder`, per the [M1-05b]/[M1-04d] precedent. The
+  real `Embedder` (`sentence-transformers` loading the pinned model) is a later
+  slice.
+
+## Still deferred in [M3-02]
+
+The content-hash embedding cache (whose key must also cover a chunk's changed
+text — the "known gap" above); the ANN index plus its build-time/size record;
+the ANN-vs-exact-search measurement at ~4,540 chunks; the
+filtered-search-returns-fewer-than-`k` question; the corpus embedding cost
+report and any dated price constant; the real `SentenceTransformerEmbedder`;
+and the `make` target composable into [M3-08]'s `make build-index`.

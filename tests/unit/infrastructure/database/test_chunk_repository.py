@@ -52,17 +52,24 @@ def test_row_values_renames_text_and_preserves_nulls() -> None:
 
 
 @pytest.mark.unit
-def test_row_values_keys_match_the_table_columns_exactly() -> None:
+def test_row_values_keys_match_the_table_columns_except_embedding() -> None:
+    # `ChunkRecord` carries no vector, so the metadata write path inserts every
+    # column but `embedding` -- which the embedding pipeline owns alone.
     assert set(_row_values(_record())) == {
-        column.name for column in _CHUNK_TABLE.columns
+        column.name for column in _CHUNK_TABLE.columns if column.name != "embedding"
     }
 
 
 @pytest.mark.unit
-def test_upsert_refreshes_every_non_key_column() -> None:
-    # A column left out of the ON CONFLICT SET list would silently keep its
-    # stale value on a re-run.
-    non_key_columns = {
-        column.name for column in _CHUNK_TABLE.columns if column.name != "chunk_id"
+def test_upsert_refreshes_every_non_key_column_except_embedding() -> None:
+    # A column left out of the ON CONFLICT SET list keeps its stored value on a
+    # re-run. That is wrong for metadata (stale) but exactly right for
+    # `embedding`: a metadata refresh must not null out vectors already
+    # computed -- see `chunk_repository._SKIP_ON_UPDATE`.
+    refreshed = {
+        column.name
+        for column in _CHUNK_TABLE.columns
+        if column.name not in {"chunk_id", "embedding"}
     }
-    assert set(_UPDATE_COLUMNS) == non_key_columns
+    assert set(_UPDATE_COLUMNS) == refreshed
+    assert "embedding" not in _UPDATE_COLUMNS

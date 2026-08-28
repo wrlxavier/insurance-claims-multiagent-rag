@@ -159,14 +159,15 @@ expanded a second time (`ck_chunk_ck_chunk_rule_valid`).
 representation of the M3-01 chunk corpus (`build/chunks.jsonl`), indexed in
 Postgres for retrieval. It is the first ORM model in the project.
 
-**This is [M3-02]'s schema half only.** The `embedding` vector column and its
-ANN index are deferred to the embedding-pipeline half. The embedding model is
-now chosen and pinned — `Alibaba-NLP/gte-multilingual-base`, 768 dimensions,
-cosine distance, L2-normalised (see `docs/EMBEDDINGS.md` and
-`app/src/infrastructure/rag/embedding_config.py`) — so the column will be
-`halfvec(768)` with a `halfvec_cosine_ops` index. It still lands later, via
-`ALTER TABLE chunk ADD COLUMN embedding halfvec(768)` plus the `pgvector`
-Python dependency. No vector column, no ANN index, no `pgvector` package yet.
+The `embedding halfvec(768)` column landed in migration `20260827_03`
+(`ALTER TABLE chunk ADD COLUMN`, plus the `pgvector` Python dependency). Its
+width, half-precision storage and cosine metric follow the pinned model
+contract — `Alibaba-NLP/gte-multilingual-base` (see `docs/EMBEDDINGS.md` and
+`app/src/infrastructure/rag/embedding_config.py`). Still deferred to a later
+[M3-02] slice: the ANN index over the column (`halfvec_cosine_ops` HNSW), its
+build-time/size record, and the ANN-vs-exact-search measurement at this corpus
+size (~4,540 chunks). Until then, exact `<=>` cosine ordering runs on the bare
+column.
 
 - **Columns** mirror `infrastructure.rag.chunk_schema.ChunkRecord` field for
   field (except `text` → `embedded_text`), so the write path is a direct
@@ -184,8 +185,10 @@ Python dependency. No vector column, no ANN index, no `pgvector` package yet.
   is [M1-07]'s structural-path id, not a hash. Same input, same id. The write
   path (`infrastructure.database.chunk_repository.upsert_chunks`) is therefore
   `INSERT ... ON CONFLICT (chunk_id) DO UPDATE`, refreshing every non-key
-  column — a re-run over the same corpus neither duplicates rows nor needs a
-  wipe. It flushes but never commits; the caller owns the transaction.
+  column *except `embedding`* — a re-run over the same corpus neither
+  duplicates rows nor needs a wipe, and refreshing chunk metadata never
+  discards vectors already computed. It flushes but never commits; the caller
+  owns the transaction.
 
 - **`bundle_section` is a genuinely nullable column** — no server default, no
   sentinel. A strict M3-04 filter `WHERE bundle_section = :x` then silently
@@ -202,6 +205,18 @@ Python dependency. No vector column, no ANN index, no `pgvector` package yet.
   injected breadcrumb removed, keeping its own heading line: the quoted
   excerpt [M4-01]'s citation type needs, which is not the string the model
   should have seen. `char_count` measures `embedded_text`.
+
+- **`embedding` is genuinely nullable, and the embedding pipeline owns it.**
+  An un-embedded chunk carries `NULL`; `WHERE embedding IS NULL` is the
+  pipeline's resumable cursor
+  (`infrastructure.rag.embedding_pipeline.embed_missing_chunks`), which
+  batches, retries the shared 3-attempt/5s policy around each embed call, and
+  commits per batch so an interrupted run resumes on exactly the remaining
+  rows. Query code orders by `ChunkRow.embedding.cosine_distance(...)` — the
+  `<=>` operator, matching `embedding_config.DISTANCE_METRIC`. Known gap: a
+  chunk whose `embedded_text` changes but whose deterministic `chunk_id` does
+  not keeps its stale vector — re-embedding on content change is the deferred
+  content-hash-cache item's job.
 
 - **Indexes:** one per field M3-04 filters by (`clause_type`,
   `bundle_section`, `susep_process`, `cnpj`, `product_line`) plus a composite
