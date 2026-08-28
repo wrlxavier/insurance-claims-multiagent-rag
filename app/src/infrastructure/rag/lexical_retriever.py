@@ -11,6 +11,10 @@ Everything here is in-memory and constructor-injected: no database, no I/O. The
 index is rebuilt from ``build/chunks.jsonl`` per run (a few seconds for ~4.5k
 chunks -- unlike the 41-minute embedding run, it does not justify an on-disk
 cache in this issue).
+
+[M3-04] adds the ``metadata_filter`` kwarg and ``retrieve_scored`` -- this leg
+of the hybrid retriever, filtered and score-exposing -- without changing the
+unfiltered ``retrieve(question, k=k)`` path or its committed numbers.
 """
 
 from collections.abc import Mapping, Sequence
@@ -19,6 +23,7 @@ from typing import Protocol
 from infrastructure.rag.bm25 import BM25Index, build_bm25_index, top_n
 from infrastructure.rag.chunk_schema import ChunkRecord
 from infrastructure.rag.lexical_config import BM25_B, BM25_K1, LEXICAL_INDEX_TEXT_FIELD
+from infrastructure.rag.retrieval_filter import RetrievalFilter
 
 
 class _Analyzer(Protocol):
@@ -44,11 +49,17 @@ class LexicalRetriever:
         index: BM25Index,
         analyzer: _Analyzer,
         chunk_to_clauses: Mapping[str, Sequence[str]],
+        chunks_by_id: Mapping[str, ChunkRecord],
     ) -> None:
-        """Build over a prepared index, its analyzer, and the chunk->clauses map."""
+        """Build over a prepared index, its analyzer, and the chunk lookups.
+
+        ``chunks_by_id`` carries the metadata [M3-04]'s pre-filter matches
+        against; it is untouched when ``retrieve`` is called without a filter.
+        """
         self._index = index
         self._analyzer = analyzer
         self._chunk_to_clauses = chunk_to_clauses
+        self._chunks_by_id = chunks_by_id
 
     @classmethod
     def from_chunks(
@@ -69,26 +80,57 @@ class LexicalRetriever:
         chunk_to_clauses = {
             chunk.chunk_id: tuple(chunk.source_clause_ids) for chunk in chunks
         }
-        return cls(index, analyzer, chunk_to_clauses)
+        chunks_by_id = {chunk.chunk_id: chunk for chunk in chunks}
+        return cls(index, analyzer, chunk_to_clauses, chunks_by_id)
 
-    def retrieve(self, question: str, *, k: int) -> list[str]:
-        """Up to ``k`` clause ids, best match first. May return fewer; never pads.
+    def retrieve(
+        self,
+        question: str,
+        *,
+        k: int,
+        metadata_filter: RetrievalFilter | None = None,
+    ) -> list[str]:
+        """Up to ``k`` clause ids, best match first. May return fewer; never pads."""
+        return [
+            clause_id
+            for clause_id, _score in self.retrieve_scored(
+                question, k=k, metadata_filter=metadata_filter
+            )
+        ]
+
+    def retrieve_scored(
+        self,
+        question: str,
+        *,
+        k: int,
+        metadata_filter: RetrievalFilter | None = None,
+    ) -> list[tuple[str, float]]:
+        """Up to ``k`` ``(clause_id, BM25 score)`` pairs, best match first.
 
         Scores every matching chunk, not just the top k: split chunks
         (``clause_id#0``, ``#1``, ...) and merged chunks collapse on the roll-up
-        to clause ids, so a fixed oversample could still under-fill.
+        to clause ids, so a fixed oversample could still under-fill. A clause's
+        score is its best chunk's -- and since chunks arrive in descending score
+        order, that is the first chunk it appears in. The scores are what
+        [M3-04]'s weighted-score fusion needs and :meth:`retrieve` discards;
+        ``metadata_filter`` drops non-matching chunks before the roll-up
+        ([M3-04]'s pre-filter, applied to this leg).
         """
         if k <= 0:
             return []
         query_tokens = self._analyzer.analyze(question)
         ranked_chunks = top_n(self._index, query_tokens, len(self._index.doc_ids))
-        clause_ids: list[str] = []
+        scored: list[tuple[str, float]] = []
         seen: set[str] = set()
-        for chunk_id, _score in ranked_chunks:
+        for chunk_id, score in ranked_chunks:
+            if metadata_filter is not None and not metadata_filter.matches(
+                self._chunks_by_id[chunk_id]
+            ):
+                continue
             for clause_id in self._chunk_to_clauses[chunk_id]:
                 if clause_id not in seen:
                     seen.add(clause_id)
-                    clause_ids.append(clause_id)
-                    if len(clause_ids) == k:
-                        return clause_ids
-        return clause_ids
+                    scored.append((clause_id, score))
+                    if len(scored) == k:
+                        return scored
+        return scored

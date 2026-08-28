@@ -60,3 +60,35 @@ def test_lexical_fields_are_optional_and_round_trip() -> None:
         lexical_config_fingerprint="deadbeefdeadbeef",
     )
     assert RetrievalRunConfig.model_validate_json(config.model_dump_json()) == config
+
+
+@pytest.mark.unit
+def test_v3_filter_and_fusion_fields_are_optional_and_round_trip() -> None:
+    # `random`/`lexical` leave every [M3-04] field None; `hybrid` sets them.
+    base = {
+        "schema_version": SCHEMA_VERSION,
+        "retriever_name": "hybrid",
+        "k_values": [1, 5, 10],
+        "ndcg_k": 10,
+        "golden_set_dir": "data/golden_set",
+        "golden_set_question_count": 140,
+        "corpus_path": "build/parsed_clauses.jsonl",
+        "corpus_clause_count": 4925,
+        "seed": None,
+        "run_at_utc": datetime.now(UTC),
+    }
+    assert RetrievalRunConfig(**base).fusion_strategy is None
+
+    config = RetrievalRunConfig(
+        **base,
+        filter_mode="default",
+        dense_model_id="Alibaba-NLP/gte-multilingual-base",
+        dense_model_revision="9bbca17d",
+        embedding_config_fingerprint="7ea39a621eaee88e",
+        fusion_strategy="rrf",
+        rrf_k=60,
+        fusion_weights=[0.5, 0.5],
+        candidate_depth=100,
+        hybrid_config_fingerprint="279ed8ee0a668227",
+    )
+    assert RetrievalRunConfig.model_validate_json(config.model_dump_json()) == config

@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -47,6 +47,8 @@ help:
 	@echo "  finalize-unanswerable-questions - M2-05: promote approved rows from eval/unanswerable_draft.csv into data/golden_set/unanswerable.jsonl"
 	@echo "  eval-retrieval    - M2-06: score Recall@{1,5,10}/MRR/nDCG@10 against the golden set, broken down by question_type/product_line/extraction_mode, plus exclusion-clause recall (built-in random-retriever self-test; writes eval/runs/retrieval_eval_random.{md,json})"
 	@echo "  eval-retrieval-lexical - M3-03: score the BM25 lexical retriever (Portuguese tokenisation + Snowball stemming over build/chunks.jsonl, no metadata filter) on the golden set; writes eval/runs/retrieval_eval_lexical.{md,json}"
+	@echo "  eval-retrieval-dense - M3-04: score the dense pgvector retriever with the SUSEP-process+CNPJ pre-filter (needs a running Postgres with loaded+embedded chunks; runs the optional embed uv group); writes eval/runs/retrieval_eval_dense_filter-default.{md,json}"
+	@echo "  eval-retrieval-hybrid - M3-04: score the hybrid (RRF fusion of lexical+dense) retriever with the SUSEP-process+CNPJ pre-filter (same Postgres + embed-group requirement as eval-retrieval-dense; pass --fusion weighted / --filter none on the script for the comparison); writes eval/runs/retrieval_eval_hybrid_*.{md,json}. Comparison and verdict: docs/HYBRID_RETRIEVAL.md"
 	@echo "  review-golden-set-sample - Independent second-reviewer pass over a stratified golden-set-v1 sample (--dry-run prints the sample composition, no model calls); writes data/golden_set/review/review_v1.jsonl and eval/runs/golden_set_review_v1.{md,json}"
 
 install:
@@ -192,6 +194,12 @@ eval-retrieval:
 
 eval-retrieval-lexical:
 	PYTHONPATH=app/src uv run python scripts/eval_retrieval.py --retriever lexical
+
+eval-retrieval-dense:
+	PYTHONPATH=app/src uv run --group embed python scripts/eval_retrieval.py --retriever dense --filter default
+
+eval-retrieval-hybrid:
+	PYTHONPATH=app/src uv run --group embed python scripts/eval_retrieval.py --retriever hybrid --filter default
 
 review-golden-set-sample:
 	PYTHONPATH=app/src uv run python scripts/review_golden_set_sample.py
