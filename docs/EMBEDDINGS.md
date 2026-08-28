@@ -177,11 +177,67 @@ index limit too, but half-precision storage is the project default.
   real `Embedder` (`sentence-transformers` loading the pinned model) is a later
   slice.
 
+## The embedding cache
+
+`infrastructure.rag.embedding_cache.CachingEmbedder` wraps any `Embedder` with a
+content-addressed, on-disk cache, so re-running the pipeline over an unchanged
+corpus costs nothing. It mirrors the two caches the [M3-02] DoD points at
+(`CachingClauseClassifier`, `CachingBoundaryVisionReviewer`): an in-memory dict
+loaded from a JSON Lines file, appended on every miss.
+
+### The key covers the whole contract, not just the text
+
+Each entry is keyed by `sha256(fingerprint · "\x00" · text)`, where `fingerprint`
+is `embedding_config.config_fingerprint()` — a digest of the model id, revision,
+dimensionality, distance metric, normalisation flag and both prefixes. The DoD
+calls an incomplete key "the most expensive failure mode available in this
+issue": a cache built under one model configuration returning its vectors to a
+different one, with no error at all. Folding every contract value into the key
+makes that impossible — swap the model, bump the revision, change the
+normalisation or add a prefix and every text is a fresh miss.
+`tests/unit/infrastructure/rag/test_embedding_config.py` asserts each of those
+fields moves the fingerprint; `test_embedding_cache.py` asserts the cache
+re-embeds when it does.
+
+### Location and format: the convention, not a departure
+
+`data/cache/embeddings/cache.jsonl`, one `{"key": ..., "vector": [...]}` per
+line — the same location and format as
+`data/cache/llm_classification/cache.jsonl` and
+`data/cache/boundary_escalation/cache.jsonl`. The DoD allows departing "if this
+cache's volume justifies" it; it does not, quite:
+
+- Every `data/cache/*` subdirectory is gitignored (each has its own
+  `.gitignore` line), so the file never enters version control whatever its
+  size.
+- The full ~4,540-chunk corpus is ≈ 55–70 MB on disk and loads once per run
+  into a ~4,540-entry dict (~110 MB RAM). That is well within the existing
+  cache footprint — `data/cache/boundary_escalation_pages/` is 257 MB — and it
+  is a batch-script cost, not a service cost.
+- One format across every cache (greppable, inspectable, no new dependency) is
+  worth more than the disk saving here. A ~10× larger corpus would tip this
+  toward a packed binary format; at this scale it does not.
+
+### Wiring
+
+`CachingEmbedder` is applied at composition time, not inside the pipeline:
+`scripts/embed_chunks.py` (a later slice) will pass
+`CachingEmbedder(SentenceTransformerEmbedder(...))` to `embed_missing_chunks`,
+exactly as `scripts/build_corpus.py` wraps `LangchainClauseClassifier` in
+`CachingClauseClassifier`.
+
+### What it does *not* fix
+
+A chunk whose `embedded_text` changed between runs keeps its stale vector: the
+pipeline's cursor is `WHERE embedding IS NULL`, and `upsert_chunks` never
+touches `embedding`, so that row is never handed to the embedder — cache or no
+cache. Closing that gap needs a pipeline/schema change (a stored content hash,
+or nulling the vector when the text changes), and it stays deferred.
+
 ## Still deferred in [M3-02]
 
-The content-hash embedding cache (whose key must also cover a chunk's changed
-text — the "known gap" above); the ANN index plus its build-time/size record;
-the ANN-vs-exact-search measurement at ~4,540 chunks; the
-filtered-search-returns-fewer-than-`k` question; the corpus embedding cost
-report and any dated price constant; the real `SentenceTransformerEmbedder`;
+The ANN index plus its build-time/size record; the ANN-vs-exact-search
+measurement at ~4,540 chunks; the filtered-search-returns-fewer-than-`k`
+question; the corpus embedding cost report and any dated price constant; the
+real `SentenceTransformerEmbedder`; the stale-vector-on-changed-text gap above;
 and the `make` target composable into [M3-08]'s `make build-index`.

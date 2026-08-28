@@ -16,6 +16,7 @@ from infrastructure.rag.embedding_config import (
     PASSAGE_PREFIX,
     QUERY_PREFIX,
     DistanceMetric,
+    config_fingerprint,
     format_passage,
     format_query,
 )
@@ -118,3 +119,34 @@ def test_env_example_embedding_model_matches_the_pinned_id() -> None:
         for key, _, value in [line.partition("=")]
     }
     assert values["EMBEDDING_MODEL"] == EMBEDDING_MODEL_ID
+
+
+@pytest.mark.unit
+def test_config_fingerprint_is_stable() -> None:
+    # A pinned literal, so reordering or dropping a field from the payload is a
+    # visible test failure -- the embedding cache's key depends on this digest.
+    assert config_fingerprint() == "7ea39a621eaee88e"
+    assert re.fullmatch(r"[0-9a-f]{16}", config_fingerprint()) is not None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("attr", "value"),
+    [
+        ("EMBEDDING_MODEL_ID", "other/model"),
+        ("EMBEDDING_MODEL_REVISION", "0" * 40),
+        ("EMBEDDING_DIMENSIONS", 1024),
+        ("NORMALIZE_EMBEDDINGS", False),
+        ("QUERY_PREFIX", "query: "),
+        ("PASSAGE_PREFIX", "passage: "),
+    ],
+)
+def test_every_contract_field_changes_the_fingerprint(
+    monkeypatch: pytest.MonkeyPatch, attr: str, value: object
+) -> None:
+    # The [M3-02] DoD: the cache key must cover model id, model version,
+    # dimensionality, normalisation and any input prefix. Each one moves the
+    # fingerprint, so none of them can be silently ignored by the cache.
+    baseline = config_fingerprint()
+    monkeypatch.setattr(f"infrastructure.rag.embedding_config.{attr}", value)
+    assert config_fingerprint() != baseline

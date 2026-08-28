@@ -19,6 +19,7 @@ name and is cross-checked against ``EMBEDDING_MODEL_ID`` by a test.
 Rationale and evidence: docs/EMBEDDINGS.md.
 """
 
+import hashlib
 from enum import StrEnum
 
 # Alibaba-NLP/gte-multilingual-base (mGTE, EMNLP 2024 industry track). Chosen
@@ -83,3 +84,29 @@ def format_query(text: str) -> str:
 def format_passage(text: str) -> str:
     """Render a chunk's text exactly as it must be embedded (index side)."""
     return f"{PASSAGE_PREFIX}{text}"
+
+
+def config_fingerprint() -> str:
+    """Digest of every contract value that determines the vectors.
+
+    The embedding cache ([infrastructure.rag.embedding_cache.CachingEmbedder])
+    prepends this to its per-text key, so a cached vector can never be served
+    under a different model id, revision, dimensionality, distance metric,
+    normalisation or prefix than the one it was computed under -- the [M3-02]
+    DoD's "most expensive failure mode". [M3-04]'s query-side cache reuses it.
+
+    Reads the module constants at call time (not import time) so a test can
+    monkeypatch one and see the fingerprint move.
+    """
+    payload = "\x00".join(
+        (
+            EMBEDDING_MODEL_ID,
+            EMBEDDING_MODEL_REVISION,
+            str(EMBEDDING_DIMENSIONS),
+            DISTANCE_METRIC.value,
+            str(NORMALIZE_EMBEDDINGS),
+            QUERY_PREFIX,
+            PASSAGE_PREFIX,
+        )
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
