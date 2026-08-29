@@ -35,14 +35,17 @@ dev = [
     "ruff>=0.16.0",
 ]
 
-# Real local embedder for `make embed-chunks` only (sentence-transformers pulls
-# torch + transformers). Deliberately excluded from [tool.uv] default-groups, so
-# `uv sync` and CI stay torch-free; opt in with `uv run --group embed` (the
-# Makefile does) or `uv sync --group embed`.
+# Real local embedder (`make embed-chunks`) and cross-encoder reranker
+# (`make eval-retrieval-rerank` / `make tune-reranking`) -- sentence-transformers
+# pulls torch + transformers and already ships `CrossEncoder`, so the reranker
+# [M3-05] adds no dependency. Deliberately excluded from [tool.uv]
+# default-groups, so `uv sync` and CI stay torch-free; opt in with
+# `uv run --group embed` (the Makefile does) or `uv sync --group embed`.
 #
-# transformers is held in the 4.4x line: gte-multilingual-base's config.json
-# declares transformers_version 4.39.1, and its `trust_remote_code` RoPE
-# modelling code (Alibaba-NLP/new-impl) raises IndexError on transformers >=5 /
+# transformers is held in the 4.4x line: gte-multilingual-base and
+# gte-multilingual-reranker-base both declare transformers_version 4.39.1 in
+# config.json, and their shared `trust_remote_code` RoPE modelling code
+# (Alibaba-NLP/new-impl) raises IndexError on transformers >=5 /
 # sentence-transformers >=4. Pinned to a tested-compatible window; the lockfile
 # is the exact pin.
 embed = [

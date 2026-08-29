@@ -24,6 +24,15 @@ process + insurer CNPJ (the default retrieval path); ``--filter none`` is
 the unknown-process degradation case. Comparison and verdict:
 ``docs/HYBRID_RETRIEVAL.md``.
 
+``--rerank`` [M3-05] wraps the chosen retriever in
+[infrastructure.rag.reranking_retriever.RerankingRetriever]: it fetches
+[infrastructure.rag.reranker_config.RERANK_CANDIDATE_DEPTH] candidates from the
+base retriever, re-scores every ``(question, clause text)`` pair with the pinned
+cross-encoder (``Alibaba-NLP/gte-multilingual-reranker-base``, also from the
+``embed`` group), and returns the reordered top-k. Needs the chunk corpus for
+the clause-text lookup. Curve, chosen operating point and latency trade-off:
+``docs/RERANKING.md``.
+
 For every golden question except ``unanswerable`` ones (which carry no
 ``reference_clause_ids`` by schema construction, so Recall/MRR/nDCG are
 undefined for them -- their count is still reported, not silently
@@ -109,6 +118,17 @@ from infrastructure.rag.lexical_config import (
 )
 from infrastructure.rag.lexical_retriever import LexicalRetriever
 from infrastructure.rag.lexical_stemming_exceptions import load_stemming_exceptions
+from infrastructure.rag.reranker import Reranker
+from infrastructure.rag.reranker_cache import CachingReranker
+from infrastructure.rag.reranker_config import (
+    RERANK_CANDIDATE_DEPTH,
+    RERANKER_MODEL_ID,
+    RERANKER_MODEL_REVISION,
+)
+from infrastructure.rag.reranker_config import (
+    config_fingerprint as reranker_config_fingerprint,
+)
+from infrastructure.rag.reranking_retriever import RerankingRetriever
 from infrastructure.rag.retrieval_filter import RetrievalFilter
 
 GOLDEN_SET_DIR = Path("data/golden_set")
@@ -155,9 +175,20 @@ def _parse_args() -> argparse.Namespace:
         default=FusionStrategy.RRF.value,
         help="Fusion strategy for --retriever hybrid [M3-04] (default: rrf).",
     )
+    parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help=(
+            "Rerank the base retriever's top candidates with the [M3-05] "
+            "cross-encoder (lexical/dense/hybrid only; needs the `embed` uv "
+            "group and the chunk corpus)."
+        ),
+    )
     args = parser.parse_args()
     if args.filter_mode == "default" and args.retriever == "random":
         parser.error("--filter default is not supported by --retriever random")
+    if args.rerank and args.retriever == "random":
+        parser.error("--rerank is not supported by --retriever random")
     return args
 
 
@@ -216,6 +247,26 @@ def load_chunk_corpus(jsonl_path: Path = CHUNKS_PATH) -> list[ChunkRecord]:
 def build_lexical_retriever(chunks: Sequence[ChunkRecord]) -> LexicalRetriever:
     """Build the [M3-03] BM25 lexical retriever from the chunk corpus."""
     return LexicalRetriever.from_chunks(list(chunks), build_analyzer())
+
+
+def build_clause_text_map(chunks: Sequence[ChunkRecord]) -> dict[str, str]:
+    """``clause_id`` -> the breadcrumb-prefixed chunk text the [M3-05] reranker scores.
+
+    Uses ``ChunkRecord.text`` -- the same field BM25 indexes and the embedder
+    embeds -- so all three legs judge the candidate on the same representation
+    (the reasoning ``docs/LEXICAL_RETRIEVAL.md`` gives for indexing ``text`` not
+    ``display_text``). A clause split across several chunks is rejoined in
+    ``chunk_index`` order; a short clause merged into a neighbour's chunk gets
+    that chunk's text via ``source_clause_ids``.
+    """
+    pieces: dict[str, list[tuple[int, str]]] = {}
+    for chunk in chunks:
+        for clause_id in chunk.source_clause_ids:
+            pieces.setdefault(clause_id, []).append((chunk.chunk_index, chunk.text))
+    return {
+        clause_id: "\n\n".join(text for _, text in sorted(parts))
+        for clause_id, parts in pieces.items()
+    }
 
 
 @dataclass(frozen=True)
@@ -534,6 +585,13 @@ def render_markdown_report(report: dict[str, Any]) -> str:
             f"{config['candidate_depth']})",
             f"- Hybrid config fingerprint: `{config['hybrid_config_fingerprint']}`",
         ]
+    if config.get("reranker_model_id"):
+        lines += [
+            f"- Reranker: `{config['reranker_model_id']}` @ "
+            f"`{config['reranker_model_revision']}`; candidate depth "
+            f"{config['rerank_candidate_depth']}",
+            f"- Reranker config fingerprint: `{config['reranker_config_fingerprint']}`",
+        ]
     if config.get("filter_mode"):
         lines.append(f"- Metadata filter: `{config['filter_mode']}`")
     lines += [
@@ -659,18 +717,49 @@ def _hybrid_config_fields(chunks: Sequence[ChunkRecord], fusion: str) -> dict[st
     }
 
 
+def _rerank_config_fields() -> dict[str, Any]:
+    """The `--rerank` slice of RetrievalRunConfig: the pinned cross-encoder contract."""
+    return {
+        "reranker_model_id": RERANKER_MODEL_ID,
+        "reranker_model_revision": RERANKER_MODEL_REVISION,
+        "rerank_candidate_depth": RERANK_CANDIDATE_DEPTH,
+        "reranker_config_fingerprint": reranker_config_fingerprint(),
+    }
+
+
+def _apply_rerank(
+    args: argparse.Namespace,
+    base: FilterableRetriever,
+    chunks: Sequence[ChunkRecord],
+    extra_config: dict[str, Any],
+) -> tuple[Retriever, dict[str, Any]]:
+    """Wrap ``base`` in a [M3-05] RerankingRetriever when ``--rerank`` is set.
+
+    ``chunks`` supplies the clause-text lookup; it is loaded by the caller only
+    on the ``--rerank`` path for ``dense`` (lexical/hybrid already have it).
+    ``base`` is always a filterable retriever here -- ``random`` (the one
+    non-filterable retriever) rejects ``--rerank`` in ``_parse_args``.
+    """
+    if not args.rerank:
+        return base, extra_config
+    reranker = CachingReranker(_load_reranker())
+    wrapped = RerankingRetriever(base, reranker, build_clause_text_map(chunks))
+    return wrapped, {**extra_config, **_rerank_config_fields()}
+
+
 @contextmanager
 def _open_retriever(
     args: argparse.Namespace, corpus: Sequence[ParsedClauseRecord]
 ) -> Iterator[tuple[Retriever, dict[str, Any]]]:
     """Yield ``(retriever, config fields)``; ``dense``/``hybrid`` hold a DB session.
 
-    ``dense``/``hybrid`` need Postgres (loaded + embedded chunks) and the local
-    embedder from the optional ``embed`` uv group, so ``make
-    eval-retrieval-hybrid`` runs under ``uv run --group embed`` -- mirroring
-    ``make embed-chunks``. The query embedder is wrapped in a
-    [infrastructure.rag.embedding_cache.CachingEmbedder] so a re-run over the
-    117 golden queries costs nothing.
+    ``dense``/``hybrid`` (and any ``--rerank`` run) need Postgres (loaded +
+    embedded chunks) and the local models from the optional ``embed`` uv group,
+    so ``make eval-retrieval-hybrid`` / ``-rerank`` run under ``uv run --group
+    embed`` -- mirroring ``make embed-chunks``. The query embedder is wrapped in
+    a [infrastructure.rag.embedding_cache.CachingEmbedder] and the reranker in a
+    [infrastructure.rag.reranker_cache.CachingReranker] so a re-run over the 117
+    golden queries costs nothing.
     """
     name = args.retriever
     if name == "random":
@@ -681,7 +770,8 @@ def _open_retriever(
         return
     if name == "lexical":
         chunks = load_chunk_corpus()
-        yield build_lexical_retriever(chunks), _lexical_config_fields(chunks)
+        lexical = build_lexical_retriever(chunks)
+        yield _apply_rerank(args, lexical, chunks, _lexical_config_fields(chunks))
         return
 
     engine = create_engine_from_settings()
@@ -691,7 +781,8 @@ def _open_retriever(
         embedder = CachingEmbedder(_load_query_embedder())
         dense = DenseRetriever(session, embedder)
         if name == "dense":
-            yield dense, _dense_config_fields()
+            chunks = load_chunk_corpus() if args.rerank else []
+            yield _apply_rerank(args, dense, chunks, _dense_config_fields())
         else:
             chunks = load_chunk_corpus()
             hybrid = HybridRetriever(
@@ -699,23 +790,66 @@ def _open_retriever(
                 dense,
                 fusion=FusionStrategy(args.fusion),
             )
-            yield hybrid, _hybrid_config_fields(chunks, args.fusion)
+            yield _apply_rerank(
+                args, hybrid, chunks, _hybrid_config_fields(chunks, args.fusion)
+            )
     finally:
         session.close()
         engine.dispose()
 
 
+class _LazyEmbedder:
+    """A query [Embedder] that builds the real model only on a cache miss.
+
+    [M3-05]: every ``golden-set-v1`` query vector is normally already in the
+    [infrastructure.rag.embedding_cache.CachingEmbedder] file from a prior
+    ``dense`` / ``hybrid`` run, so a run that wraps this in a ``CachingEmbedder``
+    never calls ``embed`` -- and eagerly loading ``SentenceTransformerEmbedder``
+    anyway pins ~1 GB of the small dev GPU that the ``--rerank`` cross-encoder now
+    wants. On an actual miss it constructs the real embedder once (same model,
+    same vectors) and delegates from then on.
+    """
+
+    def __init__(self) -> None:
+        self._real: Embedder | None = None
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        if self._real is None:
+            from infrastructure.rag.sentence_transformer_embedder import (
+                SentenceTransformerEmbedder,
+            )
+
+            self._real = SentenceTransformerEmbedder()
+        return self._real.embed(texts)
+
+
 def _load_query_embedder() -> Embedder:
-    """Load the real local embedder.
+    """A lazily-constructed real embedder (see [_LazyEmbedder]).
 
     Deferred import so the heavy ``embed`` group is only needed for
     ``dense``/``hybrid`` runs (mirrors ``scripts/embed_chunks.py``).
     """
-    from infrastructure.rag.sentence_transformer_embedder import (
-        SentenceTransformerEmbedder,
-    )
+    return _LazyEmbedder()
 
-    return SentenceTransformerEmbedder()
+
+def _load_reranker(*, device: str | None = None) -> Reranker:
+    """Load the real local cross-encoder ([M3-05]).
+
+    ``device`` passes straight to ``sentence-transformers`` (``None`` auto-selects
+    CUDA when present, else CPU). Deferred import so the heavy ``embed`` group is
+    only needed on a ``--rerank`` run (mirrors ``_load_query_embedder``). The
+    cross-encoder's *scores* -- and so every Recall / MRR / nDCG / exclusion
+    number -- are device-independent, so ``make eval-retrieval-rerank`` takes the
+    default (the dev GPU when present: ~10x faster, and ``_load_query_embedder``
+    is lazy now so the card is free).
+    The *latency* the ``docs/RERANKING.md`` trade-off turns on is a CPU number by
+    design -- a reranker in an interactive path, no GPU serving infra -- so
+    ``scripts/tune_reranking.py`` measures that on a ``device="cpu"`` instance.
+    M4 constructs its own reranker for its serving hardware.
+    """
+    from infrastructure.rag.cross_encoder_reranker import CrossEncoderReranker
+
+    return CrossEncoderReranker(device=device)
 
 
 def _build_filter_for(
@@ -743,6 +877,8 @@ def _output_stem(args: argparse.Namespace) -> str:
     parts = [args.retriever]
     if args.retriever == "hybrid":
         parts.append(args.fusion)
+    if args.rerank:
+        parts.append("rerank")
     if args.filter_mode != "none":
         parts.append(f"filter-{args.filter_mode}")
     return "retrieval_eval_" + "_".join(parts)
