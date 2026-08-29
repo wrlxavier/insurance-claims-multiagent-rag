@@ -292,6 +292,24 @@ from the coverage clause it cancels.
 - `make build-index` rebuilds the full index from `data/policies/raw/` on a
   clean machine.
 
+**[M3-05] outcome (2026-08-29).** Cross-encoder reranking
+(`Alibaba-NLP/gte-multilingual-reranker-base`) of the [M3-04] hybrid RRF top-10,
+filtered to each question's SUSEP process + CNPJ.
+`RERANK_CANDIDATE_DEPTH` is set to **10** — the shallowest point — from the
+`make tune-reranking` sweep (`docs/RERANKING.md`): reranking the hybrid top-10
+lifts overall MRR 78.8 → 80.6, R@1 64.5 → 65.8, R@5 83.6 → 86.9 and nDCG@10
+80.3 → 82.0, with R@10 unchanged at 91.5% and exclusion-clause recall unchanged
+at 92.6% (25/27); every deeper depth trades the top-rank gain away, and depth
+≥ 30 pushes exclusion clauses out of the top-10 (the DoD's named regression) and
+drops R@10 below the no-rerank baseline. Both M3 exit values still clear their
+bars. Three of five pre-registered predictions missed and are published rather
+than absorbed, per this file's protocol: the metric lift is real but ~half the
+predicted magnitude; the curve peaks at the shallowest depth, not at k ≈ 30–50;
+and CPU reranking latency (~9.7 s/query p50 at depth 10 on a Ryzen 5 5600H) is
+~50–100× the "tens to low-hundreds of ms" predicted — which makes the CPU
+cross-encoder a batch-eval / GPU-serving tool, not a live-path component. The
+four-configuration benchmark matrix and `make build-index` remain [M3-08].
+
 ## M4 — Agent graph
 
 Assemble the LangGraph state graph: intake with a conditional clarification

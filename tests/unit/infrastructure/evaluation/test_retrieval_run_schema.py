@@ -92,3 +92,32 @@ def test_v3_filter_and_fusion_fields_are_optional_and_round_trip() -> None:
         hybrid_config_fingerprint="279ed8ee0a668227",
     )
     assert RetrievalRunConfig.model_validate_json(config.model_dump_json()) == config
+
+
+@pytest.mark.unit
+def test_v4_rerank_fields_are_optional_and_round_trip() -> None:
+    # Every non-rerank run leaves the [M3-05] fields None; `--rerank` sets them.
+    base = {
+        "schema_version": SCHEMA_VERSION,
+        "retriever_name": "hybrid",
+        "k_values": [1, 5, 10],
+        "ndcg_k": 10,
+        "golden_set_dir": "data/golden_set",
+        "golden_set_question_count": 140,
+        "corpus_path": "build/parsed_clauses.jsonl",
+        "corpus_clause_count": 4925,
+        "seed": None,
+        "run_at_utc": datetime.now(UTC),
+    }
+    assert RetrievalRunConfig(**base).reranker_model_id is None
+
+    config = RetrievalRunConfig(
+        **base,
+        filter_mode="default",
+        fusion_strategy="rrf",
+        reranker_model_id="Alibaba-NLP/gte-multilingual-reranker-base",
+        reranker_model_revision="8215cf04918ba6f7b6a62bb44238ce2953d8831c",
+        rerank_candidate_depth=10,
+        reranker_config_fingerprint="777c0503f1073d52",
+    )
+    assert RetrievalRunConfig.model_validate_json(config.model_dump_json()) == config

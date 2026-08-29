@@ -11,6 +11,7 @@ from scripts.eval_retrieval import (
     _output_stem,
     _parse_args,
     aggregate,
+    build_clause_text_map,
     build_lexical_retriever,
     compute_exclusion_clause_recall,
     compute_foreign_document_rate,
@@ -216,6 +217,10 @@ def test_output_stem_keeps_random_and_lexical_names_and_tags_the_rest(
     assert (
         stem_for("--retriever", "hybrid", "--fusion", "weighted", "--filter", "default")
         == "retrieval_eval_hybrid_weighted_filter-default"
+    )
+    assert (
+        stem_for("--retriever", "hybrid", "--filter", "default", "--rerank")
+        == "retrieval_eval_hybrid_rrf_rerank_filter-default"
     )
 
 
@@ -495,3 +500,78 @@ def test_render_markdown_report_includes_the_lexical_config_block() -> None:
     assert "Chunk corpus (BM25-indexed): `build/chunks.jsonl` (4540 chunks)" in markdown
     assert "BM25 k1=1.5, b=0.75" in markdown
     assert "deadbeefdeadbeef" in markdown
+
+
+@pytest.mark.unit
+def test_parse_args_rejects_rerank_with_the_random_retriever(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv", ["eval_retrieval.py", "--retriever", "random", "--rerank"]
+    )
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+@pytest.mark.unit
+def test_render_markdown_report_includes_the_reranker_config_block() -> None:
+    metrics_row = {
+        "n": 1.0,
+        "recall@1": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0,
+    }
+    report = {
+        "config": {
+            "schema_version": "v4",
+            "retriever_name": "hybrid",
+            "k_values": [1, 5, 10],
+            "ndcg_k": 10,
+            "golden_set_dir": "data/golden_set",
+            "golden_set_question_count": 140,
+            "corpus_path": "build/parsed_clauses.jsonl",
+            "corpus_clause_count": 4925,
+            "seed": None,
+            "run_at_utc": "2026-08-28T00:00:00+00:00",
+            "filter_mode": "default",
+            "reranker_model_id": "Alibaba-NLP/gte-multilingual-reranker-base",
+            "reranker_model_revision": "8215cf04",
+            "rerank_candidate_depth": 10,
+            "reranker_config_fingerprint": "777c0503f1073d52",
+        },
+        "overall": metrics_row,
+        "by_question_type": {
+            "direct_lookup": metrics_row,
+            "unanswerable": {"n": 23, "excluded_from_scoring": True},
+        },
+        "by_product_line": {"CASCO": metrics_row},
+        "by_extraction_mode": {"text": metrics_row},
+        "exclusion_clause_recall": {"k": 10, "hits": 25, "total": 27, "recall": 0.925},
+        "foreign_document_rate": {"k": 10, "hits": 0, "total": 90, "rate": 0.0},
+    }
+
+    markdown = render_markdown_report(report)
+
+    assert "gte-multilingual-reranker-base` @ `8215cf04`" in markdown
+    assert "candidate depth 10" in markdown
+    assert "777c0503f1073d52" in markdown
+
+
+@pytest.mark.unit
+def test_build_clause_text_map_joins_a_split_clause_in_chunk_index_order() -> None:
+    base = _chunk("1:c#0", "1:c", "primeira parte")
+    part0 = base.model_copy(update={"chunk_index": 0})
+    part1 = base.model_copy(
+        update={"chunk_id": "1:c#1", "chunk_index": 1, "text": "segunda parte"}
+    )
+    merged = _chunk("1:d", "1:d", "corpo de d").model_copy(
+        update={"source_clause_ids": ["1:d", "1:e"]}
+    )
+
+    text_map = build_clause_text_map([part1, part0, merged])
+
+    assert text_map["1:c"] == "primeira parte\n\nsegunda parte"
+    # A short clause merged into a neighbour's chunk gets that chunk's text.
+    assert text_map["1:e"] == "corpo de d"

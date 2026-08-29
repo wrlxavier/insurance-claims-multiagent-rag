@@ -11,15 +11,17 @@ a frozen schema, since its shape is expected to grow with new breakdowns.
 ``v2`` [M3-03]: the lexical retriever adds the chunk-corpus identity and its
 BM25/analyzer contract. ``v3`` [M3-04]: the dense and hybrid retrievers add the
 metadata-filter mode, the fusion strategy and its constants, and the embedding /
-hybrid config fingerprints. Every added field is optional -- ``random`` and
-``lexical`` leave the new ones ``None``.
+hybrid config fingerprints. ``v4`` [M3-05]: the ``--rerank`` path adds the
+cross-encoder model id/revision, the candidate depth and the reranker config
+fingerprint. Every added field is optional -- a run without that leg leaves the
+new ones ``None``.
 """
 
 from datetime import datetime
 
 from pydantic import BaseModel
 
-SCHEMA_VERSION = "v3"
+SCHEMA_VERSION = "v4"
 
 
 class RetrievalRunConfig(BaseModel):
@@ -63,3 +65,11 @@ class RetrievalRunConfig(BaseModel):
     fusion_weights: list[float] | None = None
     candidate_depth: int | None = None
     hybrid_config_fingerprint: str | None = None
+
+    # [M3-05] `--rerank` only; None otherwise. `rerank_candidate_depth` is how
+    # many of the base retriever's candidates the cross-encoder re-scored before
+    # the top-k cut.
+    reranker_model_id: str | None = None
+    reranker_model_revision: str | None = None
+    rerank_candidate_depth: int | None = None
+    reranker_config_fingerprint: str | None = None
