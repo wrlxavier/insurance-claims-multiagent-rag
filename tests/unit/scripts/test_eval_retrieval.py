@@ -222,6 +222,12 @@ def test_output_stem_keeps_random_and_lexical_names_and_tags_the_rest(
         stem_for("--retriever", "hybrid", "--filter", "default", "--rerank")
         == "retrieval_eval_hybrid_rrf_rerank_filter-default"
     )
+    assert (
+        stem_for(
+            "--retriever", "hybrid", "--filter", "default", "--rerank", "--co-retrieval"
+        )
+        == "retrieval_eval_hybrid_rrf_rerank_co-retrieval_filter-default"
+    )
 
 
 @pytest.mark.unit
@@ -511,6 +517,62 @@ def test_parse_args_rejects_rerank_with_the_random_retriever(
     )
     with pytest.raises(SystemExit):
         _parse_args()
+
+
+@pytest.mark.unit
+def test_parse_args_rejects_co_retrieval_with_the_random_retriever(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv", ["eval_retrieval.py", "--retriever", "random", "--co-retrieval"]
+    )
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+@pytest.mark.unit
+def test_render_markdown_report_includes_the_co_retrieval_config_block() -> None:
+    metrics_row = {
+        "n": 1.0,
+        "recall@1": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr": 0.0,
+        "ndcg@10": 0.0,
+    }
+    report = {
+        "config": {
+            "schema_version": "v5",
+            "retriever_name": "hybrid",
+            "k_values": [1, 5, 10],
+            "ndcg_k": 10,
+            "golden_set_dir": "data/golden_set",
+            "golden_set_question_count": 140,
+            "corpus_path": "build/parsed_clauses.jsonl",
+            "corpus_clause_count": 4925,
+            "seed": None,
+            "run_at_utc": "2026-08-29T00:00:00+00:00",
+            "filter_mode": "default",
+            "reserved_exclusion_slots": 2,
+            "adjacent_section_max_page_gap": 3,
+            "co_retrieval_config_fingerprint": "7ed4c97c4e8f1cb4",
+        },
+        "overall": metrics_row,
+        "by_question_type": {
+            "direct_lookup": metrics_row,
+            "unanswerable": {"n": 23, "excluded_from_scoring": True},
+        },
+        "by_product_line": {"CASCO": metrics_row},
+        "by_extraction_mode": {"text": metrics_row},
+        "exclusion_clause_recall": {"k": 10, "hits": 27, "total": 27, "recall": 1.0},
+        "foreign_document_rate": {"k": 10, "hits": 0, "total": 90, "rate": 0.0},
+    }
+
+    markdown = render_markdown_report(report)
+
+    assert "Exclusion co-retrieval ([M3-06]): 2 reserved slot(s)" in markdown
+    assert "adjacent-section page gap 3" in markdown
+    assert "7ed4c97c4e8f1cb4" in markdown
 
 
 @pytest.mark.unit

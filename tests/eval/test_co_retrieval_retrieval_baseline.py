@@ -1,11 +1,12 @@
-"""Sanity floor for the [M3-05] cross-encoder rerank of the filtered hybrid.
+"""Sanity floor for the [M3-06] exclusion co-retrieval step.
 
-The mirror of ``test_hybrid_retrieval_baseline.py`` for the rerank stage: proves
-that hybrid RRF + cross-encoder rerank, filtered to each question's SUSEP
-process + CNPJ, still clears a recall floor **and** does not push exclusion
-clauses out of the kept context relative to the no-rerank baseline (the M3-05
-DoD's named regression). A smoke check, not a quality gate -- the committed
-numbers, the curve and the verdict live in ``docs/RERANKING.md``.
+The mirror of ``test_rerank_retrieval_baseline.py`` for the co-retrieval stage:
+proves that hybrid RRF + rerank + exclusion co-retrieval, filtered to each
+question's SUSEP process + CNPJ, still clears a recall floor **and** does not
+lose ground against the no-co-retrieval baseline on the two numbers M3-06 exists
+to move -- pooled exclusion-clause recall and the ``coverage_with_exclusion``
+Recall@10. A smoke check, not a quality gate -- the committed numbers, the slot
+sweep and the verdict live in ``docs/EXCLUSION_CO_RETRIEVAL.md``.
 
 Needs ``build/chunks.jsonl``, a reachable Postgres with embedded chunks, and the
 optional ``embed`` uv group (which also ships the cross-encoder). Skips cleanly
@@ -49,13 +50,13 @@ def _skip_unless_ready() -> None:
             ).scalar_one()
         engine.dispose()
     except Exception as exc:  # noqa: BLE001 - any DB failure is a skip, not a fail
-        pytest.skip(f"database not ready for the rerank eval: {exc}")
+        pytest.skip(f"database not ready for the co-retrieval eval: {exc}")
     if embedded < 100:
         pytest.skip(f"only {embedded} embedded chunks; run `make embed-chunks`")
 
 
 @pytest.mark.eval
-def test_filtered_hybrid_rerank_clears_a_floor_and_keeps_exclusion_clauses() -> None:
+def test_co_retrieval_clears_a_floor_and_does_not_lose_exclusion_ground() -> None:
     _skip_unless_ready()
 
     from scripts.eval_retrieval import (
@@ -79,27 +80,33 @@ def test_filtered_hybrid_rerank_clears_a_floor_and_keeps_exclusion_clauses() -> 
     questions = load_golden_questions(GOLDEN_SET_DIR)
     filter_for = _build_filter_for("default", document_meta)
 
-    def score(rerank: bool) -> tuple[dict[str, float], float | None]:
+    def score(co_retrieval: bool) -> tuple[dict[str, float], float | None, float]:
         args = argparse.Namespace(
             retriever="hybrid",
             fusion="rrf",
             filter_mode="default",
             seed=42,
-            rerank=rerank,
-            co_retrieval=False,
+            rerank=True,
+            co_retrieval=co_retrieval,
         )
         with _open_retriever(args, corpus) as (retriever, _config):
             rows, _ = evaluate_questions(
                 questions, retriever, document_meta, filter_for=filter_for
             )
         exclusion = compute_exclusion_clause_recall(rows, clause_by_id, k=10)
-        return aggregate(rows, (1, 5, 10), 10), exclusion["recall"]
+        subset = aggregate(
+            [row for row in rows if row.question_type == "coverage_with_exclusion"],
+            (1, 5, 10),
+            10,
+        )
+        return aggregate(rows, (1, 5, 10), 10), exclusion["recall"], subset["recall@10"]
 
-    baseline_overall, baseline_exclusion = score(rerank=False)
-    rerank_overall, rerank_exclusion = score(rerank=True)
+    base_overall, base_exclusion, base_subset = score(co_retrieval=False)
+    co_overall, co_exclusion, co_subset = score(co_retrieval=True)
 
-    assert rerank_overall["recall@10"] > RECALL_FLOOR
-    assert rerank_overall["mrr"] > MRR_FLOOR
-    # DoD item 4: reranking must not push exclusion clauses out of the context.
-    assert baseline_exclusion is not None and rerank_exclusion is not None
-    assert rerank_exclusion >= baseline_exclusion - 1e-9
+    assert co_overall["recall@10"] > RECALL_FLOOR
+    assert co_overall["mrr"] > MRR_FLOOR
+    # M3-06's purpose: never regress the exclusion-side numbers.
+    assert base_exclusion is not None and co_exclusion is not None
+    assert co_exclusion >= base_exclusion - 1e-9
+    assert co_subset >= base_subset - 1e-9

@@ -74,7 +74,12 @@ def test_filtered_hybrid_clears_a_floor_and_stays_in_document() -> None:
     from infrastructure.parsing.corpus_artifact import JSONL_PATH
 
     args = argparse.Namespace(
-        retriever="hybrid", fusion="rrf", filter_mode="default", seed=42, rerank=False
+        retriever="hybrid",
+        fusion="rrf",
+        filter_mode="default",
+        seed=42,
+        rerank=False,
+        co_retrieval=False,
     )
     document_meta = load_document_metadata(MANIFEST_PATH)
     questions = load_golden_questions(GOLDEN_SET_DIR)
