@@ -181,8 +181,11 @@ by `question_type`, product line, and extraction mode.
 construction) are excluded from every metric above — Recall/MRR/nDCG are
 mathematically undefined for an empty reference set, not zero; the harness
 raises rather than silently reporting a meaningless 0.0. Whether the system
-correctly abstains on them is a separate, not-yet-built check ([M3-07]'s
-insufficient-context gate), out of scope for this harness.
+correctly abstains on them is measured separately by [M3-07]'s
+insufficient-context gate (`make eval-insufficient-context-gate`,
+`docs/INSUFFICIENT_CONTEXT_GATE.md`): on `golden-set-v1` the gate abstains on
+all 23 with zero false positives among the 117 scorable questions. It remains
+out of scope for *this* (ranking) harness.
 
 **A current, real limitation of golden-set-v1, not a harness bug:** the 117
 scorable questions (the four non-`unanswerable` types) reference only CASCO

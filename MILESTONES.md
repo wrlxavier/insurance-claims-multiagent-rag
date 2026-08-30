@@ -310,6 +310,30 @@ and CPU reranking latency (~9.7 s/query p50 at depth 10 on a Ryzen 5 5600H) is
 cross-encoder a batch-eval / GPU-serving tool, not a live-path component. The
 four-configuration benchmark matrix and `make build-index` remain [M3-08].
 
+**[M3-07] outcome (2026-08-30).** The insufficient-context gate
+(`app/src/infrastructure/rag/insufficient_context_gate.py`), a deterministic
+decision over the hybrid RRF + rerank signals. It abstains when nothing was
+retrieved, when the rank-1 reranked score is below
+`TOP_SCORE_ABSTAIN_THRESHOLD` (**0.46**), or — for a question that asks for a
+specific policy-instance value of a `docs/SCOPE.md`-absent fact — when that
+score is below the stricter `INSTANCE_VALUE_TOP_SCORE_THRESHOLD` (**0.84**).
+On `golden-set-v1` it abstains on **all 23** `unanswerable` questions
+(**recall 100%**, the exit criterion, locked by a unit test over a committed
+signal snapshot) with **zero false positives** (**precision 100%**, ≥ the ≥80%
+reference), and no false negatives. The result is a calibration, not an
+evaluation: a pure top-score gate manages only 25% precision at 100% recall
+(FP 69) because the reranker scores a clause that merely *discusses* a
+deductible / a policy period as highly as one that answers a real question —
+six of the 23 sit in the answerable band. The instance-value rule closes that
+gap, but its two thresholds each sit in a ~0.05-wide gap on this one
+23-question set and its value-vs-rule keyword patterns are fitted to it;
+`golden-set-v2` must re-run `make eval-insufficient-context-gate`. Two of seven
+pre-registered predictions missed (the "clean-absent questions score low"
+framing — they don't; the "only the 3 decoys are high" framing — six are), one
+was beaten (precision recovered to 100%, not the low-to-mid 80s). Full method,
+sweep, fragility table and prediction-vs-actual: `docs/INSUFFICIENT_CONTEXT_GATE.md`.
+Wiring the gate into the graph is [M4-04]; the benchmark matrix is [M3-08].
+
 ## M4 — Agent graph
 
 Assemble the LangGraph state graph: intake with a conditional clarification
