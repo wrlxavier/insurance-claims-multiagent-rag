@@ -320,5 +320,7 @@ evidence. A dated `[M3-05]` note is added to `MILESTONES.md`'s M3 section.
 - **Exclusion co-retrieval** (pull the exclusion linked to every retrieved
   coverage clause) — [M3-06]. `coverage_with_exclusion` is the weakest question
   type and reranking does not fix it — it can only reorder what retrieval found.
-- **The insufficient-context gate** on the retrieval signals — [M3-07].
+- **The insufficient-context gate** on the retrieval signals — [M3-07] (done:
+  `docs/INSUFFICIENT_CONTEXT_GATE.md`; the gate reads the rank-1 reranked score
+  this stage produces).
 - **BM25 `k1`/`b` and RRF `k` tuning with the reranker in the loop** — [M3-08].

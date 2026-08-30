@@ -308,9 +308,11 @@ strict drops it) and `tests/unit/infrastructure/rag/test_retrieval_filter.py`.
 - **Exclusion co-retrieval** (pull the exclusion linked to every retrieved
   coverage clause) — [M3-06]. `coverage_with_exclusion` R@10 78.9% is the
   weakest type and the reason this exists.
-- **The insufficient-context gate** on the retrieval signals — [M3-07]. The
-  "up to `k`, never padded" contract and a stacked filter legitimately
-  returning `< k` are the inputs it will read.
+- **The insufficient-context gate** on the retrieval signals — [M3-07] (done:
+  `docs/INSUFFICIENT_CONTEXT_GATE.md`). The "up to `k`, never padded" contract
+  is one of its inputs (the `NO_CONTEXT` trigger), though on `golden-set-v1`
+  every filtered partition returns a full `k` and the rank-1 reranked score
+  carries the decision.
 - **The lexical / dense / hybrid / hybrid+rerank benchmark matrix and `make
   build-index`** — [M3-08], which also re-opens the RRF-vs-weighted call with
   reranking in the mix and re-runs the ANN-earns-its-place check on real

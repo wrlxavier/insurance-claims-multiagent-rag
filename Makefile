@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-insufficient-context-gate tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -51,6 +51,7 @@ help:
 	@echo "  eval-retrieval-hybrid - M3-04: score the hybrid (RRF fusion of lexical+dense) retriever with the SUSEP-process+CNPJ pre-filter (same Postgres + embed-group requirement as eval-retrieval-dense; pass --fusion weighted / --filter none on the script for the comparison); writes eval/runs/retrieval_eval_hybrid_*.{md,json}. Comparison and verdict: docs/HYBRID_RETRIEVAL.md"
 	@echo "  eval-retrieval-rerank - M3-05: score hybrid RRF + cross-encoder rerank with the SUSEP-process+CNPJ pre-filter at the chosen candidate depth (same Postgres + embed-group requirement); writes eval/runs/retrieval_eval_hybrid_rrf_rerank_filter-default.{md,json}. Verdict: docs/RERANKING.md"
 	@echo "  eval-retrieval-co-retrieval - M3-06: score hybrid RRF + rerank + exclusion co-retrieval with the SUSEP-process+CNPJ pre-filter (same Postgres + embed-group requirement); reserves top-k slots for the exclusion clauses linked to each retrieved coverage clause; writes eval/runs/retrieval_eval_hybrid_rrf_rerank_co-retrieval_filter-default.{md,json}. Rule: docs/ARCHITECTURE.md; measurement: docs/EXCLUSION_CO_RETRIEVAL.md"
+	@echo "  eval-insufficient-context-gate - M3-07: calibrate the insufficient-context gate on retrieval signals over the 23 unanswerable golden questions (hybrid RRF + rerank, SUSEP-process+CNPJ filter; same Postgres + embed-group requirement); sweeps the abstain threshold, reports precision/recall + the false-negative cases; writes eval/runs/insufficient_context_gate.{md,json} + the committed snapshot eval/insufficient_context_gate_signals.json. Verdict: docs/INSUFFICIENT_CONTEXT_GATE.md"
 	@echo "  tune-reranking    - M3-05: sweep the reranker candidate depth on the golden set and record the metrics + latency curve (same Postgres + embed-group requirement); writes eval/runs/rerank_tuning.{md,json}. Curve and chosen depth: docs/RERANKING.md"
 	@echo "  tune-exclusion-co-retrieval - M3-06: sweep the reserved exclusion-slot count on the golden set (pure-Python replay over one cached rerank pass; same Postgres + embed-group requirement for that pass); writes eval/runs/exclusion_co_retrieval_tuning.{md,json}. Curve and chosen count: docs/EXCLUSION_CO_RETRIEVAL.md"
 	@echo "  review-golden-set-sample - Independent second-reviewer pass over a stratified golden-set-v1 sample (--dry-run prints the sample composition, no model calls); writes data/golden_set/review/review_v1.jsonl and eval/runs/golden_set_review_v1.{md,json}"
@@ -210,6 +211,9 @@ eval-retrieval-rerank:
 
 eval-retrieval-co-retrieval:
 	PYTHONPATH=app/src uv run --group embed python scripts/eval_retrieval.py --retriever hybrid --filter default --rerank --co-retrieval
+
+eval-insufficient-context-gate:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_insufficient_context_gate
 
 tune-reranking:
 	PYTHONPATH=app/src uv run --group embed python -m scripts.tune_reranking
