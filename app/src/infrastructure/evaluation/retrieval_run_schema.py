@@ -13,6 +13,8 @@ BM25/analyzer contract. ``v3`` [M3-04]: the dense and hybrid retrievers add the
 metadata-filter mode, the fusion strategy and its constants, and the embedding /
 hybrid config fingerprints. ``v4`` [M3-05]: the ``--rerank`` path adds the
 cross-encoder model id/revision, the candidate depth and the reranker config
+fingerprint. ``v5`` [M3-06]: the ``--co-retrieval`` path adds the reserved
+exclusion-slot count, the adjacent-section page gap and the co-retrieval config
 fingerprint. Every added field is optional -- a run without that leg leaves the
 new ones ``None``.
 """
@@ -21,7 +23,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-SCHEMA_VERSION = "v4"
+SCHEMA_VERSION = "v5"
 
 
 class RetrievalRunConfig(BaseModel):
@@ -73,3 +75,10 @@ class RetrievalRunConfig(BaseModel):
     reranker_model_revision: str | None = None
     rerank_candidate_depth: int | None = None
     reranker_config_fingerprint: str | None = None
+
+    # [M3-06] `--co-retrieval` only; None otherwise. `reserved_exclusion_slots`
+    # is how many final top-k slots were held for exclusion clauses linked to a
+    # retrieved coverage clause.
+    reserved_exclusion_slots: int | None = None
+    adjacent_section_max_page_gap: int | None = None
+    co_retrieval_config_fingerprint: str | None = None

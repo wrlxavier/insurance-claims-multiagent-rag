@@ -121,3 +121,31 @@ def test_v4_rerank_fields_are_optional_and_round_trip() -> None:
         reranker_config_fingerprint="777c0503f1073d52",
     )
     assert RetrievalRunConfig.model_validate_json(config.model_dump_json()) == config
+
+
+@pytest.mark.unit
+def test_v5_co_retrieval_fields_are_optional_and_round_trip() -> None:
+    # Every non-co-retrieval run leaves the [M3-06] fields None; the flag sets them.
+    base = {
+        "schema_version": SCHEMA_VERSION,
+        "retriever_name": "hybrid",
+        "k_values": [1, 5, 10],
+        "ndcg_k": 10,
+        "golden_set_dir": "data/golden_set",
+        "golden_set_question_count": 140,
+        "corpus_path": "build/parsed_clauses.jsonl",
+        "corpus_clause_count": 4925,
+        "seed": None,
+        "run_at_utc": datetime.now(UTC),
+    }
+    assert RetrievalRunConfig(**base).reserved_exclusion_slots is None
+
+    config = RetrievalRunConfig(
+        **base,
+        filter_mode="default",
+        fusion_strategy="rrf",
+        reserved_exclusion_slots=2,
+        adjacent_section_max_page_gap=3,
+        co_retrieval_config_fingerprint="7ed4c97c4e8f1cb4",
+    )
+    assert RetrievalRunConfig.model_validate_json(config.model_dump_json()) == config

@@ -94,6 +94,17 @@ from infrastructure.rag.embedding_config import (
 from infrastructure.rag.embedding_config import (
     config_fingerprint as embedding_config_fingerprint,
 )
+from infrastructure.rag.exclusion_co_retrieval import (
+    ClauseGraph,
+    ExclusionCoRetrievalRetriever,
+)
+from infrastructure.rag.exclusion_co_retrieval_config import (
+    ADJACENT_SECTION_MAX_PAGE_GAP,
+    RESERVED_EXCLUSION_SLOTS,
+)
+from infrastructure.rag.exclusion_co_retrieval_config import (
+    config_fingerprint as co_retrieval_config_fingerprint,
+)
 from infrastructure.rag.hybrid_config import (
     CANDIDATE_DEPTH,
     FUSION_WEIGHTS,
@@ -184,11 +195,24 @@ def _parse_args() -> argparse.Namespace:
             "group and the chunk corpus)."
         ),
     )
+    parser.add_argument(
+        "--co-retrieval",
+        dest="co_retrieval",
+        action="store_true",
+        help=(
+            "After ranking, reserve top-k slots for the [M3-06] exclusion "
+            "clauses linked to each retrieved coverage clause (lexical/dense/"
+            "hybrid only; applied outermost, after --rerank). Pure structural "
+            "post-processing over the parsed corpus -- no model calls."
+        ),
+    )
     args = parser.parse_args()
     if args.filter_mode == "default" and args.retriever == "random":
         parser.error("--filter default is not supported by --retriever random")
     if args.rerank and args.retriever == "random":
         parser.error("--rerank is not supported by --retriever random")
+    if args.co_retrieval and args.retriever == "random":
+        parser.error("--co-retrieval is not supported by --retriever random")
     return args
 
 
@@ -592,6 +616,14 @@ def render_markdown_report(report: dict[str, Any]) -> str:
             f"{config['rerank_candidate_depth']}",
             f"- Reranker config fingerprint: `{config['reranker_config_fingerprint']}`",
         ]
+    if config.get("reserved_exclusion_slots") is not None:
+        lines += [
+            f"- Exclusion co-retrieval ([M3-06]): {config['reserved_exclusion_slots']} "
+            f"reserved slot(s), adjacent-section page gap "
+            f"{config['adjacent_section_max_page_gap']}",
+            "- Co-retrieval config fingerprint: "
+            f"`{config['co_retrieval_config_fingerprint']}`",
+        ]
     if config.get("filter_mode"):
         lines.append(f"- Metadata filter: `{config['filter_mode']}`")
     lines += [
@@ -747,6 +779,37 @@ def _apply_rerank(
     return wrapped, {**extra_config, **_rerank_config_fields()}
 
 
+def _co_retrieval_config_fields() -> dict[str, Any]:
+    """The `--co-retrieval` slice of RetrievalRunConfig: the [M3-06] contract."""
+    return {
+        "reserved_exclusion_slots": RESERVED_EXCLUSION_SLOTS,
+        "adjacent_section_max_page_gap": ADJACENT_SECTION_MAX_PAGE_GAP,
+        "co_retrieval_config_fingerprint": co_retrieval_config_fingerprint(),
+    }
+
+
+def _apply_co_retrieval(
+    args: argparse.Namespace,
+    base: Retriever,
+    corpus: Sequence[ParsedClauseRecord],
+    extra_config: dict[str, Any],
+) -> tuple[Retriever, dict[str, Any]]:
+    """Wrap ``base`` in a [M3-06] ExclusionCoRetrievalRetriever for ``--co-retrieval``.
+
+    Applied outermost -- after ``--rerank`` -- over the same parsed corpus the
+    harness already loaded. Pure structural post-processing, no model calls, so
+    (unlike ``--rerank``) it needs nothing from the ``embed`` uv group. ``base``
+    is always a filterable retriever here (``random`` rejects ``--co-retrieval``
+    in ``_parse_args``).
+    """
+    if not args.co_retrieval:
+        return base, extra_config
+    wrapped = ExclusionCoRetrievalRetriever(
+        cast(FilterableRetriever, base), ClauseGraph(corpus)
+    )
+    return wrapped, {**extra_config, **_co_retrieval_config_fields()}
+
+
 @contextmanager
 def _open_retriever(
     args: argparse.Namespace, corpus: Sequence[ParsedClauseRecord]
@@ -771,7 +834,10 @@ def _open_retriever(
     if name == "lexical":
         chunks = load_chunk_corpus()
         lexical = build_lexical_retriever(chunks)
-        yield _apply_rerank(args, lexical, chunks, _lexical_config_fields(chunks))
+        base, config = _apply_rerank(
+            args, lexical, chunks, _lexical_config_fields(chunks)
+        )
+        yield _apply_co_retrieval(args, base, corpus, config)
         return
 
     engine = create_engine_from_settings()
@@ -782,7 +848,8 @@ def _open_retriever(
         dense = DenseRetriever(session, embedder)
         if name == "dense":
             chunks = load_chunk_corpus() if args.rerank else []
-            yield _apply_rerank(args, dense, chunks, _dense_config_fields())
+            base, config = _apply_rerank(args, dense, chunks, _dense_config_fields())
+            yield _apply_co_retrieval(args, base, corpus, config)
         else:
             chunks = load_chunk_corpus()
             hybrid = HybridRetriever(
@@ -790,9 +857,10 @@ def _open_retriever(
                 dense,
                 fusion=FusionStrategy(args.fusion),
             )
-            yield _apply_rerank(
+            base, config = _apply_rerank(
                 args, hybrid, chunks, _hybrid_config_fields(chunks, args.fusion)
             )
+            yield _apply_co_retrieval(args, base, corpus, config)
     finally:
         session.close()
         engine.dispose()
@@ -879,6 +947,8 @@ def _output_stem(args: argparse.Namespace) -> str:
         parts.append(args.fusion)
     if args.rerank:
         parts.append("rerank")
+    if args.co_retrieval:
+        parts.append("co-retrieval")
     if args.filter_mode != "none":
         parts.append(f"filter-{args.filter_mode}")
     return "retrieval_eval_" + "_".join(parts)
