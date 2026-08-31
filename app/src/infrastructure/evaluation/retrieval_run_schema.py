@@ -7,13 +7,23 @@ read in isolation still says what generated it. Embedded as one key of the
 larger report dict both the JSON and Markdown outputs render from (see
 ``scripts/eval_retrieval.py``), which is otherwise a plain dict rather than
 a frozen schema, since its shape is expected to grow with new breakdowns.
+
+``v2`` [M3-03]: the lexical retriever adds the chunk-corpus identity and its
+BM25/analyzer contract. ``v3`` [M3-04]: the dense and hybrid retrievers add the
+metadata-filter mode, the fusion strategy and its constants, and the embedding /
+hybrid config fingerprints. ``v4`` [M3-05]: the ``--rerank`` path adds the
+cross-encoder model id/revision, the candidate depth and the reranker config
+fingerprint. ``v5`` [M3-06]: the ``--co-retrieval`` path adds the reserved
+exclusion-slot count, the adjacent-section page gap and the co-retrieval config
+fingerprint. Every added field is optional -- a run without that leg leaves the
+new ones ``None``.
 """
 
 from datetime import datetime
 
 from pydantic import BaseModel
 
-SCHEMA_VERSION = "v1"
+SCHEMA_VERSION = "v5"
 
 
 class RetrievalRunConfig(BaseModel):
@@ -29,3 +39,46 @@ class RetrievalRunConfig(BaseModel):
     corpus_clause_count: int
     seed: int | None
     run_at_utc: datetime
+
+    # [M3-03] lexical retriever (and the lexical leg of `hybrid`); None for
+    # `random` and `dense`.
+    chunk_corpus_path: str | None = None
+    chunk_corpus_chunk_count: int | None = None
+    lexical_analyzer_version: str | None = None
+    bm25_k1: float | None = None
+    bm25_b: float | None = None
+    lexical_idf_variant: str | None = None
+    lexical_index_text_field: str | None = None
+    stemming_exception_count: int | None = None
+    lexical_config_fingerprint: str | None = None
+
+    # [M3-04] metadata pre-filter: `none` or `default` (per-question SUSEP
+    # process + CNPJ from the manifest join). None for pre-M3-04 runs.
+    filter_mode: str | None = None
+
+    # [M3-04] dense retriever (and the dense leg of `hybrid`); None otherwise.
+    dense_model_id: str | None = None
+    dense_model_revision: str | None = None
+    embedding_config_fingerprint: str | None = None
+
+    # [M3-04] `hybrid` only; None otherwise.
+    fusion_strategy: str | None = None
+    rrf_k: int | None = None
+    fusion_weights: list[float] | None = None
+    candidate_depth: int | None = None
+    hybrid_config_fingerprint: str | None = None
+
+    # [M3-05] `--rerank` only; None otherwise. `rerank_candidate_depth` is how
+    # many of the base retriever's candidates the cross-encoder re-scored before
+    # the top-k cut.
+    reranker_model_id: str | None = None
+    reranker_model_revision: str | None = None
+    rerank_candidate_depth: int | None = None
+    reranker_config_fingerprint: str | None = None
+
+    # [M3-06] `--co-retrieval` only; None otherwise. `reserved_exclusion_slots`
+    # is how many final top-k slots were held for exclusion clauses linked to a
+    # retrieved coverage clause.
+    reserved_exclusion_slots: int | None = None
+    adjacent_section_max_page_gap: int | None = None
+    co_retrieval_config_fingerprint: str | None = None

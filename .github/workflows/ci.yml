@@ -50,3 +50,49 @@ jobs:
 
       - name: Validate golden set
         run: make validate-golden-set
+
+  integration:
+    name: Integration tests (Postgres + pgvector)
+    runs-on: ubuntu-latest
+
+    # Kept as its own job rather than a step inside `quality`: a database
+    # problem should read as a database problem, not as a lint or type
+    # failure.
+    services:
+      postgres:
+        # Same pin as docker-compose.yaml -- Postgres major and pgvector
+        # version both explicit. See docs/DATABASE.md.
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: insurance_claims_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d insurance_claims_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/insurance_claims_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Apply migrations and run integration tests
+        run: make test-integration

@@ -244,6 +244,12 @@ data/cache/boundary_escalation/
 # Boundary-escalation rasterized-page cache (idempotent PyMuPDF page images)
 data/cache/boundary_escalation_pages/
 
+# Embedding cache, keyed by a hash of (embedding-contract fingerprint, input text)
+data/cache/embeddings/
+
+# Reranker cache, keyed by a hash of (reranker-contract fingerprint, query, passage)
+data/cache/reranker/
+
 # Embeddings and vector index artifacts — rebuilt via `make build-index`
 data/index/
 *.faiss
