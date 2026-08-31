@@ -57,3 +57,69 @@ pure function of text the artifact already carries, so `extract_cross_references
 runs at graph-build time — the production formalisation of the helper
 `scripts/find_candidate_clauses.py` ([M2-08]) already uses for golden-set
 curation. Full rationale in `docs/EXCLUSION_CO_RETRIEVAL.md`.
+
+---
+
+## Graph nodes are plain functions with dependencies injected through the runtime — [M4-01b]
+
+**Decision.** A graph node is a module-level function
+`def <name>(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, object]`,
+one node per file under `app/src/infrastructure/graph/nodes/`. It reads `state`,
+never mutates it, and returns only the keys it changed — a partial `ClaimState`
+update — always including at least one `AuditEvent` appended to `audit_trail`.
+No class-based nodes, no `__call__` objects, no module-level model or retriever
+singletons. Run-scoped dependencies — the fast and reasoning chat models, the
+retrieval port, the model config — are fields of `GraphContext`
+(`app/src/infrastructure/graph/context.py`), a frozen dataclass registered with
+`StateGraph(ClaimState, context_schema=GraphContext)` and read inside a node as
+`runtime.context`. Each LLM node's structured-output schema is a frozen Pydantic
+`<Node>Output` in `app/src/infrastructure/graph/schemas.py`, kept distinct from
+the `state.py` sub-models. Each node's prompt is built by
+`build_<node>_prompt(...) -> str` in
+`app/src/infrastructure/graph/prompts/<node>.py`, wrapped in
+`with_scope_preamble(...)`; prompt text never appears inside a node function.
+
+**Why a function and not a class.** The node is then testable by calling it with
+a literal state dict and a `GraphContext` of fakes — no graph, no `compile()`,
+no framework in the test. It is LangGraph's documented v1 style, and it is the
+shape `tests/unit/infrastructure/graph/test_state_merges.py` already uses for
+its fan-in fixtures. A class holding its dependencies in `__init__` reintroduces
+the construction-order and shared-mutable-state problems `context_schema` exists
+to remove, and invites five M4 issues to settle on five different constructors.
+
+**Why dependencies arrive through `Runtime[GraphContext]`.** Nodes are
+registered as bare functions — there is no constructor to pass anything to. A
+module global couples every node to one process-wide client and makes the test
+suite fight over monkeypatches. `context_schema` is the single seam LangGraph
+provides, and `GraphContext` is the one object the composition root builds and
+hands to `graph.invoke(state, context=...)`. The API moved at v1: LangGraph
+1.2.11 uses `context_schema=` / `Runtime` / `get_runtime`, not the deprecated
+`config_schema=` / `config["configurable"]` of pre-1.0 tutorials. The return
+type is `dict[str, object]`, not `ClaimState` — a partial return typed
+`ClaimState` fails on its required `claim_id` / `raw_claim_text` keys.
+
+**How to add a node.**
+
+1. `schemas.py`: add `class <Node>Output(BaseModel)` (frozen) — the exact shape
+   passed to `.with_structured_output(...)`. Map it onto the `state.py`
+   sub-model inside the node (the model returns clause-id strings; the node
+   hydrates `Citation` objects from the retrieved clauses' provenance).
+2. `prompts/<node>.py`: add `build_<node>_prompt(...) -> str` returning
+   `with_scope_preamble(body)`.
+3. `nodes/<node>.py`: the function. Take `fast_model` / `reasoning_model` /
+   `retriever` / `llm_settings` off `runtime.context`; read optional state with
+   `state.get(...)`. Return the changed keys plus an `AuditEvent` — set `model`
+   and `token_usage` for an LLM call, leave them `None` for a deterministic one.
+   Any other function in the module is a private `_`-prefixed helper.
+4. `tests/unit/infrastructure/graph/test_<node>.py`, `@pytest.mark.unit`: a fake
+   `BaseChatModel` and a stub retriever, no network. Verdict accuracy against
+   the synthetic claims is a separate `eval`-marked test ([M4-10]).
+5. Edges, the parallel fan-in and the checkpointer are not the node's concern —
+   see [M4-07] and [M4-09].
+
+**Enforcement.** `tests/architecture/test_graph_node_conventions.py`
+(unit-marked, runs in CI) fails on any class under `nodes/` that defines
+`__call__` or subclasses a `Runnable*`, and on any exported node function whose
+first two parameters are not `(state, runtime)`.
+`tests/architecture/test_scope_vocabulary.py` already scans the same tree for
+verdict-vocabulary drift.
