@@ -133,6 +133,28 @@ def test_llm_vision_provider_order_defaults_to_the_zone_qualified_route(
 
 
 @pytest.mark.unit
+def test_llm_fast_provider_pin_defaults_to_baidu_fp8_no_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LLM_FAST_PROVIDER_ORDER", raising=False)
+    monkeypatch.delenv("LLM_FAST_ALLOW_FALLBACKS", raising=False)
+
+    settings = _llm_settings()
+
+    assert settings.llm_fast_provider_order == ["baidu/fp8"]
+    assert settings.llm_fast_allow_fallbacks is False
+
+
+@pytest.mark.unit
+def test_llm_fast_provider_order_reads_the_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_FAST_PROVIDER_ORDER", '["deepinfra", "baidu/fp8"]')
+
+    assert _llm_settings().llm_fast_provider_order == ["deepinfra", "baidu/fp8"]
+
+
+@pytest.mark.unit
 def test_langfuse_secret_key_is_redacted_from_repr_and_str() -> None:
     settings = ObservabilitySettings(LANGFUSE_SECRET_KEY=SECRET_VALUE)
 

@@ -193,6 +193,21 @@ class LlmSettings(BaseSettings):
         alias="LLM_REASONING_ALLOW_FALLBACKS", default=False
     )
 
+    # The fast model (deepseek/deepseek-v4-flash-0731) reused outside the corpus
+    # classification pass -- first by M4's intake node ([M4-02]). baidu/fp8 is
+    # the same OpenRouter route [M1-08b] validated for this model, fallback
+    # disabled -- same rationale as the pins above: a transient provider outage
+    # should surface as an exception the caller retries, not a silent reroute to
+    # an unvalidated upstream. Kept here so the pin is decided where the model
+    # is chosen, like every other model in the project.
+    llm_fast_provider_order: list[str] = Field(
+        alias="LLM_FAST_PROVIDER_ORDER",
+        default_factory=lambda: ["baidu/fp8"],
+    )
+    llm_fast_allow_fallbacks: bool = Field(
+        alias="LLM_FAST_ALLOW_FALLBACKS", default=False
+    )
+
     # Rough, provider-published per-1M-token prices at time of writing --
     # check against the provider's current pricing before treating
     # estimated_cost_usd (scripts/escalate_vision_boundaries.py) as
