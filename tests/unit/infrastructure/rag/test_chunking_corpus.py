@@ -45,6 +45,7 @@ from domain.clause_classification import ClauseType
 from infrastructure.parsing.extraction import PyMuPdfTextExtractor
 from infrastructure.parsing.manifest import read_manifest
 from infrastructure.parsing.rules_loader import load_classification_rules
+from infrastructure.rag.chunk_schema import flatten_chunk
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RAW_DIR = REPO_ROOT / "data" / "policies" / "raw"
@@ -136,6 +137,23 @@ def test_chunking_matches_committed_snapshot(document_id: str) -> None:
     expected = _load_snapshot(document_id)
 
     assert actual == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("document_id", sorted(_DOCUMENTS))
+def test_flatten_chunk_display_text_is_the_embedded_text_minus_breadcrumb(
+    document_id: str,
+) -> None:
+    # [M3-02]: `display_text` (citation excerpt) must be exactly the embedded
+    # text with only the injected ancestor breadcrumb removed. Checked against
+    # every real chunk of the trio so a change to `_render_piece` that breaks
+    # the derivation is caught.
+    for chunk in _chunk_document(document_id, _DOCUMENTS[document_id]):
+        record = flatten_chunk(chunk, source="text")
+        if chunk.parent_path:
+            assert record.text == f"{chunk.parent_path}\n{record.display_text}"
+        else:
+            assert record.display_text == record.text
 
 
 @pytest.mark.unit

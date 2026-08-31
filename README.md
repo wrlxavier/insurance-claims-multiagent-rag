@@ -52,6 +52,64 @@ Copy the example file and fill in the values for your environment:
 cp .env.example .env
 ```
 
+### Database (Postgres + pgvector)
+
+Postgres is required by the retrieval index, the LangGraph checkpointer and
+the audit trail. Bring it up locally, in this order, on a clean clone:
+
+```bash
+cp .env.example .env
+docker compose up -d postgres
+make migrate
+```
+
+The `.env.example` defaults match the Compose service, so the sequence works
+as written without editing anything first. `make migrate` applies the Alembic
+migrations (the first one enables the `vector` extension); `make migrate-down`
+rolls the latest one back.
+
+Run the database-backed tests with:
+
+```bash
+make test-integration
+```
+
+This applies migrations to the `insurance_claims_test` database — created by
+the Compose service on first boot — before running `pytest -m integration`.
+
+See [`docs/DATABASE.md`](docs/DATABASE.md) for the pinned pgvector version and
+why, how `CREATE EXTENSION vector` is executed and what privilege it needs,
+and the sync-vs-async engine decision.
+
+### Index the corpus
+
+One command rebuilds the whole searchable index from `data/policies/raw/`:
+
+```bash
+make build-index     # parse -> chunk -> Postgres -> embeddings
+```
+
+It needs the same environment as `make parse` (the `LLM_*` keys in `.env`, plus
+Tesseract) and a running Postgres. When `build/parsed_clauses.jsonl` is already
+present — from an earlier `make parse` or `make fetch-corpus-artifacts` — the
+parse stage is skipped and the rest runs from cache. The manual breakdown of the
+last two steps:
+
+```bash
+make load-chunks     # upsert the chunk corpus into Postgres (idempotent)
+make embed-chunks    # embed the chunks; installs the optional `embed` group on first run
+```
+
+The embedding model (`Alibaba-NLP/gte-multilingual-base`) runs locally, so the
+dollar cost is **$0.00** — no API key needed. A cold pass over the ~4,540-chunk
+corpus is ~41 min of CPU time on an AMD Ryzen 5 5600H (a few minutes on a GPU);
+re-runs are served from an on-disk cache and do zero inference. See
+[`docs/EMBEDDINGS.md`](docs/EMBEDDINGS.md).
+
+Score every retrieval configuration on the golden set with
+`make eval-retrieval-matrix` — the committed comparison table and verdict are in
+[`docs/RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md).
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):

@@ -1,13 +1,26 @@
+from pathlib import Path
+
 import pytest
 
 from infrastructure.config.enums import LlmProvider
 from infrastructure.config.settings import (
     DatabaseSettings,
+    EmbeddingSettings,
     LlmSettings,
     ObservabilitySettings,
 )
+from infrastructure.rag.embedding_pipeline import EMBEDDING_BATCH_SIZE
 
 SECRET_VALUE = "super-secret-value"
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _env_keys_in_order(path: Path) -> list[str]:
+    return [
+        line.split("=", 1)[0].strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#") and "=" in line
+    ]
 
 
 @pytest.mark.unit
@@ -94,3 +107,33 @@ def test_sqlalchemy_database_url_still_encodes_the_real_password() -> None:
     )
 
     assert SECRET_VALUE in settings.sqlalchemy_database_url
+
+
+@pytest.mark.unit
+def test_embedding_batch_size_defaults_to_the_module_constant() -> None:
+    # `.env`'s EMBEDDING_BATCH_SIZE is the operational knob [M1-09] moved out of
+    # code; blank/absent falls back to the embedding_pipeline default.
+    settings = EmbeddingSettings(_env_file=None)
+
+    assert settings.embedding_batch_size == EMBEDDING_BATCH_SIZE == 64
+
+
+@pytest.mark.unit
+def test_embedding_batch_size_reads_the_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "16")
+
+    assert EmbeddingSettings(_env_file=None).embedding_batch_size == 16
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not (_REPO_ROOT / ".env").exists(),
+    reason="no .env in CI; parity is a local/pre-commit guard ([M1-09] rule)",
+)
+def test_env_and_env_example_have_identical_keys_in_order() -> None:
+    # [M3-02] / [M1-09] DoD: `.env.example` in exact key parity with `.env`.
+    assert _env_keys_in_order(_REPO_ROOT / ".env") == _env_keys_in_order(
+        _REPO_ROOT / ".env.example"
+    )

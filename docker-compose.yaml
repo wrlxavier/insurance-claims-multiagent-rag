@@ -1,0 +1,37 @@
+# Local database for development and integration tests.
+#
+# [M0-08] brings up the database *capability* only. [M5-09] adds the api,
+# redis and langfuse services to this same file -- the service block below is
+# self-contained and reads its configuration from the same `${DATABASE_*}`
+# variables those services will, so they are appended rather than requiring a
+# rewrite.
+services:
+  postgres:
+    # Postgres major and pgvector version are both explicit: the floating
+    # `pg17` tag would let a pgvector upgrade in and silently change index
+    # behaviour. See docs/DATABASE.md for the minimum version this project
+    # requires and why.
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-insurance_claims}
+    ports:
+      # `make migrate` and pytest run on the host, not inside the network.
+      - ${DATABASE_PORT:-5432}:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DATABASE_USER:-postgres} -d ${DATABASE_NAME:-insurance_claims}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:

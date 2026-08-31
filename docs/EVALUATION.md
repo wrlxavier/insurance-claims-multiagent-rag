@@ -146,10 +146,14 @@ validate-golden-set`), run in CI so a corpus re-parse that breaks a
 
 Implemented in `app/src/infrastructure/evaluation/retrieval_metrics.py`
 (pure functions, no I/O) and orchestrated by `scripts/eval_retrieval.py`
-(`make eval-retrieval`) — the [M2-06] retrieval evaluation harness, built
-before any real retriever exists so the measuring instrument itself is
-proven first (validated against a deliberately broken random retriever
-whose metrics collapse to ~0%, per that issue's own DoD).
+— the [M2-06] retrieval evaluation harness, built before any real
+retriever exists so the measuring instrument itself is proven first
+(`make eval-retrieval`, validated against a deliberately broken random
+retriever whose metrics collapse to ~0%, per that issue's own DoD).
+`make eval-retrieval-lexical` (`--retriever lexical`) scores the [M3-03]
+BM25 lexical retriever through the same harness; its standalone
+`golden-set-v1` numbers and the verdict on which question types it wins
+live in `docs/LEXICAL_RETRIEVAL.md`.
 
 - **Recall@k** (k = 1, 5, 10): the fraction of `reference_clause_ids`
   present in the top-k retrieved ids. Chosen over precision because
@@ -177,8 +181,11 @@ by `question_type`, product line, and extraction mode.
 construction) are excluded from every metric above — Recall/MRR/nDCG are
 mathematically undefined for an empty reference set, not zero; the harness
 raises rather than silently reporting a meaningless 0.0. Whether the system
-correctly abstains on them is a separate, not-yet-built check ([M3-07]'s
-insufficient-context gate), out of scope for this harness.
+correctly abstains on them is measured separately by [M3-07]'s
+insufficient-context gate (`make eval-insufficient-context-gate`,
+`docs/INSUFFICIENT_CONTEXT_GATE.md`): on `golden-set-v1` the gate abstains on
+all 23 with zero false positives among the 117 scorable questions. It remains
+out of scope for *this* (ranking) harness.
 
 **A current, real limitation of golden-set-v1, not a harness bug:** the 117
 scorable questions (the four non-`unanswerable` types) reference only CASCO

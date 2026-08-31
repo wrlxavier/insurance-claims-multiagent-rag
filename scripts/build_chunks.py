@@ -21,6 +21,7 @@ contract M2's golden-set/eval tooling already depends on, and forcing every
 """
 
 from pathlib import Path
+from typing import Literal
 
 from tqdm import tqdm
 
@@ -56,6 +57,16 @@ MANIFEST_PATH = Path("data/policies/manifest.csv")
 RULES_PATH = Path("data/parsing/clause_type_mapping.csv")
 LLM_CLASSIFICATION_CACHE_PATH = Path("data/cache/llm_classification/cache.jsonl")
 REPORT_PATH = Path("docs/CHUNKING_REPORT.md")
+
+
+def resolve_source(extraction_mode: str) -> Literal["text", "ocr"]:
+    """Map the manifest's ``extraction_mode`` to the chunk schema's ``source``.
+
+    Mirrors ``scripts/build_corpus.py``'s ``resolve_source`` exactly: a whole
+    document is routed through one extraction path, so this is decided once per
+    document, never per clause.
+    """
+    return "ocr" if extraction_mode == "ocr_required" else "text"
 
 
 def load_clause_tree(document_id: str, filename: str) -> ClauseTree:
@@ -97,6 +108,7 @@ def run_build_chunks() -> tuple[list[ChunkRecord], list[ChunkReportRow]]:
     for entry in tqdm(manifest_records, desc="Documents", unit="doc"):
         document_id = entry["id"]
         filename = entry["filename"]
+        source = resolve_source(entry["extraction_mode"])
         tree = load_clause_tree(document_id, filename)
         typed_clauses = classify_and_enrich_clauses(
             tree,
@@ -112,7 +124,7 @@ def run_build_chunks() -> tuple[list[ChunkRecord], list[ChunkReportRow]]:
             max_char_count=chunking_settings.chunk_max_char_count,
             sliding_window_overlap_chars=chunking_settings.chunk_sliding_window_overlap_chars,
         )
-        records.extend(flatten_chunk(chunk) for chunk in chunks)
+        records.extend(flatten_chunk(chunk, source=source) for chunk in chunks)
         rows.append(
             ChunkReportRow(
                 document_id=document_id,
