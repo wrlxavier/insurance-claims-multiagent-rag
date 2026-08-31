@@ -228,6 +228,14 @@ pre-commitment against post-hoc cherry-picking; the deviation is on reasons
 strategies remain one flag apart (`--fusion weighted`). [M3-08] re-opens this
 with reranking in the matrix.
 
+**Resolved by [M3-08] (2026-08-30):** with the reranker *and* exclusion
+co-retrieval in the loop, RRF wins **every** metric — Recall@10 92.3 vs 89.3,
+MRR 80.6 vs 80.4, nDCG 82.3 vs 81.1, exclusion recall 100% vs 96.3%. The
+reranker erased weighted's fusion-stage MRR edge (both ~80.5); what remained was
+weighted's weaker *candidate set*, which the reranker cannot recover from. The
+deviation above is now a measured result. Full comparison:
+`docs/RETRIEVAL_BENCHMARK.md`.
+
 ### DoD item 4 — cross-document errors are eliminated
 
 The 16 `cross_document` questions each target a document whose same-insurer
@@ -296,9 +304,11 @@ strict drops it) and `tests/unit/infrastructure/rag/test_retrieval_filter.py`.
   That one-off rebuilt BM25 per single-document index, sharpening IDF; the
   proper filtered lexical number with corpus-wide IDF is **87.2%**. Still
   clears 0.85; the 6-point gap is the IDF effect, not a regression.
-- **`fusion_weights` are untuned** at `(0.5, 0.5)`. Weighted fusion already
-  beats RRF on MRR/nDCG untuned; a tilt was not explored — [M3-08]'s, with the
-  reranker in the loop.
+- **`fusion_weights` are untuned** at `(0.5, 0.5)`. Weighted fusion beats RRF on
+  MRR/nDCG at the fusion stage untuned; a tilt was not explored. [M3-08] settled
+  the fusion choice (RRF, with the reranker in the loop — see "Resolved by
+  [M3-08]" above) without a weight sweep, since the deciding factor turned out
+  to be weighted's weaker candidate *set*, not its weighting.
 
 ---
 
@@ -314,7 +324,8 @@ strict drops it) and `tests/unit/infrastructure/rag/test_retrieval_filter.py`.
   every filtered partition returns a full `k` and the rank-1 reranked score
   carries the decision.
 - **The lexical / dense / hybrid / hybrid+rerank benchmark matrix and `make
-  build-index`** — [M3-08], which also re-opens the RRF-vs-weighted call with
-  reranking in the mix and re-runs the ANN-earns-its-place check on real
-  embeddings.
+  build-index`** — done: [M3-08], `docs/RETRIEVAL_BENCHMARK.md`. It re-opened
+  the RRF-vs-weighted call with reranking in the mix (RRF wins — see "Resolved
+  by [M3-08]" above) and re-ran the ANN-earns-its-place check on real embeddings
+  (recall 0.9932, verdict unchanged — `docs/EMBEDDINGS.md`).
 - **A DB-side lexical column** — still declined (see Scope).

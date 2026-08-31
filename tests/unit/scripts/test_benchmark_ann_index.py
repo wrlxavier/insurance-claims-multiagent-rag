@@ -13,6 +13,7 @@ from scripts.benchmark_ann_index import (
     AnnBenchmarkConfig,
     K,
     Partition,
+    _parse_args,
     _scan_summary,
     build_report,
     choose_partitions,
@@ -21,6 +22,7 @@ from scripts.benchmark_ann_index import (
     pseudo_random_unit_vector,
     recall_at_k,
     render_markdown_report,
+    render_real_report,
     summarise_latency,
     vector_literal,
 )
@@ -267,3 +269,48 @@ def test_render_markdown_report_has_every_section_and_the_caveat() -> None:
     assert "Synthetic vectors" in markdown
     assert "| --- | ---: | ---: | ---: | --- |" in markdown
     assert "9088 kB" in markdown
+
+
+@pytest.mark.unit
+def test_parse_args_exposes_the_real_embeddings_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("sys.argv", ["benchmark_ann_index.py"])
+    assert _parse_args().real_embeddings is False
+    monkeypatch.setattr("sys.argv", ["benchmark_ann_index.py", "--real-embeddings"])
+    assert _parse_args().real_embeddings is True
+
+
+@pytest.mark.unit
+def test_render_real_report_states_the_recall_and_the_filtered_plan() -> None:
+    config = _config().model_dump(mode="json")
+    config["synthetic_vectors"] = False
+    report = {
+        "config": config,
+        "caveat": "**Real embeddings.** ... rolled back ...",
+        "embedding_config_fingerprint": "7ea39a621eaee88e",
+        "build": {
+            "build_seconds": 0.81,
+            "index_bytes": 9306112,
+            "index_size_pretty": "9088 kB",
+            "table_bytes": 13533184,
+            "index_to_table_ratio": 0.688,
+        },
+        "latency": {
+            "exact_full": _latency_entry(),
+            "exact_partition": _latency_entry(),
+            "indexed_full": _latency_entry(),
+            "indexed_partition": _latency_entry(),
+        },
+        "ann_recall_at_k_full_corpus": 0.9631,
+        "filtered_path_plan": "Index Scan using ix_chunk_susep_process_cnpj",
+    }
+
+    markdown = render_real_report(report)
+
+    assert "# ANN index benchmark -- real embeddings" in markdown
+    assert "## ANN recall vs. exact" in markdown
+    assert "0.9631" in markdown
+    assert "ix_chunk_susep_process_cnpj" in markdown
+    assert "recall 1.0 by construction" in markdown
+    assert "7ea39a621eaee88e" in markdown

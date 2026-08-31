@@ -300,9 +300,9 @@ the bottleneck.
   reuses this module's `TextAnalyzer` unchanged and may key a cache on
   `config_fingerprint()`. No cache in this issue — the index builds in ~3 s.
 - **Hybrid fusion (RRF), metadata pre-filtering** — [M3-04].
-- **The lexical-vs-dense-vs-hybrid benchmark matrix** — [M3-08].
-- **`make build-index`** — [M3-08]; `make eval-retrieval-lexical` is composable
-  into it.
+- **The lexical-vs-dense-vs-hybrid benchmark matrix** and **`make build-index`**
+  — done: [M3-08], `docs/RETRIEVAL_BENCHMARK.md`. Filtered lexical Recall@10 is
+  87.2% in the matrix (the committed baseline here is `--filter none`, 58.7%).
 
 ## Limitations
 

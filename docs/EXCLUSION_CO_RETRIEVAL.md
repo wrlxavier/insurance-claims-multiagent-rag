@@ -268,9 +268,11 @@ coverage, and it can only do that for exclusions retrieval actually returned.
 ## Deferred / handed to later issues
 
 - The lexical / dense / hybrid / hybrid+rerank+co-retrieval **benchmark
-  matrix** and `make build-index` — [M3-08].
+  matrix** and `make build-index` — done: [M3-08], `docs/RETRIEVAL_BENCHMARK.md`.
+  The committed best config is this one (Recall@10 92.3%, exclusion recall 100%).
 - Coverage-clause recall on the `coverage_with_exclusion` subset — base
-  retrieval tuning, [M3-08] or later.
+  retrieval tuning, not re-run by [M3-08] (bars cleared); a future issue or
+  golden-set-v2.
 - M4's retrieval node constructs its own `ExclusionCoRetrievalRetriever` with a
   `reserved_slots` sized for its context budget; the config constant is the
   default and the golden-set-validated value.

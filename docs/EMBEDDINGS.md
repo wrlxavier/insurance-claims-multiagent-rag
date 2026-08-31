@@ -391,6 +391,43 @@ penalty that has to be measured and tuned. The definition stays in
 is one call away when the corpus grows (~10× is where exact scan starts to
 hurt); it does not go into the schema now.
 
+## Does the ANN index earn its place? Second measurement, real embeddings (2026-08-30, [M3-08])
+
+The measurement above rested on synthetic vectors — its recall number (0.448)
+"does not transfer". `make benchmark-ann-index-real`
+(`scripts/benchmark_ann_index.py --real-embeddings`) closes that gap: it builds
+the HNSW index on the **real 4,540 `chunk.embedding` vectors** already in
+`DATABASE_URL` and measures it against the **117 real `golden-set-v1` query
+vectors**, inside a single transaction that is rolled back — the dev database is
+left untouched, with no `ix_chunk_embedding_hnsw`. Regenerable output:
+`eval/runs/ann_index_benchmark_real.{md,json}` (gitignored).
+
+| measurement | synthetic (above, 2026-08-28) | **real (2026-08-30)** |
+| --- | ---: | ---: |
+| `CREATE INDEX` wall time | ~0.8 s | **0.39 s** |
+| index size | ~9 MB (0.69× the table) | **8.8 MB (0.45× the table)** |
+| exact `<=>`, full corpus, no index | p50 ~11.4 ms | p50 **9.8 ms** |
+| exact `<=>`, single partition, no index | p50 ~0.6 ms | p50 **0.58 ms** |
+| HNSW, full corpus | p50 ~0.8 ms | p50 **0.62 ms** |
+| HNSW available, single partition | p50 ~0.6 ms (planner chose btree) | p50 **0.55 ms (planner chose btree)** |
+| HNSW recall@10 vs. exact, full corpus | 0.448 *(synthetic — does not transfer)* | **0.9932** |
+
+The two are **not one series** — the synthetic run's recall was noise; the real
+one is the number. Everything else confirms the synthetic run: build time, index
+size and latency are structural and transferred as [M3-02] predicted.
+
+**Verdict: unchanged. The HNSW index still does not earn its place — and
+[M3-08]'s `make build-index` does not call `create_hnsw_index`.** Real recall is
+99.3%, not 44.8%, but that only matters on a path the system does not use. The
+default retrieval path is filtered to one SUSEP process + CNPJ, and there the
+planner reads the `(susep_process, cnpj)` btree partition and sorts it exactly
+in 0.55 ms — plan `Bitmap Heap Scan`, never the HNSW index, *whether or not the
+index exists*. The index only speeds the unfiltered full-corpus scan
+(9.8 → 0.62 ms), which is a degradation mode ([M3-04] item 5), not the default.
+Against a real, non-zero recall penalty (0.7%), 8.8 MB and a build step, on a
+path nobody takes: no. The [M3-08] benchmark matrix (`docs/RETRIEVAL_BENCHMARK.md`)
+records this alongside the four-configuration comparison.
+
 ## Filtered search and the fewer-than-`k` question
 
 Whether a metadata-filtered vector search can return fewer than `k` rows, and
@@ -440,12 +477,14 @@ index artifact rather than a property of the retriever. See
 
 ## Still deferred in [M3-02]
 
-Two items remain open:
+One item remains open:
 
 - **Stale vector on a changed `embedded_text`** ("What it does *not* fix" above)
   — a chunk whose text changes under a stable `chunk_id` keeps its old vector.
   Needs a stored content hash or a null-on-change step.
-- **The ANN-earns-its-place check on *real* embeddings** — the verdict above
-  rests on latency and synthetic vectors. [M3-08]'s benchmark matrix re-runs it
-  on the real embeddings and settles whether `make build-index` should call
-  `create_hnsw_index`.
+
+**Closed (2026-08-30, [M3-08]):** the ANN-earns-its-place check on *real*
+embeddings — see "Does the ANN index earn its place? Second measurement" above.
+Real HNSW recall@10 vs. exact is 0.9932, but the verdict is unchanged: the
+default filtered path never routes through the index, so `make build-index` does
+not build it.

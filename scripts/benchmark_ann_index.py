@@ -54,6 +54,7 @@ from sqlalchemy.orm import Session
 
 from infrastructure.database import (
     create_engine_from_database_url,
+    create_engine_from_settings,
     create_session_factory,
 )
 from infrastructure.database.chunk_repository import (
@@ -61,6 +62,7 @@ from infrastructure.database.chunk_repository import (
     upsert_chunks,
     write_chunk_embeddings,
 )
+from infrastructure.evaluation.golden_set_schema import QuestionType
 from infrastructure.rag.ann_index import (
     HNSW_EF_CONSTRUCTION,
     HNSW_EF_SEARCH,
@@ -71,12 +73,18 @@ from infrastructure.rag.ann_index import (
 )
 from infrastructure.rag.chunk_artifact import CHUNKS_JSONL_PATH, read_chunks_jsonl
 from infrastructure.rag.chunk_schema import ChunkRecord
-from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS
+from infrastructure.rag.embedding_cache import CachingEmbedder
+from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS, format_query
+from infrastructure.rag.embedding_config import (
+    config_fingerprint as embedding_config_fingerprint,
+)
 
 SCHEMA_VERSION = "v1"
 OUTPUT_DIR = Path("eval/runs")
 JSON_PATH = OUTPUT_DIR / "ann_index_benchmark.json"
 MD_PATH = OUTPUT_DIR / "ann_index_benchmark.md"
+REAL_JSON_PATH = OUTPUT_DIR / "ann_index_benchmark_real.json"
+REAL_MD_PATH = OUTPUT_DIR / "ann_index_benchmark_real.md"
 
 VECTOR_SEED = 20260828
 QUERY_SEED = 920260828
@@ -575,6 +583,269 @@ def render_markdown_report(report: dict[str, Any]) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Real-embeddings A/B -- [M3-08]                                             #
+# --------------------------------------------------------------------------- #
+
+_REAL_CAVEAT = (
+    "**Real embeddings.** This runs against the `chunk.embedding` vectors "
+    "already in `DATABASE_URL` (from `make embed-chunks`) and the real "
+    "`golden-set-v1` query vectors -- so the ANN recall@k number here is the "
+    "one [M3-02]'s synthetic-vector benchmark could not produce. `CREATE "
+    "INDEX` and every measurement run inside a single transaction that is "
+    "**rolled back**: the dev database is left exactly as it was, with no "
+    "`ix_chunk_embedding_hnsw`."
+)
+
+
+def load_golden_query_vectors() -> list[tuple[str, str, list[float]]]:
+    """``(susep_process, cnpj, query_vector)`` for every scorable golden question.
+
+    The query embedder is lazy and wrapped in ``CachingEmbedder``; every golden
+    query vector is already in ``data/cache/embeddings/`` from prior dense runs,
+    so this does zero forward passes on a warm cache.
+    """
+    # Deferred so the synthetic ``make benchmark-ann-index`` stays path-runnable
+    # (this is the only ``scripts.*`` import, and ``--real-embeddings`` runs as
+    # ``python -m scripts.benchmark_ann_index``).
+    from scripts.eval_retrieval import (
+        GOLDEN_SET_DIR,
+        MANIFEST_PATH,
+        _load_query_embedder,
+        load_document_metadata,
+        load_golden_questions,
+    )
+
+    document_meta = load_document_metadata(MANIFEST_PATH)
+    questions = [
+        question
+        for question in load_golden_questions(GOLDEN_SET_DIR)
+        if question.question_type is not QuestionType.UNANSWERABLE
+    ]
+    embedder = CachingEmbedder(_load_query_embedder())
+    vectors = embedder.embed([format_query(q.question) for q in questions])
+    return [
+        (
+            document_meta[question.document_id]["susep_process"],
+            document_meta[question.document_id]["cnpj"],
+            vector,
+        )
+        for question, vector in zip(questions, vectors, strict=True)
+    ]
+
+
+def measure_real_recall(
+    session: Session, query_vectors: Sequence[Sequence[float]]
+) -> float:
+    """Mean full-corpus HNSW recall@k vs. the exact top-k, per query.
+
+    The full-corpus ``ORDER BY <=> LIMIT k`` is the one path the planner routes
+    through the HNSW index; the default (filtered) path never touches it -- see
+    the plan check in :func:`run_real_embeddings`. The index must already be
+    built when this is called.
+    """
+    sql = f"SELECT chunk_id FROM chunk {_ORDER_BY_DISTANCE}"
+    recalls: list[float] = []
+    for vector in query_vectors:
+        params: dict[str, Any] = {"q": vector_literal(vector), "k": K}
+        session.execute(text("SET LOCAL enable_indexscan = off"))
+        session.execute(text("SET LOCAL enable_indexonlyscan = off"))
+        exact_ids = _topk_ids(session, sql, params)
+        _reset_planner_gucs(session)
+        apply_ann_search_gucs(session)
+        approx_ids = _topk_ids(session, sql, params)
+        recalls.append(recall_at_k(approx_ids, exact_ids))
+    return round(statistics.fmean(recalls), 4)
+
+
+def run_real_embeddings() -> None:
+    """The [M3-08] ANN-earns-its-place A/B on the real embeddings.
+
+    Connects to ``DATABASE_URL`` (not the test DB -- the real vectors live
+    there), reads the existing rows, and does everything inside one rolled-back
+    transaction.
+    """
+    queries = load_golden_query_vectors()
+    example_process, example_cnpj, example_vector = queries[0]
+    filter_params = {"susep_process": example_process, "cnpj": example_cnpj}
+
+    engine = create_engine_from_settings()
+    session = create_session_factory(engine=engine)()
+    try:
+        assert_chunk_table_ready(session)
+        total = session.execute(text("SELECT count(*) FROM chunk")).scalar_one()
+        embedded = session.execute(
+            text("SELECT count(*) FROM chunk WHERE embedding IS NOT NULL")
+        ).scalar_one()
+        if embedded == 0 or embedded != total:
+            raise RuntimeError(
+                f"{embedded}/{total} chunks embedded -- run `make embed-chunks` "
+                "first (this A/B needs every chunk's real vector)."
+            )
+        print(f"real-embeddings A/B: {total} chunks, all embedded", flush=True)
+
+        exact_full = measure_latency(
+            session, where="", base_params={}, query_vectors=[example_vector]
+        )
+        exact_partition = measure_latency(
+            session,
+            where=_DEFAULT_FILTER,
+            base_params=filter_params,
+            query_vectors=[example_vector],
+        )
+
+        build = build_and_measure_index(session)
+        apply_ann_search_gucs(session)
+        indexed_full = measure_latency(
+            session, where="", base_params={}, query_vectors=[example_vector]
+        )
+        indexed_partition = measure_latency(
+            session,
+            where=_DEFAULT_FILTER,
+            base_params=filter_params,
+            query_vectors=[example_vector],
+        )
+
+        recall_full = measure_real_recall(session, [v for _, _, v in queries])
+        filtered_plan = explain_scan(
+            session,
+            f"SELECT chunk_id FROM chunk WHERE {_DEFAULT_FILTER} {_ORDER_BY_DISTANCE}",
+            {**filter_params, "q": vector_literal(example_vector), "k": K},
+        )
+
+        config = AnnBenchmarkConfig(
+            schema_version=SCHEMA_VERSION,
+            run_at_utc=datetime.now(UTC),
+            corpus_path="DATABASE_URL/chunk (real embeddings)",
+            chunk_count=int(total),
+            partition_count=session.execute(
+                text("SELECT count(DISTINCT (susep_process, cnpj)) FROM chunk")
+            ).scalar_one(),
+            smallest_partition_size=session.execute(
+                text(
+                    "SELECT min(c) FROM (SELECT count(*) c FROM chunk "
+                    "GROUP BY susep_process, cnpj) s"
+                )
+            ).scalar_one(),
+            median_partition_size=0,
+            largest_partition_size=session.execute(
+                text(
+                    "SELECT max(c) FROM (SELECT count(*) c FROM chunk "
+                    "GROUP BY susep_process, cnpj) s"
+                )
+            ).scalar_one(),
+            hnsw_m=HNSW_M,
+            hnsw_ef_construction=HNSW_EF_CONSTRUCTION,
+            hnsw_ef_search=HNSW_EF_SEARCH,
+            synthetic_vectors=False,
+            vector_seed=0,
+            query_seed=0,
+            query_count=len(queries),
+            measure_iterations=MEASURE_ITERATIONS,
+            k=K,
+            platform=platform.platform(),
+            **server_versions(session),
+        )
+        report = {
+            "config": config.model_dump(mode="json"),
+            "caveat": _REAL_CAVEAT,
+            "embedding_config_fingerprint": embedding_config_fingerprint(),
+            "build": build,
+            "latency": {
+                "exact_full": exact_full,
+                "exact_partition": exact_partition,
+                "indexed_full": indexed_full,
+                "indexed_partition": indexed_partition,
+            },
+            "ann_recall_at_k_full_corpus": recall_full,
+            "filtered_path_plan": filtered_plan,
+        }
+    finally:
+        session.rollback()
+        session.close()
+        engine.dispose()
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    REAL_JSON_PATH.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    REAL_MD_PATH.write_text(render_real_report(report), encoding="utf-8")
+    print(
+        f"real HNSW recall@{K} (full corpus) = {recall_full:.4f}; "
+        f"filtered path plan: {filtered_plan}"
+    )
+    print(f"Wrote {REAL_JSON_PATH} and {REAL_MD_PATH}")
+
+
+def render_real_report(report: dict[str, Any]) -> str:
+    """Render the real-embeddings A/B (numbers copied into docs/EMBEDDINGS.md)."""
+    config = report["config"]
+    build = report["build"]
+    latency = report["latency"]
+    return "\n".join(
+        [
+            "# ANN index benchmark -- real embeddings ([M3-08])",
+            "",
+            "Generated by `scripts/benchmark_ann_index.py --real-embeddings` "
+            "(`make benchmark-ann-index-real`). Regenerable; the committed "
+            "verdict lives in `docs/EMBEDDINGS.md` as a dated second measurement "
+            "and is summarised in `docs/RETRIEVAL_BENCHMARK.md`.",
+            "",
+            report["caveat"],
+            "",
+            "## Run configuration",
+            "",
+            f"- Corpus: {config['chunk_count']} real-embedded chunks, "
+            f"{config['partition_count']} `(susep_process, cnpj)` partitions "
+            f"(smallest {config['smallest_partition_size']}, largest "
+            f"{config['largest_partition_size']})",
+            f"- Embedding contract fingerprint: "
+            f"`{report['embedding_config_fingerprint']}`",
+            f"- HNSW: `m={config['hnsw_m']}`, "
+            f"`ef_construction={config['hnsw_ef_construction']}`, "
+            f"`ef_search={config['hnsw_ef_search']}`",
+            f"- Queries: {config['query_count']} real `golden-set-v1` query "
+            f"vectors; k={config['k']}",
+            f"- pgvector {config['pgvector_version']}; {config['postgres_version']}",
+            f"- Platform: {config['platform']}",
+            f"- Run at (UTC): {config['run_at_utc']}",
+            "",
+            "## Build time and index size",
+            "",
+            f"- `CREATE INDEX` wall time: **{build['build_seconds']:.3f} s**",
+            f"- Index size: **{build['index_size_pretty']}** "
+            f"({build['index_bytes']} bytes); index/table ratio "
+            f"{build['index_to_table_ratio']}",
+            "",
+            "## Latency: exact scan vs. HNSW",
+            "",
+            "| scope | p50 ms | p95 ms | mean ms | plan |",
+            "| --- | ---: | ---: | ---: | --- |",
+            _latency_row("exact, full corpus (no index)", latency["exact_full"]),
+            _latency_row(
+                "exact, single partition (no index)", latency["exact_partition"]
+            ),
+            _latency_row("with HNSW index, full corpus", latency["indexed_full"]),
+            _latency_row(
+                "with HNSW index, single partition", latency["indexed_partition"]
+            ),
+            "",
+            "## ANN recall vs. exact",
+            "",
+            f"- **HNSW recall@{config['k']} vs. exact, full corpus: "
+            f"{report['ann_recall_at_k_full_corpus']:.4f}** -- averaged over the "
+            f"{config['query_count']} real golden queries.",
+            f"- Default (filtered) retrieval path plan with the index present: "
+            f"`{report['filtered_path_plan']}` -- the planner reads the "
+            f"`(susep_process, cnpj)` btree partition and sorts it exactly; it "
+            f"does **not** touch the HNSW index, so the default path returns the "
+            f"exact top-{config['k']} whether the index exists or not "
+            f"(recall 1.0 by construction).",
+            "",
+        ]
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Entry point                                                                #
 # --------------------------------------------------------------------------- #
 
@@ -585,6 +856,14 @@ def _parse_args() -> argparse.Namespace:
         "--allow-nontest-db",
         action="store_true",
         help="run even if the target database name has no 'test' in it",
+    )
+    parser.add_argument(
+        "--real-embeddings",
+        action="store_true",
+        help=(
+            "[M3-08] A/B against the real vectors in DATABASE_URL (not the "
+            "synthetic-vector test-DB benchmark); all changes rolled back"
+        ),
     )
     return parser.parse_args()
 
@@ -602,6 +881,9 @@ def load_records() -> list[ChunkRecord]:
 def main() -> None:
     """Run the benchmark against the test database and write the report."""
     args = _parse_args()
+    if args.real_embeddings:
+        run_real_embeddings()
+        return
     url = resolve_test_database_url()
     assert_target_is_test_db(url, allow_nontest=args.allow_nontest_db)
     records = load_records()
