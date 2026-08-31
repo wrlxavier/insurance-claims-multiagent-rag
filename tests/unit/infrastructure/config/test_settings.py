@@ -87,6 +87,51 @@ def test_llm_model_vision_can_be_set() -> None:
     assert settings.llm_model_vision == "google/gemini-3.7-flash"
 
 
+def _llm_settings(**overrides: object) -> LlmSettings:
+    fields: dict[str, object] = {
+        "LLM_PROVIDER": LlmProvider.OPENAI,
+        "LLM_API_KEY": SECRET_VALUE,
+        "LLM_MODEL_FAST": "gpt-fast",
+        "LLM_MODEL_REASONING": "gpt-reasoning",
+        "EMBEDDING_MODEL": "embed-model",
+        "RERANKER_MODEL": "rerank-model",
+        "_env_file": None,
+    }
+    fields.update(overrides)
+    return LlmSettings(**fields)  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+def test_llm_reasoning_provider_pin_defaults_to_streamlake_no_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LLM_REASONING_PROVIDER_ORDER", raising=False)
+    monkeypatch.delenv("LLM_REASONING_ALLOW_FALLBACKS", raising=False)
+
+    settings = _llm_settings()
+
+    assert settings.llm_reasoning_provider_order == ["streamlake"]
+    assert settings.llm_reasoning_allow_fallbacks is False
+
+
+@pytest.mark.unit
+def test_llm_reasoning_provider_order_reads_the_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_REASONING_PROVIDER_ORDER", '["fireworks", "streamlake"]')
+
+    assert _llm_settings().llm_reasoning_provider_order == ["fireworks", "streamlake"]
+
+
+@pytest.mark.unit
+def test_llm_vision_provider_order_defaults_to_the_zone_qualified_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LLM_VISION_PROVIDER_ORDER", raising=False)
+
+    assert _llm_settings().llm_vision_provider_order == ["google-vertex/global"]
+
+
 @pytest.mark.unit
 def test_langfuse_secret_key_is_redacted_from_repr_and_str() -> None:
     settings = ObservabilitySettings(LANGFUSE_SECRET_KEY=SECRET_VALUE)
