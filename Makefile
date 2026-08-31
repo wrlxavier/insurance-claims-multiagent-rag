@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks benchmark-ann-index sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-insufficient-context-gate tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -23,7 +23,9 @@ help:
 	@echo "  check-embedding-input-length - M3-02: tokenise build/chunks.jsonl with the pinned embedding model and check every chunk fits its input window"
 	@echo "  load-chunks       - M3-02: upsert build/chunks.jsonl into the chunk table (idempotent; needs Postgres + make migrate)"
 	@echo "  embed-chunks      - M3-02: embed every chunk still missing a vector with the local sentence-transformers model (depends on load-chunks; runs the optional embed uv group; writes eval/runs/embedding_cost_report.{md,json})"
+	@echo "  build-index       - M3-08: end-to-end reproducible index build: raw PDFs -> parse -> chunk -> Postgres -> embeddings (composes parse/build-chunks/migrate/load-chunks/embed-chunks; needs the same LLM_* env + tesseract as make parse, and a running Postgres; the parse stage is skipped when build/parsed_clauses.jsonl already exists)"
 	@echo "  benchmark-ann-index - M3-02: build the HNSW index against TEST_DATABASE_URL and measure build time, size, exact-vs-ANN latency and filtered result counts (synthetic vectors; writes eval/runs/ann_index_benchmark.{md,json})"
+	@echo "  benchmark-ann-index-real - M3-08: the ANN-earns-its-place A/B on the REAL embeddings in DATABASE_URL - HNSW recall@10 vs exact + latency, all inside a rolled-back transaction (runs the optional embed uv group; writes eval/runs/ann_index_benchmark_real.{md,json})"
 	@echo "  sample-parsing-quality - Draw the M1-08 stratified 50-clause sample"
 	@echo "  validate-parsing-quality-sample - Automated LLM validation of the M1-08b sample (fills judgment columns)"
 	@echo "  score-parsing-quality  - Score the annotated M1-08 sample and write eval/parsing_quality_results.md"
@@ -51,6 +53,7 @@ help:
 	@echo "  eval-retrieval-hybrid - M3-04: score the hybrid (RRF fusion of lexical+dense) retriever with the SUSEP-process+CNPJ pre-filter (same Postgres + embed-group requirement as eval-retrieval-dense; pass --fusion weighted / --filter none on the script for the comparison); writes eval/runs/retrieval_eval_hybrid_*.{md,json}. Comparison and verdict: docs/HYBRID_RETRIEVAL.md"
 	@echo "  eval-retrieval-rerank - M3-05: score hybrid RRF + cross-encoder rerank with the SUSEP-process+CNPJ pre-filter at the chosen candidate depth (same Postgres + embed-group requirement); writes eval/runs/retrieval_eval_hybrid_rrf_rerank_filter-default.{md,json}. Verdict: docs/RERANKING.md"
 	@echo "  eval-retrieval-co-retrieval - M3-06: score hybrid RRF + rerank + exclusion co-retrieval with the SUSEP-process+CNPJ pre-filter (same Postgres + embed-group requirement); reserves top-k slots for the exclusion clauses linked to each retrieved coverage clause; writes eval/runs/retrieval_eval_hybrid_rrf_rerank_co-retrieval_filter-default.{md,json}. Rule: docs/ARCHITECTURE.md; measurement: docs/EXCLUSION_CO_RETRIEVAL.md"
+	@echo "  eval-retrieval-matrix - M3-08: run every retrieval configuration (lexical / dense / hybrid RRF / +rerank / +co-retrieval / weighted+rerank+co-retrieval) on the SUSEP-process+CNPJ path in one pass, with per-query latency (same Postgres + embed-group requirement); writes eval/runs/retrieval_benchmark_matrix.{md,json}. Committed table and verdict: docs/RETRIEVAL_BENCHMARK.md"
 	@echo "  eval-insufficient-context-gate - M3-07: calibrate the insufficient-context gate on retrieval signals over the 23 unanswerable golden questions (hybrid RRF + rerank, SUSEP-process+CNPJ filter; same Postgres + embed-group requirement); sweeps the abstain threshold, reports precision/recall + the false-negative cases; writes eval/runs/insufficient_context_gate.{md,json} + the committed snapshot eval/insufficient_context_gate_signals.json. Verdict: docs/INSUFFICIENT_CONTEXT_GATE.md"
 	@echo "  tune-reranking    - M3-05: sweep the reranker candidate depth on the golden set and record the metrics + latency curve (same Postgres + embed-group requirement); writes eval/runs/rerank_tuning.{md,json}. Curve and chosen depth: docs/RERANKING.md"
 	@echo "  tune-exclusion-co-retrieval - M3-06: sweep the reserved exclusion-slot count on the golden set (pure-Python replay over one cached rerank pass; same Postgres + embed-group requirement for that pass); writes eval/runs/exclusion_co_retrieval_tuning.{md,json}. Curve and chosen count: docs/EXCLUSION_CO_RETRIEVAL.md"
@@ -112,8 +115,23 @@ load-chunks:
 embed-chunks: load-chunks
 	PYTHONPATH=app/src uv run --group embed python scripts/embed_chunks.py
 
+# M3-08: the whole index, reproducibly, from raw PDFs. Needs the same
+# environment as `make parse` (LLM_* in .env, tesseract) plus a running
+# Postgres. The file prerequisite skips the expensive parse stage (OCR + LLM
+# classification + vision escalation) when build/parsed_clauses.jsonl is already
+# there; build-chunks still runs but is cache-served, and load-chunks /
+# embed-chunks are idempotent / short-circuiting, so a re-run is cheap.
+build/parsed_clauses.jsonl:
+	$(MAKE) parse
+
+build-index: build/parsed_clauses.jsonl build-chunks check-embedding-input-length migrate load-chunks embed-chunks
+	@echo "build-index: raw -> parsed clauses -> chunks -> Postgres -> embeddings. Index ready for 'make eval-retrieval-matrix'."
+
 benchmark-ann-index:
 	PYTHONPATH=app/src uv run python scripts/benchmark_ann_index.py
+
+benchmark-ann-index-real:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.benchmark_ann_index --real-embeddings
 
 sample-parsing-quality:
 	PYTHONPATH=app/src uv run python scripts/sample_parsing_quality.py
@@ -211,6 +229,9 @@ eval-retrieval-rerank:
 
 eval-retrieval-co-retrieval:
 	PYTHONPATH=app/src uv run --group embed python scripts/eval_retrieval.py --retriever hybrid --filter default --rerank --co-retrieval
+
+eval-retrieval-matrix:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.benchmark_retrieval_matrix
 
 eval-insufficient-context-gate:
 	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_insufficient_context_gate

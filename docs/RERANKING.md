@@ -315,12 +315,18 @@ evidence. A dated `[M3-05]` note is added to `MILESTONES.md`'s M3 section.
 ## Deferred / handed to later issues
 
 - **The lexical / dense / hybrid / hybrid+rerank benchmark matrix and
-  `make build-index`** — [M3-08], which also re-opens the RRF-vs-weighted fusion
-  call now that the reranker exists.
+  `make build-index`** — done: [M3-08], `docs/RETRIEVAL_BENCHMARK.md`. It also
+  re-opened the RRF-vs-weighted fusion call with the reranker in the loop (RRF
+  wins every metric — 92.3 vs 89.3 Recall@10) and confirmed at depth 10 the
+  reranked+co-retrieval best config clears both M3 bars (Recall@10 92.3%, MRR
+  80.6%).
 - **Exclusion co-retrieval** (pull the exclusion linked to every retrieved
   coverage clause) — [M3-06]. `coverage_with_exclusion` is the weakest question
   type and reranking does not fix it — it can only reorder what retrieval found.
 - **The insufficient-context gate** on the retrieval signals — [M3-07] (done:
   `docs/INSUFFICIENT_CONTEXT_GATE.md`; the gate reads the rank-1 reranked score
   this stage produces).
-- **BM25 `k1`/`b` and RRF `k` tuning with the reranker in the loop** — [M3-08].
+- **BM25 `k1`/`b` and RRF `k` tuning with the reranker in the loop** — not
+  re-run by [M3-08]: the M3 bars are cleared and each value was tuned on this
+  same golden set. The `make tune-*` targets remain for a changed corpus or
+  golden-set-v2.

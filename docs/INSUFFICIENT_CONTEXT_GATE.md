@@ -314,4 +314,5 @@ answer before it starts, and on the evidence available it does.
   cannot be *evaluated* (as opposed to calibrated) without one.
 - **A real query-intent classifier** to replace the `needs_verified_instance_value`
   keyword heuristic — future work, most naturally alongside M4's intake node.
-- **The four-configuration benchmark matrix** — [M3-08].
+- **The four-configuration benchmark matrix** — done: [M3-08],
+  `docs/RETRIEVAL_BENCHMARK.md`.

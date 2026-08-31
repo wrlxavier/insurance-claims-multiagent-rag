@@ -53,7 +53,7 @@ is cleared.
 | M0        | Foundations                | done |
 | M1        | Policy parsing              | done        |
 | M2        | Ground truth                | done        |
-| M3        | Retrieval                   | todo        |
+| M3        | Retrieval                   | done        |
 | M4        | Agent graph                 | todo        |
 | M5        | Service and hardening       | todo        |
 | M6        | Release and portfolio       | todo        |
@@ -333,6 +333,38 @@ framing — they don't; the "only the 3 decoys are high" framing — six are), o
 was beaten (precision recovered to 100%, not the low-to-mid 80s). Full method,
 sweep, fragility table and prediction-vs-actual: `docs/INSUFFICIENT_CONTEXT_GATE.md`.
 Wiring the gate into the graph is [M4-04]; the benchmark matrix is [M3-08].
+
+**[M3-08] outcome (2026-08-30). M3 closes.** The benchmark matrix
+(`scripts/benchmark_retrieval_matrix.py`, `make eval-retrieval-matrix`,
+committed in `docs/RETRIEVAL_BENCHMARK.md`) scores every configuration on the
+117 scorable `golden-set-v1` questions over the `--filter default`
+SUSEP-process + CNPJ path. **Best configuration — hybrid RRF + cross-encoder
+rerank (depth 10) + exclusion co-retrieval (1 slot): Recall@10 92.3%, MRR
+80.6%, nDCG@10 82.3%, exclusion-clause recall 100% (27/27), foreign-document
+rate 0.0%** — both exit bars (Recall@10 ≥ 0.85, MRR ≥ 0.60) cleared, and every
+exclusion reference in the golden set retrieved. The four core rows reproduce
+their [M3-03]/[M3-04]/[M3-05] committed numbers exactly and are byte-identical
+across two matrix runs (retrieval is deterministic; tolerance is fp32 reranker
+rounding across hardware, ≤ ~1 question). **RRF-vs-weighted, re-opened with the
+reranker in the loop: RRF wins every metric** (Recall@10 92.3 vs 89.3, MRR 80.6
+vs 80.4) — the reranker erased the fusion-stage MRR edge weighted had, and
+weighted's weaker candidate *set* is what remains; `DEFAULT_FUSION_STRATEGY`
+unchanged, and the [M3-04] deviation is now a measured result. **Real-embedding
+ANN A/B** (`make benchmark-ann-index-real`, second measurement in
+`docs/EMBEDDINGS.md`): HNSW recall@10 vs. exact is **0.9932** (vs the 0.448
+synthetic), but the verdict is unchanged — the filtered default path's planner
+reads the btree partition (`Bitmap Heap Scan`), never the index, so
+`make build-index` does not build it. **`make build-index`** rebuilds the index
+end to end (`parse` → `build-chunks` → `migrate` → `load-chunks` →
+`embed-chunks`); it needs the same `LLM_*` + Tesseract environment as
+`make parse`, and a file-target prerequisite skips the parse stage when the
+parsed corpus is already present. **Deviation, stated per this file:** the DoD's
+`make eval-retrieval` is the [M2-06] random self-test, so the matrix is realised
+as the new target `make eval-retrieval-matrix`. Pre-registered predictions: the
+four-core reproduction held; "keep RRF" held but for a stronger reason than
+predicted (RRF wins outright, not on a trade-off); the ANN prediction held.
+Not re-run: rerank-depth / `k1`,`b` / `RRF_K` re-tuning — the bars are cleared
+and each was tuned on this golden set.
 
 ## M4 — Agent graph
 
