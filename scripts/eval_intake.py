@@ -46,6 +46,7 @@ from infrastructure.graph.context import GraphContext
 from infrastructure.graph.nodes.intake import intake
 from infrastructure.graph.schemas import MissingInfoTag
 from infrastructure.graph.state import ClaimState, ExtractedEntities
+from infrastructure.rag.retrieved_clause import RetrievedClause
 
 CLAIM_PATHS = (
     Path("data/synthetic_claims/claims.jsonl"),
@@ -80,7 +81,7 @@ class _NoopRetriever:
 
     def retrieve(
         self, question: str, *, k: int, metadata_filter: object | None = None
-    ) -> list[str]:
+    ) -> list[RetrievedClause]:
         return []
 
 

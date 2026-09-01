@@ -17,7 +17,7 @@ docker compose up -d postgres
 make migrate
 ```
 
-`docker-compose.yaml` currently holds one service. [M5-09] adds `api`, `redis`
+`compose.yaml` currently holds one service. [M5-09] adds `api`, `redis`
 and `langfuse` to that same file; the Postgres block is written so they are
 appended rather than requiring it to be rewritten.
 

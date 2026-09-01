@@ -43,6 +43,7 @@ from infrastructure.graph.build import MAX_CLARIFICATION_ROUNDS, build_claim_gra
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.nodes.clarification import clarification
 from infrastructure.graph.state import ClaimState
+from infrastructure.rag.retrieved_clause import RetrievedClause
 
 CLAIMS_PATH = Path("data/synthetic_claims/claims.jsonl")
 REPORT_MD = Path("eval/runs/clarification_loop.md")
@@ -62,7 +63,7 @@ _GENERIC_RE = re.compile(
 class _NoopRetriever:
     def retrieve(
         self, question: str, *, k: int, metadata_filter: object | None = None
-    ) -> list[str]:
+    ) -> list[RetrievedClause]:
         return []
 
 

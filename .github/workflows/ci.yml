@@ -60,7 +60,7 @@ jobs:
     # failure.
     services:
       postgres:
-        # Same pin as docker-compose.yaml -- Postgres major and pgvector
+        # Same pin as compose.yaml -- Postgres major and pgvector
         # version both explicit. See docs/DATABASE.md.
         image: pgvector/pgvector:0.8.6-pg17-bookworm
         env:

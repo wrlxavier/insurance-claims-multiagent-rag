@@ -23,6 +23,7 @@ from infrastructure.graph.nodes.intake import _invoke_with_retry, intake
 from infrastructure.graph.prompts.scope_preamble import SCOPE_PREAMBLE
 from infrastructure.graph.schemas import IntakeOutput, MissingInfoTag
 from infrastructure.graph.state import ExtractedEntities
+from infrastructure.rag.retrieved_clause import RetrievedClause
 
 
 class _FakeRaw:
@@ -70,7 +71,7 @@ class _StubRetriever:
 
     def retrieve(
         self, question: str, *, k: int, metadata_filter: object | None = None
-    ) -> list[str]:
+    ) -> list[RetrievedClause]:
         return []
 
 
