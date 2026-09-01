@@ -244,6 +244,78 @@ def test_missing_info_tags_match_the_synthetic_claim_missing_fact_types() -> Non
 
 
 @pytest.mark.unit
+def test_intake_merges_a_re_entry_over_the_previous_entities() -> None:
+    prior = ExtractedEntities(
+        event_type="colisão", product_line="CASCO", estimated_amount=15000.0
+    )
+    # this pass re-reads the same narrative and finds only the event type
+    model = FakeChatModel(IntakeOutput(event_type="colisão"))
+
+    state = {"claim_id": "c1", "raw_claim_text": "bati o carro", "entities": prior}
+    result = intake(cast(Any, state), Runtime(context=_context(model)))
+
+    merged = cast(ExtractedEntities, result["entities"])
+    assert merged.event_type == "colisão"
+    assert merged.product_line == "CASCO"  # prior value kept, not lost
+    assert merged.estimated_amount == 15000.0
+
+
+@pytest.mark.unit
+def test_intake_re_entry_lets_a_fresh_non_null_value_win() -> None:
+    prior = ExtractedEntities(description="algo vago", product_line=None)
+    model = FakeChatModel(
+        IntakeOutput(description="bateu numa mureta", product_line="CASCO")
+    )
+
+    result = intake(
+        cast(Any, {"claim_id": "c1", "raw_claim_text": "...", "entities": prior}),
+        Runtime(context=_context(model)),
+    )
+
+    merged = cast(ExtractedEntities, result["entities"])
+    assert merged.description == "bateu numa mureta"
+    assert merged.product_line == "CASCO"
+
+
+@pytest.mark.unit
+def test_intake_prompt_names_questions_already_asked_on_re_entry() -> None:
+    from infrastructure.graph.state import ClarificationQuestion
+
+    model = FakeChatModel(_FULL_OUTPUT)
+    asked = [
+        ClarificationQuestion(field="data_evento_vigencia", question="Quando foi?")
+    ]
+
+    intake(
+        cast(
+            Any,
+            {
+                "claim_id": "c1",
+                "raw_claim_text": "bati o carro no portao",
+                "clarification_questions": asked,
+            },
+        ),
+        Runtime(context=_context(model)),
+    )
+
+    messages = cast(list[BaseMessage], model.received[0])
+    system_text = str(messages[0].content)
+    assert "Quando foi?" in system_text
+    assert messages[1].content == "bati o carro no portao"
+
+
+@pytest.mark.unit
+def test_intake_prompt_is_unchanged_without_clarification_history() -> None:
+    from infrastructure.graph.prompts.intake import build_intake_prompt
+
+    model = FakeChatModel(_FULL_OUTPUT)
+    _run(model)
+
+    messages = cast(list[BaseMessage], model.received[0])
+    assert str(messages[0].content) == build_intake_prompt()
+
+
+@pytest.mark.unit
 def test_intake_runs_as_a_node_in_a_compiled_state_graph() -> None:
     from infrastructure.graph.state import ClaimState
 

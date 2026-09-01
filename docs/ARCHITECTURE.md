@@ -123,3 +123,43 @@ type is `dict[str, object]`, not `ClaimState` — a partial return typed
 first two parameters are not `(state, runtime)`.
 `tests/architecture/test_scope_vocabulary.py` already scans the same tree for
 verdict-vocabulary drift.
+
+---
+
+## The clarification loop is self-capping in the router, not in the framework — [M4-03]
+
+**Decision.** When intake leaves `missing_information` non-empty, a conditional
+edge routes the claim to a `clarification` node (one specific question per gap)
+and back to `intake`. `route_after_intake` in
+`app/src/infrastructure/graph/build.py` — the first real graph assembly, which
+every later M4 node issue extends — enforces the cap: once `clarification_rounds`
+reaches `MAX_CLARIFICATION_ROUNDS` (a module constant, `2`) with gaps still open,
+it routes to a deterministic `clarification_exhausted` node that sets
+`clarification_exhausted = True`, and the graph ends. Loop termination is a
+property of the router plus the counter; the graph never depends on LangGraph's
+`recursion_limit` / `GraphRecursionError`.
+
+**Why the cap is a code constant, not an `.env` setting.** The clarification cap
+is product behaviour — "ask, then follow up once, then escalate to a human" —
+defined and tested in code, exactly like the retry constants in
+`application/use_cases/llm_retry_defaults.py`. The `.env` LLM knobs
+(`LLM_*_PROVIDER_ORDER`, `LLM_CLASSIFICATION_MAX_WORKERS`) are deployment-
+environment concerns; the number of times a claims bot re-asks is not.
+
+**Why `clarification_exhausted` is its own state channel.** It means "the
+claimant never supplied enough to proceed", which [M4-08] maps to
+`INSUFFICIENT_INFORMATION` and [M4-10] catalogues as a distinct failure mode. It
+is deliberately *not* folded into `context_sufficient` (owned by [M4-04] and the
+[M3-07] retrieval gate — "retrieval did not return enough"), nor written as a
+citation-free `CompatibilityAssessment` into the `compatibility` channel (whose
+"every assertion cites a clause" contract is [M4-05]'s). The open gaps stay
+listed in `missing_information`.
+
+**Why intake merges on re-entry.** The DoD requires accumulated context to
+survive an iteration. The `intake` node reads the previous `entities` and the
+questions already asked, feeds the questions into its prompt, and null-coalesces
+its fresh extraction over the prior one (fresh non-null wins; prior non-null
+fills a fresh gap). Extraction re-runs, but an already-known fact is never lost.
+`missing_information` is recomputed fresh so an answered gap drops off.
+
+Full method and the committed measurement: `docs/CLARIFICATION_LOOP.md`.

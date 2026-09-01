@@ -8,6 +8,8 @@ objects with the retrieved clauses' provenance).
 
 ``IntakeOutput`` ([M4-02]) is the first: it maps onto ``ExtractedEntities`` and
 routes ``missing_information`` to its own ``ClaimState`` channel.
+``ClarificationOutput`` ([M4-03]) is the second: the clarification node maps
+each ``ClarificationQuestionItem`` onto a ``state.ClarificationQuestion``.
 """
 
 from typing import Literal
@@ -116,3 +118,38 @@ class IntakeOutput(BaseModel):
             "complete enough to proceed."
         ),
     )
+
+
+class ClarificationQuestionItem(BaseModel):
+    """One (gap, question) pair the clarification node ([M4-03]) produces.
+
+    ``field`` is the ``missing_information`` tag the question is meant to
+    close; ``question`` is the concrete thing to ask the claimant. The node
+    maps this onto ``state.ClarificationQuestion`` and guarantees exactly one
+    item per input gap -- filling any tag the model omits from a per-tag
+    fallback template.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field: MissingInfoTag
+    question: str = Field(
+        description=(
+            "One specific question, in informal Brazilian Portuguese, whose "
+            "answer would close exactly this gap and no other. Refer to what "
+            "the claimant already said. Never a generic 'send more details'."
+        )
+    )
+
+
+class ClarificationOutput(BaseModel):
+    """The clarification node's ([M4-03]) structured set of questions.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)`` -- one
+    ``ClarificationQuestionItem`` per gap in the current ``missing_information``
+    list.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    questions: list[ClarificationQuestionItem]

@@ -112,6 +112,23 @@ class ExtractedEntities(BaseModel):
     product_line: str | None = None
 
 
+class ClarificationQuestion(BaseModel):
+    """One question the clarification loop ([M4-03]) put to the claimant.
+
+    ``field`` is one of ``schemas.MissingInfoTag``'s values -- typed ``str``
+    here, not that ``Literal``, so ``state.py`` keeps importing nothing from
+    ``schemas.py`` (the two schemas are deliberately separate). The value is
+    constrained to the tag set upstream, by ``schemas.ClarificationOutput``.
+    The clarification node accumulates these across rounds; there is no channel
+    reducer because only that one sequential node ever writes them.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field: _NonEmptyStr
+    question: _NonEmptyStr
+
+
 class CompatibilityAssessment(BaseModel):
     """The compatibility node's ([M4-05]) structured verdict.
 
@@ -225,14 +242,26 @@ class ClaimState(_ClaimStateIn, total=False):
     ``audit_trail`` is the only channel with a reducer: the parallel
     assessment nodes write disjoint fields otherwise (``compatibility`` vs
     ``consistency``), and ``entities`` / ``missing_information`` are rewritten
-    by the sequential clarification passes, where last-write-wins is intended
-    ([M4-03] adds its own accumulator if it needs one).
+    by the sequential clarification passes, where last-write-wins is intended.
+    [M4-03]'s ``clarification_questions`` is accumulated by the clarification
+    node itself (``prior + new``), which is the "own accumulator" this note
+    anticipated -- still no channel reducer, because that one sequential node
+    is its only writer.
     """
 
     # intake + clarification loop -- M4-02, M4-03
     entities: ExtractedEntities | None
     missing_information: list[str]
     clarification_rounds: int
+    # every question the loop has asked, across every round -- accumulated by
+    # the clarification node, no reducer (sole writer, runs sequentially)
+    clarification_questions: list[ClarificationQuestion]
+    # set once by the terminal clarification_exhausted node when the loop hits
+    # MAX_CLARIFICATION_ROUNDS with gaps still open: "terminate as
+    # insufficient_information, gaps listed" (the gaps stay in
+    # missing_information). A plain bool, not a Literal outcome -- there is no
+    # "resolved" writer or consumer to justify one yet.
+    clarification_exhausted: bool
     # retrieval -- M4-04
     citations: list[Citation]
     context_sufficient: bool | None

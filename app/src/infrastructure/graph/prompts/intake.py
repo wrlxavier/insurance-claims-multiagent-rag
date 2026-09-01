@@ -5,9 +5,15 @@
 every call -- that turns a free-text Brazilian-Portuguese claim narrative into
 an ``IntakeOutput``. The claim text itself is a separate human message the node
 adds; per the [M4-01b] convention, no prompt text lives in the node function.
+
+On a clarification-loop re-entry ([M4-03]) the node passes the questions
+already put to the claimant; the prompt then names them so the pass does not
+simply re-flag the same gaps. With no such questions the output is byte-for-
+byte the first-pass prompt.
 """
 
 from infrastructure.graph.prompts.scope_preamble import with_scope_preamble
+from infrastructure.graph.state import ClarificationQuestion
 
 # code -> one-line description, taken from data/README.md so the model
 # classifies against the same definitions the corpus documentation uses. Keys
@@ -68,8 +74,15 @@ MISSING_INFO_GUIDE: dict[str, str] = {
 }
 
 
-def build_intake_prompt() -> str:
-    """Return the intake node's system prompt: scope preamble + extraction task."""
+def build_intake_prompt(
+    asked_questions: list[ClarificationQuestion] | None = None,
+) -> str:
+    """Return the intake node's system prompt: scope preamble + extraction task.
+
+    ``asked_questions`` -- the clarification loop's questions so far -- adds a
+    short block when non-empty; ``None`` or ``[]`` leaves the prompt identical
+    to the first pass.
+    """
     product_lines = "\n".join(
         f"- {code}: {description}" for code, description in PRODUCT_LINE_GUIDE.items()
     )
@@ -105,4 +118,23 @@ is met -- a fact that would stop an analyst from even starting, not merely one \
 that more precision would improve. When in doubt, leave it out.
 {missing_tags}
 """
+    body += _asked_questions_block(asked_questions)
     return with_scope_preamble(body)
+
+
+def _asked_questions_block(
+    asked_questions: list[ClarificationQuestion] | None,
+) -> str:
+    """A trailing note listing questions already put to the claimant, or ``""``."""
+    if not asked_questions:
+        return ""
+    lines = "\n".join(
+        f"- ({question.field}) {question.question}" for question in asked_questions
+    )
+    return (
+        "\nThese questions have already been put to the claimant on earlier "
+        "rounds and are still unanswered. Do not re-flag a gap the claimant "
+        "was already asked about unless the narrative still gives you nothing "
+        "for it:\n"
+        f"{lines}\n"
+    )
