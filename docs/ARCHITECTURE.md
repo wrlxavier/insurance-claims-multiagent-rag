@@ -280,3 +280,91 @@ no-context guard, the audit event); `tests/eval/test_compatibility_baseline.py`
 (eval-marked, skips without a reasoning model + the retrieval stack).
 
 Full method and the committed measurement: `docs/COMPATIBILITY_ASSESSMENT.md`.
+
+---
+
+## The consistency node splits arithmetic from judgement, and only signals — [M4-06]
+
+**Decision.** The consistency node
+(`app/src/infrastructure/graph/nodes/consistency.py`) reads a claim for
+*internal* consistency and runs two legs. The **deterministic** leg
+(`app/src/infrastructure/graph/consistency_checks.py`) is plain Python over the
+entities intake extracted, executed **unconditionally**, with no model: a stated
+`event_date` in the future or long past, an `estimated_amount` outside crude BRL
+bands, a field intake populated while also tagging it missing, a `product_line`
+whose registered definition is contradicted by a token in the event text. The
+**semantic** leg is one call on the *fast* model
+(`GraphContext.fast_model`), structured into `schemas.ConsistencyOutput`, for
+the judgement the first leg cannot make: narrative coherence, description vs.
+stated event type, vagueness where a claimant would give detail. The two legs'
+signals merge into one `state.ConsistencyReport`, each `ConsistencySignal`
+tagged `source` (`"deterministic"` / `"llm"`). The node emits **two**
+`AuditEvent` rows — `action="deterministic_checks"` (`model` / `token_usage` /
+`confidence` all `None`, the absence being the record that no model ran) and
+`action="semantic_judgement"` — so the boundary is visible in the trail itself.
+[M4-07] wires this node alongside the compatibility node; `build.py` is untouched
+here.
+
+**Why the split falls where it does.** The rule is: *string / number / set
+equality is Python; "do these two prose fields disagree in meaning" is the
+model's.* Whether a date is after today, whether a number is in band, whether an
+event token collides with a product line's own definition — none of that needs a
+language model's permission, and routing it through one turns a system that is
+right into one that is usually right. This is the same principle as exclusion
+co-retrieval ([M3-06] above): *a structural fact the system should not need a
+model's permission to act on.* The product-line/event-type check is deliberately
+a closed contradiction table, not a re-run of intake's classifier: it fires only
+on a positive, un-negated token collision, never proposes an alternative line,
+and stays silent when `product_line` is `None` — a hit means intake's own
+classification disagrees with the event text intake itself extracted. The table
+holds only the two lines with an absolute definitional constraint (GAR.EST — no
+external cause; ASSIST — a service, not indemnification); CASCO vs. RCF-A turns
+on *who* was damaged, which a terse extracted description renders unreliably, so
+those lines were dropped after the first eval run flagged coherent claims. Full
+account: `docs/CONSISTENCY_NODE.md`.
+
+**Why `fast_model`, not the reasoning model.** The semantic leg is a scan for
+inconsistencies, not legal reasoning — it matches the fast model's weight and
+the `clarification` node's precedent (lightweight structured output, graceful
+degradation). The failure path is non-fatal: a model call that fails every retry
+degrades to the deterministic signals alone and the node records that, it never
+raises. And once [M4-07] runs this node and the compatibility node in the same
+superstep, using the fast model here keeps the parallel branch from being two
+reasoning-model calls on the critical path.
+
+**Why signals, not a verdict.** `ConsistencyOutput` and `ConsistencySignal`
+carry no verdict field, and the prompt says so explicitly (the scope preamble
+names the verdict vocabulary the *other* nodes use, which is a tension worth
+removing in words). The node flags for human attention; [M4-08] presents those
+flags as attention points kept separate from the compatibility verdict, and
+[M4-10] treats a signal as triage input, never a verdict.
+
+**Why this is not a fraud detector.** Stated in the code (the module docstrings
+of both `consistency_checks.py` and `nodes/consistency.py`), the prompt (which
+forbids speculation about intent), and here. The data carries no fraud labels
+and the method — four range checks plus an LLM reading for coherence — is not
+one. `docs/SCOPE.md` is the canonical statement; this entry and the code must
+stay consistent with it. Whether the event date falls inside the policy period —
+the issue's motivating example — is **not** attempted: the corpus is registered
+product conditions, not contracts, so it carries no vigência to compare against;
+intake's `data_evento_vigencia` tag records that gap.
+
+**LangGraph v1.** The node introduces no new idiom — it copies the
+`compatibility` node's shape (`Runtime[GraphContext]` / `runtime.context`,
+`with_structured_output(..., include_raw=True)` → `{"parsed", "raw"}`, a
+module-local `_invoke_with_retry`). No deprecated `config_schema` /
+`config["configurable"]`.
+
+**Enforcement.** `tests/architecture/test_graph_node_conventions.py` (plain
+`(state, runtime)` function, `_`-prefixed helpers) and
+`test_scope_vocabulary.py` (whole-package rglob — no forbidden verdict
+vocabulary in the new module or prompt);
+`tests/unit/infrastructure/graph/test_consistency_checks.py` (every deterministic
+check in isolation, no LLM import — the DoD's "unit-test every deterministic
+check in isolation");
+`tests/unit/infrastructure/graph/test_consistency.py` (unit, fake fast model —
+the leg merge, the degrade path, the two audit events, the no-verdict guards);
+`tests/eval/test_consistency_baseline.py` (eval-marked, skips without
+`LLM_PROVIDER`).
+
+Full method and the committed measurement: `docs/CONSISTENCY_NODE.md`.
