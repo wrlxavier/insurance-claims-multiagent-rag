@@ -10,6 +10,10 @@ objects with the retrieved clauses' provenance).
 routes ``missing_information`` to its own ``ClaimState`` channel.
 ``ClarificationOutput`` ([M4-03]) is the second: the clarification node maps
 each ``ClarificationQuestionItem`` onto a ``state.ClarificationQuestion``.
+``CompatibilityOutput`` ([M4-05]) is the third: the compatibility node maps its
+``verdict`` onto ``domain.verdict.Verdict``, renders its ``assertions`` into the
+plain ``reasoning`` string ``state.CompatibilityAssessment`` holds, and hydrates
+a ``state.Citation`` per cited clause id from the clauses retrieval put in state.
 """
 
 from typing import Literal
@@ -153,3 +157,79 @@ class ClarificationOutput(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     questions: list[ClarificationQuestionItem]
+
+
+# The M0-06 verdict vocabulary, redeclared as a ``Literal`` for the structured
+# output rather than imported from ``domain.verdict.Verdict`` -- same reason
+# ``MissingInfoTag`` is redeclared: ``schemas.py`` stays free of cross-package
+# imports, and the compatibility node ([M4-05]) maps the string onto ``Verdict``.
+# ``tests/unit/infrastructure/graph/test_compatibility.py`` guards the match.
+CompatibilityVerdict = Literal["compatible", "incompatible", "insufficient_information"]
+
+
+class ReasonedAssertion(BaseModel):
+    """One statement the compatibility node ([M4-05]) makes, with its clause backing.
+
+    The DoD's hard rule -- "every assertion in the reasoning references at least
+    one clause id" -- is enforced on this object: the node rejects a
+    ``compatible`` / ``incompatible`` output carrying an assertion whose
+    ``clause_ids`` is empty or names a clause retrieval did not return, and
+    retries. Modelling the reasoning as a list of (statement, clause_ids) pairs
+    makes that a field check rather than a parse of free prose.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    statement: str = Field(
+        description=(
+            "One factual claim, in Brazilian Portuguese, about whether the "
+            "described event is consistent with the registered product's "
+            "conditions. Keep each assertion to a single point."
+        )
+    )
+    clause_ids: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The ids of the retrieved clauses that support THIS statement, "
+            "copied verbatim from the numbered clause list. At least one for "
+            "every statement, unless the verdict is insufficient_information."
+        ),
+    )
+
+
+class CompatibilityOutput(BaseModel):
+    """The compatibility node's ([M4-05]) structured verdict.
+
+    The exact shape passed to ``reasoning_model.with_structured_output(...)``.
+    The node maps ``verdict`` onto ``domain.verdict.Verdict``, renders
+    ``assertions`` into the plain ``reasoning`` string that
+    ``state.CompatibilityAssessment`` holds, and hydrates a ``state.Citation``
+    for every clause id the assertions cite from the clauses in
+    ``ClaimState.citations``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    verdict: CompatibilityVerdict = Field(
+        description=(
+            "compatible when the retrieved clauses show the event fits the "
+            "product's conditions; incompatible when a retrieved clause "
+            "(typically an exclusion) rules it out; insufficient_information "
+            "when the retrieved clauses do not settle the question -- never a "
+            "guess."
+        )
+    )
+    assertions: list[ReasonedAssertion] = Field(
+        default_factory=list,
+        description=(
+            "The reasoning, one assertion at a time. When both a coverage "
+            "clause and an exclusion were retrieved, weigh them against each "
+            "other explicitly in the assertions and cite both. Empty only for "
+            "insufficient_information when nothing relevant was retrieved."
+        ),
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="How firmly the retrieved clauses settle the question, 0-1.",
+    )

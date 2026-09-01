@@ -178,8 +178,9 @@ plus the product line; `None` when neither is known, the [M3-04] unconstrained
 degradation path), calls the port, maps every returned clause to a `state.Citation`,
 assembles a [M3-07] `GateSignals` from the reranker scores and runs `evaluate_gate`
 to set `context_sufficient`. The router `route_after_retrieval` in `build.py` acts
-on that flag; both its keys (`"assess"` / `"insufficient"`) terminate at `END`
-until [M4-05]/[M4-07]/[M4-08] wire the downstream nodes.
+on that flag; `"assess"` enters the compatibility node ([M4-05], which [M4-07]
+widens into a fan-out), `"insufficient"` terminates at `END` until [M4-08]
+consumes it.
 
 **Why the port returns `RetrievedClause`, not clause-id strings.** A `Citation`
 needs the clause's document, SUSEP process, clause type and a quoted excerpt, and
@@ -222,3 +223,60 @@ plain `(state, runtime)` function with `_`-prefixed helpers, no LLM schema);
 `tests/eval/test_retrieval_node_baseline.py` (eval-marked, skips without the stack).
 
 Full method and the committed measurement: `docs/RETRIEVAL_NODE.md`.
+
+---
+
+## The compatibility node grounds every assertion in a retrieved clause — [M4-05]
+
+**Decision.** The compatibility node
+(`app/src/infrastructure/graph/nodes/compatibility.py`) is the node that answers
+the question. It reads `state.citations` and `state.entities`, calls the
+**reasoning** model (`GraphContext.reasoning_model`, pinned by
+`LlmSettings.llm_reasoning_provider_order` — [M4-05] is its first consumer),
+structured output into `schemas.CompatibilityOutput`, and writes a
+`state.CompatibilityAssessment` (verdict / reasoning / citations / confidence).
+`route_after_retrieval`'s `"assess"` key now enters it; `compatibility → END`.
+[M4-07] widens that single edge into the fan-out to the compatibility and
+consistency nodes.
+
+**Why the reasoning is a list of `(statement, clause_ids)` pairs, not prose.**
+The DoD requires that *every assertion in the reasoning reference at least one
+clause id*, and that a citation-free assertion be "a malformed output, rejected
+and retried, not post-edited". Modelling `CompatibilityOutput.assertions` as a
+list of `ReasonedAssertion` makes that a field check
+(`_grounding_errors`): for a `compatible` / `incompatible` verdict every
+assertion must carry ≥1 `clause_id`, and every id must be one retrieval actually
+returned. On a violation the node appends a corrective turn naming the offending
+assertions and re-invokes — up to `MAX_GROUNDING_ATTEMPTS` (3, a code constant
+like `RETRIEVAL_K` / `MAX_CLARIFICATION_ROUNDS`). The node then renders the list
+into the plain `reasoning: str` the state model holds and hydrates a
+`state.Citation` per cited id from `state.citations`.
+
+**Why an ungroundable answer degrades to `insufficient_information`.** After the
+retries are spent the node does not raise and does not emit an ungrounded
+`compatible` / `incompatible` verdict — it returns `insufficient_information`
+with confidence `0.0` and a reasoning line recording the failure. An assessment
+that cannot be tied to a clause is exactly the M0-06 "use
+`insufficient_information` rather than guessing" case, and the graph stays
+runnable. A *transient* (network) failure still propagates, via the same
+`_invoke_with_retry` helper intake uses. When retrieval returned nothing at all,
+the node skips the model call entirely and abstains — there is nothing to reason
+over.
+
+**Why the exclusion-weighing rule lives in the prompt.** The DoD asks the node
+to "weigh retrieved exclusions against retrieved coverage explicitly, and say so
+in the reasoning". Exclusion co-retrieval ([M3-06]) already guarantees the
+linked exclusions are in `state.citations`; the prompt instructs the model to
+compare them against the coverage side in an explicit assertion citing both.
+This is a prompt requirement, not a second structural check — the structural
+guarantee is the grounding one above.
+
+**Enforcement.** `tests/architecture/test_graph_node_conventions.py` (plain
+`(state, runtime)` function, `_`-prefixed helpers) and
+`test_scope_vocabulary.py` (no `covered` / `denied` / `coverage decision` in the
+new prompt); `tests/unit/infrastructure/graph/test_compatibility.py` (unit,
+fake reasoning model — the grounding-retry loop, the degrade path, the
+no-context guard, the audit event); `tests/eval/test_compatibility_baseline.py`
+(eval-marked, skips without a reasoning model + the retrieval stack).
+
+Full method and the committed measurement: `docs/COMPATIBILITY_ASSESSMENT.md`.
