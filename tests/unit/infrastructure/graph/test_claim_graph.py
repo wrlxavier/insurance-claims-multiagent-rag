@@ -17,6 +17,7 @@ from langchain_core.runnables import Runnable, RunnableLambda
 from langgraph.graph import START
 
 from domain.clause_classification import ClauseType
+from domain.verdict import Verdict
 from infrastructure.config.enums import LlmProvider
 from infrastructure.config.settings import LlmSettings
 from infrastructure.evaluation.synthetic_claims_schema import SyntheticClaim
@@ -30,7 +31,9 @@ from infrastructure.graph.context import GraphContext, RetrievalPort
 from infrastructure.graph.schemas import (
     ClarificationOutput,
     ClarificationQuestionItem,
+    CompatibilityOutput,
     IntakeOutput,
+    ReasonedAssertion,
 )
 from infrastructure.rag.retrieved_clause import RetrievedClause
 
@@ -55,6 +58,17 @@ class _LoopModel:
             if schema is IntakeOutput:
                 parsed: object = IntakeOutput(
                     product_line="CASCO", missing_information=list(self.missing)
+                )
+            elif schema is CompatibilityOutput:
+                parsed = CompatibilityOutput(
+                    verdict="compatible",
+                    assertions=[
+                        ReasonedAssertion(
+                            statement="A colisão está coberta.",
+                            clause_ids=[_STUB_HIT.clause_id],
+                        )
+                    ],
+                    confidence=0.7,
                 )
             else:
                 parsed = ClarificationOutput(
@@ -179,9 +193,15 @@ def test_complete_claim_passes_straight_through() -> None:
     assert out.get("clarification_exhausted") in (None, False)
     assert not out.get("clarification_questions")
     assert out.get("clarification_rounds", 0) == 0
-    assert [e.node for e in out["audit_trail"]] == ["intake", "retrieval"]
+    assert [e.node for e in out["audit_trail"]] == [
+        "intake",
+        "retrieval",
+        "compatibility",
+    ]
     assert out["context_sufficient"] is True
     assert [c.clause_id for c in out["citations"]] == ["doc-1:1.1"]
+    assert out["compatibility"].verdict is Verdict.COMPATIBLE
+    assert [c.clause_id for c in out["compatibility"].citations] == ["doc-1:1.1"]
 
 
 @pytest.mark.unit

@@ -3,20 +3,20 @@
 [M4-03] is the first issue that needs graph topology (a loop), so this module
 is where ``StateGraph`` wiring lives from now on. Every later M4 node issue
 extends it: [M4-04] added the retrieval node on the ``"proceed"`` branch,
-[M4-07] fans out from retrieval to the two assessment nodes, [M4-08] adds the
-recommendation node, [M4-09] passes a Postgres ``checkpointer`` into
-``.compile()``.
+[M4-05] points the ``"assess"`` branch at the compatibility node, [M4-07] fans
+that branch out to the two assessment nodes, [M4-08] adds the recommendation
+node, [M4-09] passes a Postgres ``checkpointer`` into ``.compile()``.
 
 ``build_claim_graph()`` returns the **uncompiled** ``StateGraph`` on purpose:
 the caller (a test today, the composition root later) owns ``.compile()``, so
 [M4-09] adds ``build_claim_graph().compile(checkpointer=pg_saver)`` without a
 second entry point here.
 
-Topology after [M4-04]::
+Topology after [M4-05]::
 
     START -> intake -> route_after_intake
         "proceed"       -> retrieval -> route_after_retrieval
-                               "assess"       -> END   (until [M4-05]/[M4-07])
+                               "assess"       -> compatibility -> END
                                "insufficient" -> END   (until [M4-08])
         "clarification" -> clarification -> intake   (loop)
         "exhausted"     -> clarification_exhausted -> END
@@ -27,10 +27,11 @@ The loop is self-capping: ``route_after_intake`` sends the claim to
 this router plus the cap -- the graph never relies on LangGraph's
 ``recursion_limit`` / ``GraphRecursionError``.
 
-``route_after_retrieval`` returns abstract keys (``"assess"`` / ``"insufficient"``)
-that both map to ``END`` for now -- the same way [M4-03] pre-wired ``"proceed"``.
-[M4-05]/[M4-07] repoint ``"assess"``; [M4-08] consumes ``context_sufficient`` on
-the ``"insufficient"`` path.
+``route_after_retrieval`` returns abstract keys (``"assess"`` / ``"insufficient"``).
+[M4-05] points ``"assess"`` at the compatibility node (a single edge);
+[M4-07] widens that into a fan-out to the compatibility and consistency nodes
+with a fan-in. ``"insufficient"`` still maps to ``END`` -- [M4-08] consumes
+``context_sufficient`` on that path.
 """
 
 from typing import Literal
@@ -40,6 +41,7 @@ from langgraph.graph import END, START, StateGraph
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.nodes.clarification import clarification
 from infrastructure.graph.nodes.clarification_exhausted import clarification_exhausted
+from infrastructure.graph.nodes.compatibility import compatibility
 from infrastructure.graph.nodes.intake import intake
 from infrastructure.graph.nodes.retrieval import retrieval
 from infrastructure.graph.state import ClaimState
@@ -74,8 +76,9 @@ def route_after_retrieval(state: ClaimState) -> Literal["assess", "insufficient"
 
     ``context_sufficient is False`` -> ``"insufficient"``; anything else (the
     gate said the context settles the question, or -- defensively -- no flag was
-    written) -> ``"assess"``. Both keys terminate at ``END`` until [M4-05]/
-    [M4-07] wire the assessment branch and [M4-08] the insufficient path.
+    written) -> ``"assess"``. ``"assess"`` enters the compatibility node
+    ([M4-05]); [M4-07] fans it out to the two assessment nodes. ``"insufficient"``
+    terminates at ``END`` until [M4-08] consumes that path.
     """
     if state.get("context_sufficient") is False:
         return "insufficient"
@@ -89,6 +92,7 @@ def build_claim_graph() -> _ClaimGraph:
     builder.add_node("clarification", clarification)
     builder.add_node("clarification_exhausted", clarification_exhausted)
     builder.add_node("retrieval", retrieval)
+    builder.add_node("compatibility", compatibility)
 
     builder.add_edge(START, "intake")
     builder.add_conditional_edges(
@@ -105,6 +109,7 @@ def build_claim_graph() -> _ClaimGraph:
     builder.add_conditional_edges(
         "retrieval",
         route_after_retrieval,
-        {"assess": END, "insufficient": END},
+        {"assess": "compatibility", "insufficient": END},
     )
+    builder.add_edge("compatibility", END)
     return builder
