@@ -14,6 +14,11 @@ each ``ClarificationQuestionItem`` onto a ``state.ClarificationQuestion``.
 ``verdict`` onto ``domain.verdict.Verdict``, renders its ``assertions`` into the
 plain ``reasoning`` string ``state.CompatibilityAssessment`` holds, and hydrates
 a ``state.Citation`` per cited clause id from the clauses retrieval put in state.
+``ConsistencyOutput`` ([M4-06]) is the fourth and covers only the *semantic*
+half of that node: the node maps each ``ConsistencySignalItem`` onto a
+``state.ConsistencySignal`` with ``source="llm"``, and concatenates them after
+the deterministic signals ``infrastructure.graph.consistency_checks`` produced.
+It carries no verdict -- the consistency node signals, it does not decide.
 """
 
 from typing import Literal
@@ -232,4 +237,73 @@ class CompatibilityOutput(BaseModel):
         ge=0.0,
         le=1.0,
         description="How firmly the retrieved clauses settle the question, 0-1.",
+    )
+
+
+# The semantic-judgement categories the consistency node ([M4-06]) asks the fast
+# model for -- narrative coherence, description vs. stated event type, and
+# vagueness where a figure or a detail would be expected. Constrained to a
+# ``Literal`` (not free ``str``) so ``scripts/eval_consistency.py`` can aggregate
+# the signal distribution by category rather than by whatever label the model
+# invents. The deterministic checks in
+# ``infrastructure.graph.consistency_checks`` emit their own stable names.
+ConsistencyCheckName = Literal[
+    "narrative_coherence",
+    "description_event_type_mismatch",
+    "unexpected_vagueness",
+]
+
+
+class ConsistencySignalItem(BaseModel):
+    """One semantic inconsistency the consistency node ([M4-06]) flags.
+
+    The node maps this onto ``state.ConsistencySignal`` with ``source="llm"``.
+    There is no verdict field here or on ``ConsistencyOutput``: this node
+    signals for human attention and decides nothing.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    check: ConsistencyCheckName = Field(
+        description=(
+            "Which kind of inconsistency this is: narrative_coherence (the "
+            "described sequence of events does not hold together), "
+            "description_event_type_mismatch (the free description does not "
+            "match the stated event type), or unexpected_vagueness (a "
+            "material loss is described with no detail a claimant would "
+            "normally give)."
+        )
+    )
+    severity: Literal["info", "attention"] = Field(
+        description=(
+            "attention when a reviewer should look before proceeding; info "
+            "when it is a minor note."
+        )
+    )
+    detail: str = Field(
+        description=(
+            "One sentence, in Brazilian Portuguese, naming the specific "
+            "inconsistency for a human reviewer. No verdict, no speculation "
+            "about intent."
+        )
+    )
+
+
+class ConsistencyOutput(BaseModel):
+    """The consistency node's ([M4-06]) semantic-judgement output.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)``. A
+    short list -- often empty -- of ``ConsistencySignalItem``. No verdict: the
+    node returns signals for a human, never a decision.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    signals: list[ConsistencySignalItem] = Field(
+        default_factory=list,
+        description=(
+            "The internal inconsistencies you found, at most a handful. Empty "
+            "when the narrative is internally coherent -- which is the common "
+            "case. Never a verdict on the claim."
+        ),
     )
