@@ -6,6 +6,13 @@ One LLM call on the fast model, structured output into
 clarification loop ([M4-03]) consumes. The node never invents a value it did
 not read: an absent fact stays null and, when it is load-bearing, becomes a
 ``missing_information`` tag.
+
+On a re-entry from the clarification loop ([M4-03]) the node keeps what it
+already learned: it feeds the questions already put to the claimant into the
+prompt, and merges this pass's extraction over the previous ``entities`` --
+a new non-null value wins, a previous non-null value fills any gap this pass
+left null. ``missing_information`` is recomputed fresh each pass (an answered
+gap must drop off), which is the last-write-wins the state schema intends.
 """
 
 import time
@@ -37,22 +44,30 @@ def intake(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, objec
     """Extract structured entities from ``raw_claim_text`` and flag what is missing."""
     context = runtime.context
     raw_claim_text = state["raw_claim_text"]
+    prior_entities = state.get("entities")
+    asked_questions = list(state.get("clarification_questions") or [])
 
     structured: Runnable[Any, Any] = context.fast_model.with_structured_output(
         IntakeOutput, include_raw=True
     )
-    messages = [SystemMessage(build_intake_prompt()), HumanMessage(raw_claim_text)]
+    messages = [
+        SystemMessage(build_intake_prompt(asked_questions)),
+        HumanMessage(raw_claim_text),
+    ]
     result = _invoke_with_retry(structured, messages)
     parsed = cast(IntakeOutput, result["parsed"])
 
-    entities = ExtractedEntities(
-        event_type=parsed.event_type,
-        event_date=parsed.event_date,
-        description=parsed.description,
-        estimated_amount=parsed.estimated_amount,
-        vehicle_info=parsed.vehicle_info,
-        susep_process=parsed.susep_process,
-        product_line=parsed.product_line,
+    entities = _merge_entities(
+        prior_entities,
+        ExtractedEntities(
+            event_type=parsed.event_type,
+            event_date=parsed.event_date,
+            description=parsed.description,
+            estimated_amount=parsed.estimated_amount,
+            vehicle_info=parsed.vehicle_info,
+            susep_process=parsed.susep_process,
+            product_line=parsed.product_line,
+        ),
     )
     missing_information = list(dict.fromkeys(parsed.missing_information))
 
@@ -68,6 +83,27 @@ def intake(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, objec
         "missing_information": missing_information,
         "audit_trail": [audit_event],
     }
+
+
+def _merge_entities(
+    prior: ExtractedEntities | None, fresh: ExtractedEntities
+) -> ExtractedEntities:
+    """Combine a re-entry's extraction with the previous pass's ``entities``.
+
+    First pass (``prior is None``): ``fresh`` unchanged. Otherwise, per field:
+    the fresh non-null value wins, and a prior non-null value fills any field
+    the fresh pass left null -- an already-extracted fact is never lost when
+    the loop restarts extraction from the same narrative.
+    """
+    if prior is None:
+        return fresh
+    merged = {
+        name: getattr(fresh, name)
+        if getattr(fresh, name) is not None
+        else getattr(prior, name)
+        for name in ExtractedEntities.model_fields
+    }
+    return ExtractedEntities(**merged)
 
 
 def _invoke_with_retry(
