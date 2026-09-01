@@ -102,8 +102,9 @@ type is `dict[str, object]`, not `ClaimState` — a partial return typed
 
 1. `schemas.py`: add `class <Node>Output(BaseModel)` (frozen) — the exact shape
    passed to `.with_structured_output(...)`. Map it onto the `state.py`
-   sub-model inside the node (the model returns clause-id strings; the node
-   hydrates `Citation` objects from the retrieved clauses' provenance).
+   sub-model inside the node. A deterministic node makes no LLM call, so it adds
+   no schema and no prompt file — the retrieval node ([M4-04]) is the first of
+   those.
 2. `prompts/<node>.py`: add `build_<node>_prompt(...) -> str` returning
    `with_scope_preamble(body)`.
 3. `nodes/<node>.py`: the function. Take `fast_model` / `reasoning_model` /
@@ -163,3 +164,61 @@ fills a fresh gap). Extraction re-runs, but an already-known fact is never lost.
 `missing_information` is recomputed fresh so an answered gap drops off.
 
 Full method and the committed measurement: `docs/CLARIFICATION_LOOP.md`.
+
+---
+
+## The retrieval node wraps the M3 pipeline behind a widened port — [M4-04]
+
+**Decision.** The retrieval node (`app/src/infrastructure/graph/nodes/retrieval.py`)
+depends only on `RetrievalPort` (`infrastructure/graph/context.py`). It builds the
+query from the extracted *entities* (`_build_query` — `event_type` + `description`
++ `vehicle_info`, never the raw claim text), builds the metadata pre-filter from
+intake's classification (`_build_filter` — SUSEP process when the claim stated one,
+plus the product line; `None` when neither is known, the [M3-04] unconstrained
+degradation path), calls the port, maps every returned clause to a `state.Citation`,
+assembles a [M3-07] `GateSignals` from the reranker scores and runs `evaluate_gate`
+to set `context_sufficient`. The router `route_after_retrieval` in `build.py` acts
+on that flag; both its keys (`"assess"` / `"insufficient"`) terminate at `END`
+until [M4-05]/[M4-07]/[M4-08] wire the downstream nodes.
+
+**Why the port returns `RetrievedClause`, not clause-id strings.** A `Citation`
+needs the clause's document, SUSEP process, clause type and a quoted excerpt, and
+the gate needs the rank-1 reranker score — none of which a `list[str]` carries.
+The port now returns `list[RetrievedClause]`
+(`infrastructure/rag/retrieved_clause.py`): a frozen row with the provenance and
+the score, ranked best-first. It lives in `infrastructure.rag`, referenced by the
+graph port under `TYPE_CHECKING` exactly as `RetrievalFilter` already is — no new
+import edge in either direction. The node does a trivial 1:1 field map; the seam
+stays where "a retrieval hit" becomes "a clause an assertion cites".
+
+**Deviation on record.** [M4-01b] wrote that the port "returns ranked clause-id
+strings only — the retrieval node hydrates `Citation` objects itself", anticipating
+an LLM retrieval node that emits ids. [M4-04] is deterministic instead: the widened
+port hands back hydrated, scored rows and the node maps them. `context.py` reserved
+this change ("[M4-04] owns any change to this shape"); the [M4-01b] entry's step-1
+line is updated to match.
+
+**Why a single bridge module.** `GraphRetrievalAdapter`
+(`infrastructure/rag/graph_retrieval_adapter.py`) is the one place that composes
+the M3 retrievers (`HybridRetriever` → cross-encoder rerank → optional
+`ExclusionCoRetrievalRetriever`) and hydrates from the chunk corpus. It reranks by
+hand rather than through `RerankingRetriever`, which discards the scores the gate
+needs — the same reason `scripts/eval_insufficient_context_gate.py` re-implements
+that step. A co-retrieved exclusion clause carries `score = 0.0`: co-retrieval
+never re-scores, so rank-1 — the gate's only score signal — is unchanged, and the
+gate's calibration (hybrid + rerank, no co-retrieval) still holds.
+
+**Why `context_sufficient` is the node's, not the router's.** The gate decision is
+retrieval's concern; the routing is topology. The node records the boolean and the
+`GateTrigger` in its `AuditEvent`; `route_after_retrieval` only reads the boolean.
+This keeps `context_sufficient` ("retrieval did not return enough") distinct from
+`clarification_exhausted` ("the claimant never supplied enough"), as the [M4-03]
+entry requires.
+
+**Enforcement.** `tests/architecture/test_graph_node_conventions.py` (the node is a
+plain `(state, runtime)` function with `_`-prefixed helpers, no LLM schema);
+`tests/unit/infrastructure/graph/test_retrieval.py` and
+`tests/unit/infrastructure/rag/test_graph_retrieval_adapter.py` (unit, fakes only);
+`tests/eval/test_retrieval_node_baseline.py` (eval-marked, skips without the stack).
+
+Full method and the committed measurement: `docs/RETRIEVAL_NODE.md`.

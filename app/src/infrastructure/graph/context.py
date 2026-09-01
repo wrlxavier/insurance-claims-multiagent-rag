@@ -18,6 +18,7 @@ from infrastructure.config.settings import LlmSettings
 
 if TYPE_CHECKING:
     from infrastructure.rag.retrieval_filter import RetrievalFilter
+    from infrastructure.rag.retrieved_clause import RetrievedClause
 
 
 class RetrievalPort(Protocol):
@@ -27,9 +28,12 @@ class RetrievalPort(Protocol):
     (``infrastructure.evaluation.retriever.FilterableRetriever``) so a concrete
     hybrid/rerank retriever satisfies it structurally, without the graph
     importing a concrete implementation or the evaluation harness's interface
-    ([M4-04]). ``retrieve`` returns ranked clause-id strings only -- the
-    retrieval node hydrates ``Citation`` objects itself. [M4-04] owns any
-    change to this shape.
+    ([M4-04]). ``retrieve`` returns ranked, scored, hydrated
+    ``infrastructure.rag.retrieved_clause.RetrievedClause`` rows -- the retrieval
+    node ([M4-04]) maps each to a ``state.Citation`` and assembles the [M3-07]
+    ``GateSignals`` from the scores. A bare-clause-id retriever does not satisfy
+    this port; [infrastructure.rag.graph_retrieval_adapter.GraphRetrievalAdapter]
+    is the adapter that does. [M4-04] owns any further change to this shape.
     """
 
     def retrieve(
@@ -38,8 +42,8 @@ class RetrievalPort(Protocol):
         *,
         k: int,
         metadata_filter: "RetrievalFilter | None" = None,
-    ) -> list[str]:
-        """Return up to ``k`` clause ids, ranked best-match first."""
+    ) -> "list[RetrievedClause]":
+        """Return up to ``k`` clauses, ranked best-match first, with provenance."""
         ...
 
 
