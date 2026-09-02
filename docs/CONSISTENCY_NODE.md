@@ -49,10 +49,10 @@ territory) would otherwise show up only as diffuse noise downstream.
 
 **Scope.** What this issue does **not** own:
 
-- The graph edges. [M4-07] wires the consistency and compatibility nodes as
-  fixed parallel branches from the retrieval node, with a fan-in, and measures
-  the wall-clock gain. Until then the node has a standalone compiled-graph unit
-  test only; `build.py` is untouched.
+- The graph edges. [M4-07] wired the consistency and compatibility nodes as
+  fixed parallel branches from the retrieval node, with a fan-in, and measured
+  the wall-clock gain (`docs/PARALLEL_ASSESSMENT.md`). This issue left `build.py`
+  untouched — the node had a standalone compiled-graph unit test only.
 - The recommendation node's consumption of `consistency_flags` — [M4-08].
 - End-to-end accuracy over the synthetic claims — [M4-10].
 

@@ -178,9 +178,9 @@ plus the product line; `None` when neither is known, the [M3-04] unconstrained
 degradation path), calls the port, maps every returned clause to a `state.Citation`,
 assembles a [M3-07] `GateSignals` from the reranker scores and runs `evaluate_gate`
 to set `context_sufficient`. The router `route_after_retrieval` in `build.py` acts
-on that flag; `"assess"` enters the compatibility node ([M4-05], which [M4-07]
-widens into a fan-out), `"insufficient"` terminates at `END` until [M4-08]
-consumes it.
+on that flag; the sufficient-context path enters the assessment stage
+([M4-05]/[M4-06], fanned out as fixed parallel branches by [M4-07]),
+`"insufficient"` terminates at `END` until [M4-08] consumes it.
 
 **Why the port returns `RetrievedClause`, not clause-id strings.** A `Citation`
 needs the clause's document, SUSEP process, clause type and a quoted excerpt, and
@@ -235,9 +235,9 @@ the question. It reads `state.citations` and `state.entities`, calls the
 `LlmSettings.llm_reasoning_provider_order` — [M4-05] is its first consumer),
 structured output into `schemas.CompatibilityOutput`, and writes a
 `state.CompatibilityAssessment` (verdict / reasoning / citations / confidence).
-`route_after_retrieval`'s `"assess"` key now enters it; `compatibility → END`.
-[M4-07] widens that single edge into the fan-out to the compatibility and
-consistency nodes.
+`route_after_retrieval` enters it on the sufficient-context path; [M4-07] made
+that a fixed parallel fan-out to this node and the consistency node, converging
+on `END` (see the [M4-07] section).
 
 **Why the reasoning is a list of `(statement, clause_ids)` pairs, not prose.**
 The DoD requires that *every assertion in the reasoning reference at least one
@@ -368,3 +368,62 @@ the leg merge, the degrade path, the two audit events, the no-verdict guards);
 `LLM_PROVIDER`).
 
 Full method and the committed measurement: `docs/CONSISTENCY_NODE.md`.
+
+---
+
+## The two assessment nodes run as fixed parallel branches — [M4-07]
+
+**Decision.** After the retrieval node, `route_after_retrieval`
+(`app/src/infrastructure/graph/build.py`) fans the sufficient-context path out to
+**both** the compatibility ([M4-05]) and consistency ([M4-06]) nodes — one
+superstep, both nodes — and the two converge on `END`. This is LangGraph's
+*fixed parallel branches* primitive: the router returns the list
+`["compatibility", "consistency"]` (a list of node names is the fan-out), each
+node has an edge to the fan-in point. `context_sufficient is False` still returns
+`[END]` directly.
+
+**Why not `Send`.** `Send` is dynamic dispatch — a conditional edge returning a
+runtime-sized list of `Send(node, payload)` for map-reduce over a variable number
+of items. This is two *known* nodes, always both; the right primitive is plain
+edges. An earlier draft of the design document
+(`.ai_context/Assistente_Sinistros_Apolices_Proposta_Completa_com_ERRATA.md`
+sec. 6.3) used `Send` here and is wrong; its ERRATA and `state.py`'s docstring
+already record the correction. Verified against the current LangGraph docs and
+the installed langgraph 1.2.11.
+
+**Why the concurrent writes are safe.** The nodes write disjoint channels —
+`compatibility` vs `consistency`, one `LastValue` write each. The only shared
+channel is `audit_trail`, which carries the `append_audit_events` reducer
+([M4-01]); without it LangGraph raises `InvalidUpdateError` on the concurrent
+append. No other channel is written by both.
+
+**Why one branch's failure is loud.** No `error_handler` is registered (that is
+[M4-09]'s concern). So if a branch raises a genuine exception — the provider
+unreachable after retries, say — LangGraph's runner cancels the sibling and
+re-raises out of `.invoke()`; `apply_writes` never runs for that superstep, so no
+partial state (`consistency` set, `compatibility` silently missing) is returned.
+The failure surfaces rather than truncating one branch. The compatibility node's
+internal degrade to `insufficient_information` for an *ungroundable* answer is a
+valid result, not a failure, and does not abort the superstep.
+
+**Why the fast model on the consistency leg pays off here.** Both calls run in
+one superstep, so the parallel wall is about `max(t_compat, t_consist)` and the
+saving is bounded by `min(t_compat, t_consist)`. The consistency node uses the
+fast model ([M4-06]), so the parallel branch costs roughly one reasoning-model
+call — the consistency check is close to free on the critical path. Measured:
+the mean saving is ≈ one whole consistency call (~22 s/claim; 26% of the stage
+on the current slow reasoning model, more on a faster one). Full run:
+`docs/PARALLEL_ASSESSMENT.md`.
+
+**Interim fan-in.** Both assessment edges point at `END` until [M4-08] adds the
+recommendation node and repoints them at `"recommendation"`, which then runs once
+after both branches finish (a node with an incoming edge from each).
+
+**Enforcement.** `tests/unit/infrastructure/graph/test_claim_graph.py` (the
+fan-out edges, the audit-trail merge across the superstep, and — the DoD's
+"failure in one branch does not silently truncate the other" — a compiled-graph
+run with a failing reasoning model asserting the raise);
+`tests/unit/infrastructure/graph/test_state_merges.py` (the fan-in reducer and
+the bare-channel race, unchanged).
+
+Full method and the committed measurement: `docs/PARALLEL_ASSESSMENT.md`.
