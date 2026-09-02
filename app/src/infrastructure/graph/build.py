@@ -6,15 +6,16 @@ extends it: [M4-04] added the retrieval node on the ``"proceed"`` branch,
 [M4-05] pointed the ``"assess"`` branch at the compatibility node, [M4-07]
 fanned that branch out to the two assessment nodes as fixed parallel branches
 with a fan-in, [M4-08] added the recommendation node as the single terminal
-consolidation point every path routes through, [M4-09] passes a Postgres
-``checkpointer`` into ``.compile()``.
+consolidation point every path routes through, [M4-09] appended the human
+checkpoint behind it.
 
 ``build_claim_graph()`` returns the **uncompiled** ``StateGraph`` on purpose:
 the caller (a test today, the composition root later) owns ``.compile()``, so
-[M4-09] adds ``build_claim_graph().compile(checkpointer=pg_saver)`` without a
-second entry point here.
+[M4-09] compiles it as
+``build_claim_graph().compile(checkpointer=pg_saver)`` without a second entry
+point here.
 
-Topology after [M4-08]::
+Topology after [M4-09]::
 
     START -> intake -> route_after_intake
         "proceed"       -> retrieval -> route_after_retrieval
@@ -23,9 +24,16 @@ Topology after [M4-08]::
         "clarification" -> clarification -> intake   (loop)
         "exhausted"     -> clarification_exhausted -> recommendation
 
-    {compatibility, consistency} -> recommendation -> END
+    {compatibility, consistency} -> recommendation -> human_review -> END
 
-``recommendation`` is the one node with an edge to ``END``.
+``human_review`` is the one node with an edge to ``END``.
+
+**Compiling this graph without a checkpointer is a mistake, not an option.**
+``human_review`` calls ``interrupt()``, and LangGraph does not complain when
+there is nowhere to persist the pause -- ``.invoke()`` simply returns early with
+``__interrupt__`` set and the run can never be resumed. Every caller passes a
+checkpointer and a ``thread_id``: ``infrastructure.graph.checkpointer`` for the
+real one, ``InMemorySaver`` for a unit test.
 
 The loop is self-capping: ``route_after_intake`` sends the claim to
 ``clarification_exhausted`` once ``clarification_rounds`` reaches
@@ -49,8 +57,15 @@ insufficient-context path -- ``route_after_retrieval`` now returns
 ``["recommendation"]`` there -- and ``clarification_exhausted``). It reads
 ``compatibility`` / ``consistency`` when present and ``context_sufficient`` /
 ``clarification_exhausted`` otherwise, and always emits one
-``state.Recommendation`` before ``END``. See ``docs/PARALLEL_ASSESSMENT.md`` for
-the measured wall-clock gain and ``docs/RECOMMENDATION_NODE.md`` for the node.
+``state.Recommendation``. See ``docs/PARALLEL_ASSESSMENT.md`` for the measured
+wall-clock gain and ``docs/RECOMMENDATION_NODE.md`` for the node.
+
+The human checkpoint ([M4-09]) sits between that and ``END``, unconditionally --
+it is the product behaviour, not a mode, so there is no flag that removes it.
+It surfaces the recommendation, pauses on ``interrupt()``, records the analyst's
+approve / edit / reject beside (never over) the system's opinion, and writes the
+audit trail somewhere a compliance reader can query. See
+``docs/HUMAN_CHECKPOINT.md``.
 """
 
 from typing import Literal
@@ -62,6 +77,7 @@ from infrastructure.graph.nodes.clarification import clarification
 from infrastructure.graph.nodes.clarification_exhausted import clarification_exhausted
 from infrastructure.graph.nodes.compatibility import compatibility
 from infrastructure.graph.nodes.consistency import consistency
+from infrastructure.graph.nodes.human_review import human_review
 from infrastructure.graph.nodes.intake import intake
 from infrastructure.graph.nodes.recommendation import recommendation
 from infrastructure.graph.nodes.retrieval import retrieval
@@ -110,7 +126,11 @@ def route_after_retrieval(state: ClaimState) -> list[str]:
 
 
 def build_claim_graph() -> _ClaimGraph:
-    """Wire the graph as it stands after [M4-08]; the caller compiles it."""
+    """Wire the graph as it stands after [M4-09]; the caller compiles it.
+
+    The caller must supply a checkpointer to ``.compile()`` and a ``thread_id``
+    to every invocation -- see the module docstring.
+    """
     builder: _ClaimGraph = StateGraph(ClaimState, context_schema=GraphContext)
     builder.add_node("intake", intake)
     builder.add_node("clarification", clarification)
@@ -119,6 +139,7 @@ def build_claim_graph() -> _ClaimGraph:
     builder.add_node("compatibility", compatibility)
     builder.add_node("consistency", consistency)
     builder.add_node("recommendation", recommendation)
+    builder.add_node("human_review", human_review)
 
     builder.add_edge(START, "intake")
     builder.add_conditional_edges(
@@ -142,5 +163,8 @@ def build_claim_graph() -> _ClaimGraph:
     # directly on the insufficient-context / clarification-exhausted paths.
     builder.add_edge("compatibility", "recommendation")
     builder.add_edge("consistency", "recommendation")
-    builder.add_edge("recommendation", END)
+    # The human checkpoint ([M4-09]) is the last thing before END, so no path
+    # reaches a final state without a person having seen the recommendation.
+    builder.add_edge("recommendation", "human_review")
+    builder.add_edge("human_review", END)
     return builder

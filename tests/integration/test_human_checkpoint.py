@@ -1,0 +1,245 @@
+"""The [M4-09] human checkpoint against a real Postgres.
+
+The DoD asks for persistence "across a full process restart ... with an
+integration test, not a manual check". So the two halves of the cycle run in two
+separate interpreters, launched with ``subprocess.run`` and sharing nothing but
+``TEST_DATABASE_URL``: the first drives a claim to the checkpoint and exits, the
+second resumes it. Two savers inside one process would prove only that a
+connection can be reopened.
+
+Also here, because they need the real tables: that ``setup()`` builds the
+checkpointer schema from nothing, and that the durable audit trail lands in
+``audit_event`` once -- and stays once when the write is repeated.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, text
+from sqlalchemy.orm import Session, sessionmaker
+
+from infrastructure.graph.checkpointer import (
+    CHECKPOINT_TABLE,
+    assert_checkpointer_ready,
+    checkpointer_conn_string,
+    open_claim_checkpointer,
+)
+from infrastructure.graph.state import AuditEvent, AuditRecord
+from tests.integration._checkpoint_fakes import CLAUSE_ID, JUSTIFICATION
+
+pytestmark = pytest.mark.integration
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+WORKER = REPO_ROOT / "tests" / "integration" / "checkpoint_restart_worker.py"
+
+THREAD_ID = "thread-restart-1"
+CLAIM_ID = "claim-restart-1"
+
+
+@pytest.fixture
+def checkpointer_schema(postgres_database_url: str) -> Iterator[None]:
+    """Run the checkpointer's own migrations on the freshly migrated database.
+
+    The autouse ``migrated_database`` fixture drops every reflected table --
+    checkpoint tables included -- and replays Alembic, which knows nothing about
+    them. So ``setup()`` runs here against a database where they genuinely do not
+    exist, which is also the assertion that it can create them from nothing.
+    """
+    with open_claim_checkpointer(postgres_database_url, setup=True):
+        pass
+    yield
+
+
+def _run_worker(
+    database_url: str, *args: str, thread_id: str = THREAD_ID
+) -> dict[str, Any]:
+    """Run the worker in a separate interpreter; return its JSON result."""
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(REPO_ROOT / "app" / "src"),
+        # The worker resolves the audit sink's engine through DatabaseSettings,
+        # the same way the service would.
+        "DATABASE_URL": database_url,
+    }
+    completed = subprocess.run(  # noqa: S603 - fixed argv, no shell
+        [
+            sys.executable,
+            str(WORKER),
+            "--database-url",
+            database_url,
+            "--thread",
+            thread_id,
+            "--claim",
+            CLAIM_ID,
+            *args,
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
+    assert completed.returncode == 0, (
+        f"worker {args} failed:\n{completed.stdout}\n{completed.stderr}"
+    )
+    return dict(json.loads(completed.stdout.strip().splitlines()[-1]))
+
+
+def _audit_rows(engine: Engine, thread_id: str = THREAD_ID) -> list[dict[str, Any]]:
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT sequence, claim_id, node, action, payload FROM audit_event "
+                "WHERE thread_id = :thread_id ORDER BY sequence"
+            ),
+            {"thread_id": thread_id},
+        ).mappings()
+        return [dict(row) for row in rows]
+
+
+# --- the checkpointer's own schema ----------------------------------------
+
+
+@pytest.mark.integration
+def test_setup_creates_the_checkpointer_tables_from_nothing(
+    postgres_database_url: str, postgres_engine: Engine
+) -> None:
+    # Before: Alembic has run, but the checkpointer's tables are not Alembic's.
+    with pytest.raises(RuntimeError, match=CHECKPOINT_TABLE):
+        with open_claim_checkpointer(postgres_database_url):
+            pass
+
+    with open_claim_checkpointer(postgres_database_url, setup=True):
+        pass
+
+    with open_claim_checkpointer(postgres_database_url) as checkpointer:
+        assert_checkpointer_ready(checkpointer.conn)  # type: ignore[arg-type]
+
+
+@pytest.mark.integration
+def test_setup_is_idempotent(postgres_database_url: str) -> None:
+    for _ in range(2):
+        with open_claim_checkpointer(postgres_database_url, setup=True):
+            pass
+
+
+@pytest.mark.integration
+def test_autogenerate_never_proposes_dropping_the_checkpointer(
+    postgres_database_url: str, alembic_config: Config
+) -> None:
+    # The footgun `alembic/env.py`'s UNMANAGED_TABLES filter exists for: the
+    # checkpointer's tables are in the database but not in Base.metadata, so
+    # without the filter the next autogenerated migration would DROP them --
+    # and every paused run with them. `alembic check` raises when it finds any
+    # pending operation, so a clean run is the assertion.
+    with open_claim_checkpointer(postgres_database_url, setup=True):
+        pass
+
+    command.check(alembic_config)
+
+
+@pytest.mark.integration
+def test_the_converted_url_is_the_one_psycopg_accepts(
+    postgres_database_url: str,
+) -> None:
+    # The project's settings hand out `postgresql+psycopg://`; this is the proof
+    # the conversion produces something a real connection accepts.
+    assert "+psycopg" not in checkpointer_conn_string(postgres_database_url)
+
+
+# --- persistence across a real process restart ----------------------------
+
+
+@pytest.mark.integration
+def test_state_survives_a_full_process_restart(
+    postgres_database_url: str,
+    postgres_engine: Engine,
+    checkpointer_schema: None,
+) -> None:
+    started = _run_worker(postgres_database_url, "start")
+
+    assert started["interrupted"] is True
+    payload = started["interrupt_value"]
+    assert payload["claim_id"] == CLAIM_ID
+    # the whole recommendation is surfaced for review, not a summary of it
+    recommendation = payload["recommendation"]
+    assert recommendation["justification"] == JUSTIFICATION
+    assert [c["clause_id"] for c in recommendation["citations"]] == [CLAUSE_ID]
+    assert started["audit_nodes"][-1] == "recommendation"
+    assert _audit_rows(postgres_engine) == [], "nothing is durable before the decision"
+
+    # The first process is gone. Everything the second one knows comes out of
+    # Postgres.
+    resumed = _run_worker(
+        postgres_database_url,
+        "resume",
+        "--decision",
+        "approve",
+        "--notes",
+        "conferido",
+    )
+
+    assert resumed["interrupted"] is False
+    assert resumed["recommendation"] == recommendation, (
+        "the system's opinion must come back byte-identical, and as a model -- "
+        "a serializer allowlist gap would surface here"
+    )
+    assert resumed["human_decision"]["decision"] == "approve"
+    assert resumed["human_decision"]["notes"] == "conferido"
+    assert resumed["human_decision"]["edited_recommendation"] is None
+    assert resumed["audit_nodes"][-1] == "human_review"
+
+
+@pytest.mark.integration
+def test_the_restart_writes_the_durable_audit_trail_exactly_once(
+    postgres_database_url: str,
+    postgres_engine: Engine,
+    checkpointer_schema: None,
+) -> None:
+    _run_worker(postgres_database_url, "start")
+    resumed = _run_worker(postgres_database_url, "resume", "--decision", "reject")
+
+    rows = _audit_rows(postgres_engine)
+    assert [row["node"] for row in rows] == resumed["audit_nodes"]
+    assert [row["sequence"] for row in rows] == list(range(len(rows)))
+    assert {row["claim_id"] for row in rows} == {CLAIM_ID}
+
+    decision_row = rows[-1]
+    assert decision_row["node"] == "human_review"
+    assert decision_row["action"] == "human_decision:reject"
+    # "what the human actually decided", in SQL, without LangGraph in the loop
+    assert decision_row["payload"]["decision"] == "reject"
+    assert "decided_at" in decision_row["payload"]
+    assert all(row["payload"] is None for row in rows[:-1])
+
+
+@pytest.mark.integration
+def test_repeating_the_audit_write_adds_nothing(
+    session_factory: sessionmaker[Session], postgres_engine: Engine
+) -> None:
+    # The checkpoint node re-runs whenever its thread is resumed, so the write
+    # has to be safe to repeat.
+    from infrastructure.database import SqlAlchemyAuditTrailSink
+
+    sink = SqlAlchemyAuditTrailSink(session_factory)
+    records = [
+        AuditRecord(AuditEvent(node="intake", action="extract_entities")),
+        AuditRecord(
+            AuditEvent(node="human_review", action="human_decision:approve"),
+            {"decision": "approve"},
+        ),
+    ]
+
+    assert sink.record(claim_id=CLAIM_ID, thread_id="thread-idem", records=records) == 2
+    assert sink.record(claim_id=CLAIM_ID, thread_id="thread-idem", records=records) == 0
+    assert len(_audit_rows(postgres_engine, "thread-idem")) == 2

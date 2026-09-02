@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
 	@echo "  migrate           - Apply Alembic migrations to the configured database"
 	@echo "  migrate-down      - Roll back the latest Alembic migration"
+	@echo "  setup-checkpointer - M4-09: run the LangGraph Postgres checkpointer's own migrations (its tables live outside Alembic); idempotent, acts on the same DATABASE_URL as make migrate"
 	@echo "  extract-text      - Extract and cache text from the policy corpus"
 	@echo "  remove-boilerplate - Remove boilerplate from the cached extraction"
 	@echo "  build-clause-tree - Recover the clause tree from the cleaned corpus"
@@ -97,6 +98,9 @@ migrate:
 
 migrate-down:
 	PYTHONPATH=app/src uv run alembic downgrade -1
+
+setup-checkpointer:
+	PYTHONPATH=app/src uv run python -m scripts.setup_checkpointer
 
 extract-text:
 	PYTHONPATH=app/src uv run python scripts/extract_text.py

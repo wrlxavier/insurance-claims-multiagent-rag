@@ -26,7 +26,7 @@ the parallel fan-in needs a channel reducer, not ``Send``.
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, Literal, NamedTuple, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -90,6 +90,25 @@ class AuditEvent(BaseModel):
     token_usage: TokenUsage | None = None
     confidence: _Confidence | None = None
     node_input: str | None = None
+
+
+class AuditRecord(NamedTuple):
+    """One audit event on its way to durable storage, with optional detail.
+
+    The pair [infrastructure.graph.context.AuditTrailSink] persists. ``payload``
+    carries structure the flat ``AuditEvent`` has no field for -- [M4-09] uses it
+    for the analyst's whole ``HumanDecision`` (notes, ``decided_at``, any
+    ``edited_recommendation``), so "what the human decided" is answerable in SQL
+    without going through LangGraph's checkpoint serde. ``None`` for every event
+    a node produced on its own.
+
+    A plain ``NamedTuple``, not a Pydantic model: it never enters graph state and
+    never crosses the serializer -- it exists only between the checkpoint node
+    and the sink.
+    """
+
+    event: AuditEvent
+    payload: dict[str, object] | None = None
 
 
 class ExtractedEntities(BaseModel):
