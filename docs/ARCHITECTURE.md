@@ -179,8 +179,8 @@ degradation path), calls the port, maps every returned clause to a `state.Citati
 assembles a [M3-07] `GateSignals` from the reranker scores and runs `evaluate_gate`
 to set `context_sufficient`. The router `route_after_retrieval` in `build.py` acts
 on that flag; the sufficient-context path enters the assessment stage
-([M4-05]/[M4-06], fanned out as fixed parallel branches by [M4-07]),
-`"insufficient"` terminates at `END` until [M4-08] consumes it.
+([M4-05]/[M4-06], fanned out as fixed parallel branches by [M4-07]), and
+`"insufficient"` routes straight to the recommendation node ([M4-08]).
 
 **Why the port returns `RetrievedClause`, not clause-id strings.** A `Citation`
 needs the clause's document, SUSEP process, clause type and a quoted excerpt, and
@@ -415,9 +415,10 @@ the mean saving is ≈ one whole consistency call (~22 s/claim; 26% of the stage
 on the current slow reasoning model, more on a faster one). Full run:
 `docs/PARALLEL_ASSESSMENT.md`.
 
-**Interim fan-in.** Both assessment edges point at `END` until [M4-08] adds the
-recommendation node and repoints them at `"recommendation"`, which then runs once
-after both branches finish (a node with an incoming edge from each).
+**The fan-in.** Both assessment edges point at the recommendation node
+([M4-08]), which runs once after both branches finish (a node with an incoming
+edge from each). `route_after_retrieval`'s insufficient-context path points there
+too, so the recommendation node is the single terminal node.
 
 **Enforcement.** `tests/unit/infrastructure/graph/test_claim_graph.py` (the
 fan-out edges, the audit-trail merge across the superstep, and — the DoD's
@@ -427,3 +428,57 @@ run with a failing reasoning model asserting the raise);
 the bare-channel race, unchanged).
 
 Full method and the committed measurement: `docs/PARALLEL_ASSESSMENT.md`.
+
+---
+
+## The recommendation node consolidates; it does not re-decide — [M4-08]
+
+**Decision.** One terminal node, `app/src/infrastructure/graph/nodes/recommendation.py`,
+that every path routes through — the two assessment branches, the
+insufficient-context path (`route_after_retrieval` now returns
+`["recommendation"]` there), and `clarification_exhausted`. It reads the upstream
+results and emits one `state.Recommendation`: `recommended_action`,
+`justification`, `citations`, `consistency_flags`, `confidence`. The
+`Recommendation` schema was defined by [M4-01]; no state-schema change.
+
+**Why the citations can't drift.** The node never constructs a `Citation`, and
+`schemas.RecommendationOutput` (what the model fills) has no citation field.
+`citations` is a deduplicated copy of `compatibility.citations`, which [M4-05]
+already hydrated from what retrieval returned. "Never introduce a citation no
+upstream node produced" is therefore structural — there is no code path that
+could — not a prompt instruction, and the unit test asserts the subset relation
+directly.
+
+**Why an insufficient upstream verdict stays unconfident.** `confidence` is
+derived, not model-reported: it starts from `compatibility.confidence` (0.0 when
+there is no assessment) and is clamped — an effective verdict of
+`insufficient_information` (compatibility abstained, retrieval missed, or the
+clarification loop was exhausted) caps it at `_INSUFFICIENT_CONFIDENCE_CEILING`
+(0.3); an unresolved `attention` consistency flag caps it at
+`_ATTENTION_FLAG_CONFIDENCE_CEILING` (0.7). An abstaining verdict cannot become a
+confident recommendation.
+
+**Why consistency flags stay separate.** `consistency_flags` is
+`consistency.signals` verbatim — its own field, never merged into the verdict,
+the action, or the confidence logic (only an `attention` flag's *ceiling* effect
+touches confidence). Per [M4-06]: attention points, not part of the decision.
+
+**Why the fast model, and only for the justification.** The legal reasoning is
+[M4-05]'s; this is a summary. The model writes one paragraph — compatibility
+finding first, then the clause ids, then the caveats — on the fast model, and
+only on the path where a real assessment exists. The claimant-gaps and
+retrieval-miss paths, and any transient model failure, fall back to a
+deterministic template. The node is terminal, so it degrades, never raises
+(like the consistency node's semantic leg).
+
+**Enforcement.** `tests/unit/infrastructure/graph/test_recommendation.py` (unit,
+fake fast model — the citation-subset invariant, the confidence clamps, the
+flag pass-through, the degrade path, the no-model-call short-circuits);
+`tests/unit/infrastructure/graph/test_claim_graph.py` (every terminal path
+converges on the node, the three compiled-graph runs);
+`tests/architecture/test_graph_node_conventions.py` and
+`tests/architecture/test_scope_vocabulary.py` (auto-cover the new node and
+prompt); `tests/eval/test_recommendation_baseline.py` (eval-marked — the two
+structural guarantees re-checked on live output, skips without `LLM_PROVIDER`).
+
+Full method and the committed measurement: `docs/RECOMMENDATION_NODE.md`.

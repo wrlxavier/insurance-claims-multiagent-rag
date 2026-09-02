@@ -35,8 +35,9 @@ from infrastructure.graph.schemas import (
     ConsistencyOutput,
     IntakeOutput,
     ReasonedAssertion,
+    RecommendationOutput,
 )
-from infrastructure.graph.state import ConsistencyReport
+from infrastructure.graph.state import ConsistencyReport, Recommendation
 from infrastructure.rag.retrieved_clause import RetrievedClause
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -74,6 +75,8 @@ class _LoopModel:
                 )
             elif schema is ConsistencyOutput:
                 parsed = ConsistencyOutput(signals=[])
+            elif schema is RecommendationOutput:
+                parsed = RecommendationOutput(justification="Resumo para o revisor.")
             else:
                 parsed = ClarificationOutput(
                     questions=[
@@ -166,9 +169,9 @@ def test_route_after_retrieval_fans_out_to_both_nodes_when_context_suffices() ->
 
 
 @pytest.mark.unit
-def test_route_after_retrieval_flags_insufficient_context() -> None:
+def test_route_after_retrieval_sends_insufficient_context_to_recommendation() -> None:
     state = {"claim_id": "c", "raw_claim_text": "x", "context_sufficient": False}
-    assert route_after_retrieval(cast(Any, state)) == [END]
+    assert route_after_retrieval(cast(Any, state)) == ["recommendation"]
 
 
 # --- structure --------------------------------------------------------
@@ -184,21 +187,30 @@ def test_graph_has_the_expected_nodes_and_entry() -> None:
         "retrieval",
         "compatibility",
         "consistency",
+        "recommendation",
     } <= set(graph.nodes)
     assert any(e.source == START and e.target == "intake" for e in graph.edges)
     assert any(e.source == "intake" and e.target == "retrieval" for e in graph.edges)
 
 
 @pytest.mark.unit
-def test_retrieval_fans_out_to_both_assessment_nodes_converging_on_end() -> None:
-    # [M4-07]: fixed parallel branches -- two edges from retrieval to the two
-    # assessment nodes, fanning back in (on END until [M4-08] adds recommendation).
+def test_every_terminal_path_converges_on_the_recommendation_node() -> None:
+    # [M4-07] fanned retrieval out to the two assessment nodes; [M4-08] repoints
+    # every terminal edge at the recommendation node, which alone reaches END.
     graph = build_claim_graph().compile().get_graph()
     edges = {(e.source, e.target) for e in graph.edges}
     assert ("retrieval", "compatibility") in edges
     assert ("retrieval", "consistency") in edges
-    assert ("compatibility", END) in edges
-    assert ("consistency", END) in edges
+    assert ("retrieval", "recommendation") in edges
+    assert ("compatibility", "recommendation") in edges
+    assert ("consistency", "recommendation") in edges
+    assert ("clarification_exhausted", "recommendation") in edges
+    assert ("recommendation", END) in edges
+    assert not any(
+        src in {"compatibility", "consistency", "clarification_exhausted"}
+        and tgt == END
+        for src, tgt in edges
+    )
 
 
 # --- the loop --------------------------------------------------------
@@ -218,12 +230,20 @@ def test_complete_claim_passes_straight_through() -> None:
     assert node_runs[:2] == ["intake", "retrieval"]
     assert node_runs.count("compatibility") == 1
     assert node_runs.count("consistency") == 2
+    # the recommendation node runs once, after both assessment branches
+    assert node_runs.count("recommendation") == 1
+    assert node_runs[-1] == "recommendation"
     assert out["context_sufficient"] is True
     assert [c.clause_id for c in out["citations"]] == ["doc-1:1.1"]
     assert out["compatibility"].verdict is Verdict.COMPATIBLE
     assert [c.clause_id for c in out["compatibility"].citations] == ["doc-1:1.1"]
     assert isinstance(out["consistency"], ConsistencyReport)
     assert out["consistency"].signals == []
+    rec = out["recommendation"]
+    assert isinstance(rec, Recommendation)
+    assert [c.clause_id for c in rec.citations] == ["doc-1:1.1"]
+    assert rec.consistency_flags == []
+    assert rec.justification == "Resumo para o revisor."
 
 
 @pytest.mark.unit
@@ -248,7 +268,15 @@ def test_retrieval_with_no_hits_flags_insufficient_context() -> None:
 
     assert out["context_sufficient"] is False
     assert out["citations"] == []
-    assert [e.node for e in out["audit_trail"]] == ["intake", "retrieval"]
+    assert [e.node for e in out["audit_trail"]] == [
+        "intake",
+        "retrieval",
+        "recommendation",
+    ]
+    rec = out["recommendation"]
+    assert isinstance(rec, Recommendation)
+    assert rec.citations == []
+    assert "revisão manual de cláusulas" in rec.recommended_action
 
 
 @pytest.mark.unit
@@ -294,11 +322,17 @@ def test_incomplete_claim_loops_then_terminates_as_exhausted() -> None:
     assert out["clarification_rounds"] == MAX_CLARIFICATION_ROUNDS
     assert out["missing_information"] == ["data_evento_vigencia"]
     assert len(out["clarification_questions"]) == MAX_CLARIFICATION_ROUNDS
-    assert out["audit_trail"][-1].node == "clarification_exhausted"
-    # intake (x3) + clarification (x2) + clarification_exhausted (x1)
+    # clarification_exhausted now hands off to the recommendation node
+    assert out["audit_trail"][-2].node == "clarification_exhausted"
+    assert out["audit_trail"][-1].node == "recommendation"
+    rec = out["recommendation"]
+    assert isinstance(rec, Recommendation)
+    assert "data_evento_vigencia" in rec.recommended_action
+    # intake x3 + clarification x2 + clarification_exhausted x1 + recommendation x1
     node_runs = [e.node for e in out["audit_trail"]]
     assert node_runs.count("intake") == MAX_CLARIFICATION_ROUNDS + 1
     assert node_runs.count("clarification") == MAX_CLARIFICATION_ROUNDS
+    assert node_runs.count("recommendation") == 1
 
 
 def _incomplete_claims() -> list[SyntheticClaim]:
@@ -324,3 +358,4 @@ def test_every_incomplete_m2_04_claim_terminates() -> None:
         )
         assert out["clarification_exhausted"] is True, claim.claim_id
         assert out["clarification_rounds"] == MAX_CLARIFICATION_ROUNDS, claim.claim_id
+        assert isinstance(out["recommendation"], Recommendation), claim.claim_id

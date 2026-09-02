@@ -19,6 +19,13 @@ half of that node: the node maps each ``ConsistencySignalItem`` onto a
 ``state.ConsistencySignal`` with ``source="llm"``, and concatenates them after
 the deterministic signals ``infrastructure.graph.consistency_checks`` produced.
 It carries no verdict -- the consistency node signals, it does not decide.
+``RecommendationOutput`` ([M4-08]) is the fifth and the narrowest: it maps onto
+``state.Recommendation`` and carries **only** ``justification``. The
+recommendation node computes every other field of ``state.Recommendation``
+(``recommended_action``, ``citations``, ``consistency_flags``, ``confidence``)
+deterministically from upstream state -- the model is asked for the prose
+summary and nothing load-bearing, so it can neither invent a citation nor turn
+an ``insufficient_information`` verdict into a confident one.
 """
 
 from typing import Literal
@@ -306,4 +313,30 @@ class ConsistencyOutput(BaseModel):
             "when the narrative is internally coherent -- which is the common "
             "case. Never a verdict on the claim."
         ),
+    )
+
+
+class RecommendationOutput(BaseModel):
+    """The recommendation node's ([M4-08]) prose summary -- and nothing else.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)``. The
+    node maps ``justification`` straight onto ``state.Recommendation.justification``
+    and fills the model's other fields itself. There is deliberately no citation
+    field, no verdict field and no confidence field here: a citation the model
+    named would be one no upstream node produced, and a confidence it reported
+    could contradict an ``insufficient_information`` upstream verdict -- so the
+    node owns both.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    justification: str = Field(
+        description=(
+            "One short paragraph, in Brazilian Portuguese, for a reviewer "
+            "scanning the case in seconds: the compatibility finding first, then "
+            "the clause ids it rests on, then the consistency attention points "
+            "as caveats. State only what the compatibility and consistency steps "
+            "found -- no real-world coverage outcome, no new facts, and no "
+            "clause id that is not in the list you were given."
+        )
     )

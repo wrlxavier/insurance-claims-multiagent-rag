@@ -4,11 +4,11 @@ The compatibility node ([M4-05]) and the consistency node ([M4-06]) do not
 depend on each other: one grounds a coverage verdict in retrieved clauses, the
 other reads the claim for internal consistency. [M4-07] runs them **concurrently**
 as *fixed parallel branches* off the retrieval node — one superstep, both nodes —
-converging on `END` (the recommendation node once [M4-08] lands).
+converging on the recommendation node ([M4-08]).
 
 ```
                    ┌─ compatibility ─┐
-retrieval ─(gate)─►┤                 ├─► END   (→ recommendation, M4-08)
+retrieval ─(gate)─►┤                 ├─► recommendation ─► END
                    └─ consistency ───┘
 ```
 
@@ -29,8 +29,9 @@ LangGraph has two fan-out mechanisms:
 
 This is the first case: two named nodes, always both. `route_after_retrieval`
 returns `["compatibility", "consistency"]` when the [M3-07] gate passed (a list
-of node names is LangGraph's fan-out), or `[END]` when it did not. Both
-assessment nodes then edge to `END`.
+of node names is LangGraph's fan-out), or `["recommendation"]` when it did not.
+Both assessment nodes then edge to the recommendation node ([M4-08]), which is
+the one node with an edge to `END`.
 
 An earlier draft of the project's design document
 (`.ai_context/Assistente_Sinistros_Apolices_Proposta_Completa_com_ERRATA.md`
@@ -121,9 +122,9 @@ check is close to free on the critical path.
 
 ## Scope
 
-- The recommendation node — [M4-08]. Until then both branches edge to `END`;
-  [M4-08] repoints them at `"recommendation"`, which then runs once after both
-  finish.
+- The recommendation node — [M4-08], now landed: both branches edge to
+  `"recommendation"`, which runs once after both finish. See
+  `docs/RECOMMENDATION_NODE.md`.
 - The Postgres checkpointer, `interrupt()`, and `error_handler`-based branch
   recovery — [M4-09].
 - End-to-end verdict accuracy over the synthetic claims — [M4-10].
