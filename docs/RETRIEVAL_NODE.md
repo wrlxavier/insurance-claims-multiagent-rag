@@ -143,8 +143,10 @@ also runs, never re-scores rank-1, so the gate's signal is unchanged.
   excerpts (`display_text`) and reranker relevance scores, and a
   `context_sufficient` flag it must honour — a `False` there means the
   assessment node should not be reached with a confident verdict.
-- [M4-07] fans out from `"assess"`; [M4-08] consumes the `"insufficient"` path
-  and the `context_sufficient` flag. Both keys currently terminate at `END`.
+- [M4-07] made the sufficient-context path a fixed parallel fan-out to the
+  compatibility and consistency nodes (`docs/PARALLEL_ASSESSMENT.md`); [M4-08]
+  consumes the `"insufficient"` path and the `context_sufficient` flag. Both
+  currently terminate at `END`.
 - [M4-09] / M5 build the composition root that hands a live
   `GraphRetrievalAdapter` to `GraphContext`; until then the adapter is
   constructed by `scripts/eval_retrieval_node.py` and the tests.

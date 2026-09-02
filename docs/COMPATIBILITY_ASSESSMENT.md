@@ -36,8 +36,9 @@ a diffuse end-to-end drop.
 
 **Scope.** This issue builds the node, wires the `"assess"` branch to it, and
 measures it on the golden set. It does **not** build the consistency node
-([M4-06]), the parallel fan-in ([M4-07] widens the single `"assess" →
-compatibility` edge into a fan-out), the recommendation node ([M4-08]), or the
+([M4-06]), the parallel branches ([M4-07] made the `"assess"` path a fixed
+parallel fan-out to this node and the consistency node — see
+`docs/PARALLEL_ASSESSMENT.md`), the recommendation node ([M4-08]), or the
 checkpointer ([M4-09]). Full three-class verdict accuracy and the citation
 coverage gate are [M4-10]'s.
 
@@ -146,9 +147,9 @@ _To be written from the first run._
 ## What this means downstream
 
 - **[M4-06]** (consistency node) is the other `"assess"`-branch node. [M4-07]
-  fans `"assess"` out to both and adds the fan-in; the `audit_trail` reducer
-  already makes the concurrent write well defined, and the two nodes write
-  disjoint state channels (`compatibility` vs `consistency`).
+  fanned `"assess"` out to both with a fan-in; the `audit_trail` reducer makes
+  the concurrent write well defined, and the two nodes write disjoint state
+  channels (`compatibility` vs `consistency`). See `docs/PARALLEL_ASSESSMENT.md`.
 - **[M4-08]** (recommendation) consumes `state.compatibility`. Its citations may
   only be ones an upstream node produced — the compatibility node's `citations`
   are already a subset of `state.citations`, so that invariant holds by

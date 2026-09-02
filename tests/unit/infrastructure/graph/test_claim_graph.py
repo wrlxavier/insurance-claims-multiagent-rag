@@ -14,7 +14,7 @@ from typing import Any, cast
 import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable, RunnableLambda
-from langgraph.graph import START
+from langgraph.graph import END, START
 
 from domain.clause_classification import ClauseType
 from domain.verdict import Verdict
@@ -32,9 +32,11 @@ from infrastructure.graph.schemas import (
     ClarificationOutput,
     ClarificationQuestionItem,
     CompatibilityOutput,
+    ConsistencyOutput,
     IntakeOutput,
     ReasonedAssertion,
 )
+from infrastructure.graph.state import ConsistencyReport
 from infrastructure.rag.retrieved_clause import RetrievedClause
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -46,7 +48,7 @@ class _FakeRaw:
 
 
 class _LoopModel:
-    """Serves both nodes: intake always reports ``missing`` as unresolved."""
+    """Serves every node: intake always reports ``missing`` as unresolved."""
 
     def __init__(self, missing: list[str]) -> None:
         self.missing = missing
@@ -70,6 +72,8 @@ class _LoopModel:
                     ],
                     confidence=0.7,
                 )
+            elif schema is ConsistencyOutput:
+                parsed = ConsistencyOutput(signals=[])
             else:
                 parsed = ClarificationOutput(
                     questions=[
@@ -156,15 +160,15 @@ def test_route_exhausts_at_the_cap() -> None:
 
 
 @pytest.mark.unit
-def test_route_after_retrieval_proceeds_when_context_suffices() -> None:
+def test_route_after_retrieval_fans_out_to_both_nodes_when_context_suffices() -> None:
     state = {"claim_id": "c", "raw_claim_text": "x", "context_sufficient": True}
-    assert route_after_retrieval(cast(Any, state)) == "assess"
+    assert route_after_retrieval(cast(Any, state)) == ["compatibility", "consistency"]
 
 
 @pytest.mark.unit
 def test_route_after_retrieval_flags_insufficient_context() -> None:
     state = {"claim_id": "c", "raw_claim_text": "x", "context_sufficient": False}
-    assert route_after_retrieval(cast(Any, state)) == "insufficient"
+    assert route_after_retrieval(cast(Any, state)) == [END]
 
 
 # --- structure --------------------------------------------------------
@@ -178,9 +182,23 @@ def test_graph_has_the_expected_nodes_and_entry() -> None:
         "clarification",
         "clarification_exhausted",
         "retrieval",
+        "compatibility",
+        "consistency",
     } <= set(graph.nodes)
     assert any(e.source == START and e.target == "intake" for e in graph.edges)
     assert any(e.source == "intake" and e.target == "retrieval" for e in graph.edges)
+
+
+@pytest.mark.unit
+def test_retrieval_fans_out_to_both_assessment_nodes_converging_on_end() -> None:
+    # [M4-07]: fixed parallel branches -- two edges from retrieval to the two
+    # assessment nodes, fanning back in (on END until [M4-08] adds recommendation).
+    graph = build_claim_graph().compile().get_graph()
+    edges = {(e.source, e.target) for e in graph.edges}
+    assert ("retrieval", "compatibility") in edges
+    assert ("retrieval", "consistency") in edges
+    assert ("compatibility", END) in edges
+    assert ("consistency", END) in edges
 
 
 # --- the loop --------------------------------------------------------
@@ -193,15 +211,19 @@ def test_complete_claim_passes_straight_through() -> None:
     assert out.get("clarification_exhausted") in (None, False)
     assert not out.get("clarification_questions")
     assert out.get("clarification_rounds", 0) == 0
-    assert [e.node for e in out["audit_trail"]] == [
-        "intake",
-        "retrieval",
-        "compatibility",
-    ]
+    # intake -> retrieval -> then the parallel superstep: compatibility (one
+    # event) and consistency (two, one per leg). Order within the superstep
+    # follows the route list, but assert on counts to stay robust.
+    node_runs = [e.node for e in out["audit_trail"]]
+    assert node_runs[:2] == ["intake", "retrieval"]
+    assert node_runs.count("compatibility") == 1
+    assert node_runs.count("consistency") == 2
     assert out["context_sufficient"] is True
     assert [c.clause_id for c in out["citations"]] == ["doc-1:1.1"]
     assert out["compatibility"].verdict is Verdict.COMPATIBLE
     assert [c.clause_id for c in out["compatibility"].citations] == ["doc-1:1.1"]
+    assert isinstance(out["consistency"], ConsistencyReport)
+    assert out["consistency"].signals == []
 
 
 @pytest.mark.unit
@@ -227,6 +249,41 @@ def test_retrieval_with_no_hits_flags_insufficient_context() -> None:
     assert out["context_sufficient"] is False
     assert out["citations"] == []
     assert [e.node for e in out["audit_trail"]] == ["intake", "retrieval"]
+
+
+@pytest.mark.unit
+def test_a_failure_in_one_assessment_branch_is_not_silently_swallowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [M4-07] DoD: a failure in one parallel branch must not silently truncate
+    # the other. With no error_handler the superstep aborts loudly -- invoke()
+    # re-raises and no partial state dict (consistency set, compatibility
+    # missing) is ever returned.
+    monkeypatch.setattr("time.sleep", lambda *_a, **_k: None)
+
+    class _BoomChain:
+        def invoke(self, _messages: Any) -> dict[str, object]:
+            raise RuntimeError("reasoning model is down")
+
+    class _BoomReasoningModel:
+        def with_structured_output(
+            self, schema: type, include_raw: bool = False
+        ) -> Any:
+            return _BoomChain()
+
+    base = _context(missing=[])
+    context = GraphContext(
+        fast_model=base.fast_model,
+        reasoning_model=cast(BaseChatModel, _BoomReasoningModel()),
+        retriever=base.retriever,
+        llm_settings=base.llm_settings,
+    )
+    compiled = build_claim_graph().compile()
+
+    with pytest.raises(RuntimeError, match="reasoning model is down"):
+        compiled.invoke(
+            {"claim_id": "c1", "raw_claim_text": "bati o carro"}, context=context
+        )
 
 
 @pytest.mark.unit
