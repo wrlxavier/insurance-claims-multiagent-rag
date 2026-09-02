@@ -27,7 +27,7 @@ incomplete claim always runs to the cap.
 START -> intake -> route_after_intake
     "proceed"       -> END          (M4-04 retargets this to the retrieval node)
     "clarification" -> clarification -> intake      (loop)
-    "exhausted"     -> clarification_exhausted -> END
+    "exhausted"     -> clarification_exhausted -> END  (M4-08 retargets this to the recommendation node)
 ```
 
 `route_after_intake` (`build.py`) runs after every intake pass:

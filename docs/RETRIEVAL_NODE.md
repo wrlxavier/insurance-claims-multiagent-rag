@@ -145,8 +145,9 @@ also runs, never re-scores rank-1, so the gate's signal is unchanged.
   assessment node should not be reached with a confident verdict.
 - [M4-07] made the sufficient-context path a fixed parallel fan-out to the
   compatibility and consistency nodes (`docs/PARALLEL_ASSESSMENT.md`); [M4-08]
-  consumes the `"insufficient"` path and the `context_sufficient` flag. Both
-  currently terminate at `END`.
+  routes the `"insufficient"` path straight to the recommendation node, which
+  turns `context_sufficient = False` into an `insufficient_information`
+  recommendation (`docs/RECOMMENDATION_NODE.md`).
 - [M4-09] / M5 build the composition root that hands a live
   `GraphRetrievalAdapter` to `GraphContext`; until then the adapter is
   constructed by `scripts/eval_retrieval_node.py` and the tests.
