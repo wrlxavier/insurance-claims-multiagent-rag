@@ -16,7 +16,10 @@ Two passes over the 13 ``insufficient_information`` claims in
    fast model -- record the question it generates and flag generic phrasing.
 2. Run the full compiled graph (real fast model for intake and clarification)
    -- confirm every claim terminates and report how many actually entered the
-   loop and the ``clarification_rounds`` distribution.
+   loop and the ``clarification_rounds`` distribution. Since [M4-09] the graph
+   ends on the human checkpoint, so "terminates" here means the loop resolved
+   and the run reached that pause -- which is exactly the property [M4-03] is
+   about, and every clarification field is written well before it.
 
 Writes ``eval/runs/clarification_loop.{md,json}`` and a per-claim
 ``eval/runs/clarification_questions.jsonl``.
@@ -34,6 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.runtime import Runtime
 
 from infrastructure.config.llm_client_factory import build_chat_model
@@ -138,9 +142,17 @@ def _evaluate_claim(claim: SyntheticClaim, context: GraphContext) -> _ClaimResul
         ]
         result.generic_flagged = any(_GENERIC_RE.search(q.question) for q in questions)
 
-        compiled = build_claim_graph().compile()
+        # An InMemorySaver, not the Postgres one: what this script measures is
+        # the clarification loop, which is finished long before the [M4-09]
+        # human checkpoint the graph now ends on. A checkpointer is required all
+        # the same -- without one the run would stop at that interrupt with no
+        # error, and "terminated" would stop meaning anything. The run is left
+        # parked at the checkpoint on purpose; every clarification field is
+        # already written by then.
+        compiled = build_claim_graph().compile(checkpointer=InMemorySaver())
         out = compiled.invoke(
             {"claim_id": claim.claim_id, "raw_claim_text": claim.narrative},
+            config={"configurable": {"thread_id": claim.claim_id}},
             context=context,
         )
         result.live_terminated = True

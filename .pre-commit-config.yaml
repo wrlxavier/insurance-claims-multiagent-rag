@@ -21,6 +21,10 @@ repos:
           - langchain-openai>=1.5.1
           - langchain-anthropic>=0.3
           - langgraph>=1.2
+          # [M4-09]: infrastructure/graph/checkpointer.py imports both
+          # directly (PostgresSaver, and psycopg for the connection).
+          - langgraph-checkpoint-postgres>=3.1.2
+          - psycopg>=3.3.4
           - sqlalchemy>=2.0.52
           - alembic>=1.19.1
           - pgvector>=0.5.0

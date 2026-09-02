@@ -9,12 +9,14 @@ config -- a node holds no module-level client and takes no constructor. See
 ``docs/ARCHITECTURE.md`` ([M4-01b]).
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from infrastructure.config.settings import LlmSettings
+from infrastructure.graph.state import AuditRecord
 
 if TYPE_CHECKING:
     from infrastructure.rag.retrieval_filter import RetrievalFilter
@@ -47,6 +49,33 @@ class RetrievalPort(Protocol):
         ...
 
 
+class AuditTrailSink(Protocol):
+    """Durable storage for the audit trail, owned by the graph layer -- [M4-09].
+
+    Graph state is already persisted by the checkpointer, but only LangGraph can
+    read it back. The audit trail is the record a compliance reader has to be
+    able to query directly, so it is written once more, to a table of its own.
+
+    ``thread_id`` plus the record's position in ``records`` is the identity of a
+    row: the write is expected to be idempotent, because the checkpoint node
+    that calls this runs again whenever its thread is resumed.
+    [infrastructure.database.graph_audit_sink.SqlAlchemyAuditTrailSink] is the
+    implementation; the port lives here for the same reason ``RetrievalPort``
+    does -- a node depends on the capability, never on the adapter, and the
+    adapter satisfies this structurally without importing it.
+    """
+
+    def record(
+        self,
+        *,
+        claim_id: str,
+        thread_id: str,
+        records: Sequence[AuditRecord],
+    ) -> int:
+        """Persist ``records`` for one graph run. Return the number of new rows."""
+        ...
+
+
 @dataclass(frozen=True)
 class GraphContext:
     """Run-scoped dependencies for the agent graph -- [M4-01b].
@@ -64,3 +93,8 @@ class GraphContext:
     reasoning_model: BaseChatModel
     retriever: RetrievalPort
     llm_settings: LlmSettings
+    # [M4-09]. Defaulted, so a context built for a test or an eval script needs
+    # no durable store; `None` means "this run leaves no separate audit record",
+    # the same way a deterministic node leaves `AuditEvent.model` unset. The
+    # composition root supplies the Postgres-backed sink.
+    audit_sink: AuditTrailSink | None = None

@@ -6,6 +6,12 @@ structure, and -- the [M4-03] DoD's core check -- that the
 M2-04 set. Termination is a property of the router plus
 ``MAX_CLARIFICATION_ROUNDS``, so a fake LLM plus a stub retriever is the right
 tool: no network, and no reliance on LangGraph's ``recursion_limit``.
+
+Since [M4-09] the graph ends on the human checkpoint, so every run here compiles
+with an ``InMemorySaver`` and a ``thread_id`` and resumes with a decision. That
+is not ceremony: without a checkpointer LangGraph returns silently at the
+``interrupt()`` instead of failing, and every assertion below about what the
+graph produced would be testing a truncated run.
 """
 
 from pathlib import Path
@@ -14,7 +20,9 @@ from typing import Any, cast
 import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable, RunnableLambda
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START
+from langgraph.types import Command
 
 from domain.clause_classification import ClauseType
 from domain.verdict import Verdict
@@ -37,7 +45,11 @@ from infrastructure.graph.schemas import (
     ReasonedAssertion,
     RecommendationOutput,
 )
-from infrastructure.graph.state import ConsistencyReport, Recommendation
+from infrastructure.graph.state import (
+    ConsistencyReport,
+    HumanDecision,
+    Recommendation,
+)
 from infrastructure.rag.retrieved_clause import RetrievedClause
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -126,12 +138,30 @@ def _context(missing: list[str]) -> GraphContext:
     )
 
 
-def _invoke(missing: list[str]) -> dict[str, Any]:
-    compiled = build_claim_graph().compile()
-    return compiled.invoke(
-        {"claim_id": "c1", "raw_claim_text": "bati o carro"},
-        context=_context(missing),
+APPROVE: dict[str, Any] = {"decision": "approve", "notes": "conferido"}
+
+
+def _run(
+    context: GraphContext,
+    *,
+    claim_id: str = "c1",
+    text: str = "bati o carro",
+    resume: dict[str, Any] | None = APPROVE,
+) -> dict[str, Any]:
+    """Run the graph to the [M4-09] checkpoint and, unless told not to, past it."""
+    compiled = build_claim_graph().compile(checkpointer=InMemorySaver())
+    config: Any = {"configurable": {"thread_id": f"thread-{claim_id}"}}
+    out = compiled.invoke(
+        {"claim_id": claim_id, "raw_claim_text": text}, config=config, context=context
     )
+    assert "__interrupt__" in out, "every path must reach the human checkpoint"
+    if resume is None:
+        return out
+    return compiled.invoke(Command(resume=resume), config=config, context=context)
+
+
+def _invoke(missing: list[str]) -> dict[str, Any]:
+    return _run(_context(missing))
 
 
 # --- route_after_intake -------------------------------------------------
@@ -188,6 +218,7 @@ def test_graph_has_the_expected_nodes_and_entry() -> None:
         "compatibility",
         "consistency",
         "recommendation",
+        "human_review",
     } <= set(graph.nodes)
     assert any(e.source == START and e.target == "intake" for e in graph.edges)
     assert any(e.source == "intake" and e.target == "retrieval" for e in graph.edges)
@@ -195,8 +226,9 @@ def test_graph_has_the_expected_nodes_and_entry() -> None:
 
 @pytest.mark.unit
 def test_every_terminal_path_converges_on_the_recommendation_node() -> None:
-    # [M4-07] fanned retrieval out to the two assessment nodes; [M4-08] repoints
-    # every terminal edge at the recommendation node, which alone reaches END.
+    # [M4-07] fanned retrieval out to the two assessment nodes; [M4-08] repointed
+    # every terminal edge at the recommendation node; [M4-09] put the human
+    # checkpoint behind it, so that node alone reaches END.
     graph = build_claim_graph().compile().get_graph()
     edges = {(e.source, e.target) for e in graph.edges}
     assert ("retrieval", "compatibility") in edges
@@ -205,11 +237,10 @@ def test_every_terminal_path_converges_on_the_recommendation_node() -> None:
     assert ("compatibility", "recommendation") in edges
     assert ("consistency", "recommendation") in edges
     assert ("clarification_exhausted", "recommendation") in edges
-    assert ("recommendation", END) in edges
-    assert not any(
-        src in {"compatibility", "consistency", "clarification_exhausted"}
-        and tgt == END
-        for src, tgt in edges
+    assert ("recommendation", "human_review") in edges
+    assert ("human_review", END) in edges
+    assert not any(src != "human_review" and tgt == END for src, tgt in edges), (
+        "nothing may reach END without passing the human checkpoint"
     )
 
 
@@ -230,9 +261,10 @@ def test_complete_claim_passes_straight_through() -> None:
     assert node_runs[:2] == ["intake", "retrieval"]
     assert node_runs.count("compatibility") == 1
     assert node_runs.count("consistency") == 2
-    # the recommendation node runs once, after both assessment branches
+    # the recommendation node runs once, after both assessment branches, and
+    # the human checkpoint closes the run
     assert node_runs.count("recommendation") == 1
-    assert node_runs[-1] == "recommendation"
+    assert node_runs[-2:] == ["recommendation", "human_review"]
     assert out["context_sufficient"] is True
     assert [c.clause_id for c in out["citations"]] == ["doc-1:1.1"]
     assert out["compatibility"].verdict is Verdict.COMPATIBLE
@@ -244,6 +276,9 @@ def test_complete_claim_passes_straight_through() -> None:
     assert [c.clause_id for c in rec.citations] == ["doc-1:1.1"]
     assert rec.consistency_flags == []
     assert rec.justification == "Resumo para o revisor."
+    decision = out["human_decision"]
+    assert isinstance(decision, HumanDecision)
+    assert decision.decision == "approve"
 
 
 @pytest.mark.unit
@@ -254,17 +289,14 @@ def test_retrieval_with_no_hits_flags_insufficient_context() -> None:
         ) -> list[RetrievedClause]:
             return []
 
-    compiled = build_claim_graph().compile()
-    context = _context(missing=[])
+    base = _context(missing=[])
     context = GraphContext(
-        fast_model=context.fast_model,
-        reasoning_model=context.reasoning_model,
+        fast_model=base.fast_model,
+        reasoning_model=base.reasoning_model,
         retriever=cast(RetrievalPort, _EmptyRetriever()),
-        llm_settings=context.llm_settings,
+        llm_settings=base.llm_settings,
     )
-    out = compiled.invoke(
-        {"claim_id": "c1", "raw_claim_text": "bati o carro"}, context=context
-    )
+    out = _run(context)
 
     assert out["context_sufficient"] is False
     assert out["citations"] == []
@@ -272,6 +304,7 @@ def test_retrieval_with_no_hits_flags_insufficient_context() -> None:
         "intake",
         "retrieval",
         "recommendation",
+        "human_review",
     ]
     rec = out["recommendation"]
     assert isinstance(rec, Recommendation)
@@ -306,12 +339,8 @@ def test_a_failure_in_one_assessment_branch_is_not_silently_swallowed(
         retriever=base.retriever,
         llm_settings=base.llm_settings,
     )
-    compiled = build_claim_graph().compile()
-
     with pytest.raises(RuntimeError, match="reasoning model is down"):
-        compiled.invoke(
-            {"claim_id": "c1", "raw_claim_text": "bati o carro"}, context=context
-        )
+        _run(context)
 
 
 @pytest.mark.unit
@@ -323,8 +352,9 @@ def test_incomplete_claim_loops_then_terminates_as_exhausted() -> None:
     assert out["missing_information"] == ["data_evento_vigencia"]
     assert len(out["clarification_questions"]) == MAX_CLARIFICATION_ROUNDS
     # clarification_exhausted now hands off to the recommendation node
-    assert out["audit_trail"][-2].node == "clarification_exhausted"
-    assert out["audit_trail"][-1].node == "recommendation"
+    assert out["audit_trail"][-3].node == "clarification_exhausted"
+    assert out["audit_trail"][-2].node == "recommendation"
+    assert out["audit_trail"][-1].node == "human_review"
     rec = out["recommendation"]
     assert isinstance(rec, Recommendation)
     assert "data_evento_vigencia" in rec.recommended_action
@@ -351,11 +381,8 @@ def test_every_incomplete_m2_04_claim_terminates() -> None:
 
     for claim in claims:
         tag = cast(Any, claim.missing_fact_type).value
-        compiled = build_claim_graph().compile()
-        out = compiled.invoke(
-            {"claim_id": claim.claim_id, "raw_claim_text": claim.narrative},
-            context=_context([tag]),
-        )
+        out = _run(_context([tag]), claim_id=claim.claim_id, text=claim.narrative)
         assert out["clarification_exhausted"] is True, claim.claim_id
         assert out["clarification_rounds"] == MAX_CLARIFICATION_ROUNDS, claim.claim_id
         assert isinstance(out["recommendation"], Recommendation), claim.claim_id
+        assert isinstance(out["human_decision"], HumanDecision), claim.claim_id

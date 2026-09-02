@@ -116,7 +116,9 @@ type is `dict[str, object]`, not `ClaimState` — a partial return typed
    `BaseChatModel` and a stub retriever, no network. Verdict accuracy against
    the synthetic claims is a separate `eval`-marked test ([M4-10]).
 5. Edges, the parallel fan-in and the checkpointer are not the node's concern —
-   see [M4-07] and [M4-09].
+   see [M4-07] and [M4-09]. Note that since [M4-09] the compiled graph needs a
+   checkpointer and a `thread_id`; a single-node test graph for one node in
+   isolation does not, because it has no `interrupt()` in it.
 
 **Enforcement.** `tests/architecture/test_graph_node_conventions.py`
 (unit-marked, runs in CI) fails on any class under `nodes/` that defines
@@ -397,8 +399,11 @@ channel is `audit_trail`, which carries the `append_audit_events` reducer
 ([M4-01]); without it LangGraph raises `InvalidUpdateError` on the concurrent
 append. No other channel is written by both.
 
-**Why one branch's failure is loud.** No `error_handler` is registered (that is
-[M4-09]'s concern). So if a branch raises a genuine exception — the provider
+**Why one branch's failure is loud.** No `error_handler` is registered — and
+[M4-09], which was where that question was deferred to, deliberately did not add
+one: it made the *checkpoint* node total instead (see below), which is where an
+unrecoverable raise actually costs something. So if a branch raises a genuine
+exception — the provider
 unreachable after retries, say — LangGraph's runner cancels the sibling and
 re-raises out of `.invoke()`; `apply_writes` never runs for that superstep, so no
 partial state (`consistency` set, `compatibility` silently missing) is returned.
@@ -482,3 +487,62 @@ prompt); `tests/eval/test_recommendation_baseline.py` (eval-marked — the two
 structural guarantees re-checked on live output, skips without `LLM_PROVIDER`).
 
 Full method and the committed measurement: `docs/RECOMMENDATION_NODE.md`.
+
+---
+
+## The human checkpoint pauses before anything is final — [M4-09]
+
+**Decision.** A terminal `human_review` node
+(`app/src/infrastructure/graph/nodes/human_review.py`) sits between the
+recommendation node and `END`, and it is the only node with an edge to `END`. It
+surfaces the whole recommendation, pauses on LangGraph's `interrupt()`, and
+records the analyst's `approve` / `edit` / `reject` into `state.human_decision`.
+Unconditional: the checkpoint is the product behaviour, not a mode, so
+`build_claim_graph()` takes no flag that removes it, and the compiled graph
+therefore requires a checkpointer and a `thread_id` at every call site.
+
+**Why the decision sits beside the recommendation, not over it.** The node never
+writes `state.recommendation`. An edited assessment lands in
+`human_decision.edited_recommendation`, so what the machine produced and what the
+human did with it are both on the record, separately — which is the only version
+of this that is auditable after the fact.
+
+**Why the node is pure until the pause and total after it.** LangGraph re-runs an
+interrupted node from the top: everything above `interrupt()` executes twice
+(once reaching the pause, once resuming), everything below it once. So the node
+reads state and builds a payload above the line, and does its one side effect —
+the durable audit write — below it. Symmetrically, nothing below the line may
+raise: a resume value is stored in the checkpoint's pending writes, so a node
+that raises after consuming one replays that same value on every subsequent
+resume and the thread can never be finished. Hence a malformed decision
+*re-asks* (a second `interrupt()` carrying the validation error) rather than
+raising, and a failing audit sink degrades to a recorded event rather than
+aborting. Both behaviours were verified against langgraph 1.2.11, not assumed.
+
+**Why the audit trail is written again, to its own table.** Graph state is
+already durable — that is what the checkpointer buys — but only LangGraph can
+read it back, and `audit_event` is the record a compliance reader has to be able
+to query. It is written once, at the checkpoint: the single point every path
+reaches, the only place a side effect is safe from the re-execution above, and
+the first moment the human decision exists. Keyed `(thread_id, sequence)`, which
+makes the insert idempotent by construction rather than by an invented id.
+
+**Why the checkpointer needs its own bring-up step.** `PostgresSaver` owns its
+schema and migrates it itself, outside Alembic — so `make migrate` leaves a
+database that is still not ready for the graph, and `make setup-checkpointer` is
+the second half. Callers that do not create the schema get
+`assert_checkpointer_ready`, which names that command, rather than an
+`UndefinedTable` raised from inside a superstep.
+
+**Enforcement.** `tests/unit/infrastructure/graph/test_human_review.py` (unit —
+the pause, the payload, no side effect before it, the three decisions, the
+original recommendation surviving an edit, the re-ask, the degrading sink);
+`tests/unit/infrastructure/graph/test_checkpointer.py` (unit — the URL
+conversion, the readiness probe, and the serializer allowlist, which silently
+returns `dict` for an unregistered type);
+`tests/unit/infrastructure/graph/test_claim_graph.py` (nothing reaches `END`
+without passing the checkpoint); `tests/integration/test_human_checkpoint.py`
+(integration — two separate OS processes, sharing only the database, prove the
+paused run survives a restart).
+
+Full contract, the verified `interrupt()` semantics and the table: `docs/HUMAN_CHECKPOINT.md`.
