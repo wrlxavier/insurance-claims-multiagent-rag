@@ -1,17 +1,26 @@
 """Schema-level guarantees for the ORM models.
 
-``chunk`` -- [M3-02]; ``audit_event`` -- [M4-09].
+``chunk`` -- [M3-02]; ``audit_event`` -- [M4-09]; ``assessment`` /
+``human_decision`` -- [M5-03].
 """
 
 import re
 
 import pytest
 from pgvector.sqlalchemy import HALFVEC
-from sqlalchemy import CheckConstraint, DateTime
+from sqlalchemy import CheckConstraint, DateTime, Table
 
+from application.assessment_record import AssessmentStatus
 from domain.chunk import ChunkRule
 from domain.clause_classification import ClauseType, TypeSource
-from infrastructure.database.models import AuditEventRow, ChunkRow
+from domain.human_decision import DecisionOutcome
+from domain.verdict import Verdict
+from infrastructure.database.models import (
+    AssessmentRow,
+    AuditEventRow,
+    ChunkRow,
+    HumanDecisionRow,
+)
 from infrastructure.graph.state import AuditEvent
 from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS
 
@@ -19,6 +28,8 @@ from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS
 # FromClause).
 _CHUNK_TABLE = ChunkRow.metadata.tables["chunk"]
 _AUDIT_TABLE = AuditEventRow.metadata.tables["audit_event"]
+_ASSESSMENT_TABLE = AssessmentRow.metadata.tables["assessment"]
+_DECISION_TABLE = HumanDecisionRow.metadata.tables["human_decision"]
 
 _EXPECTED_INDEXES = {
     "ix_chunk_clause_type",
@@ -30,8 +41,8 @@ _EXPECTED_INDEXES = {
 }
 
 
-def _check_constraint_values(name: str) -> set[str]:
-    for constraint in _CHUNK_TABLE.constraints:
+def _check_constraint_values(name: str, table: Table = _CHUNK_TABLE) -> set[str]:
+    for constraint in table.constraints:
         if isinstance(constraint, CheckConstraint) and str(constraint.name) == name:
             return set(re.findall(r"'([^']*)'", str(constraint.sqltext)))
     raise AssertionError(f"no CHECK constraint named {name}")
@@ -189,5 +200,104 @@ def test_audit_event_timestamp_is_timezone_aware() -> None:
     # `AuditEvent.timestamp` defaults to `datetime.now(UTC)`; a naive column
     # would silently drop the offset.
     column_type = _AUDIT_TABLE.c.timestamp.type
+    assert isinstance(column_type, DateTime)
+    assert column_type.timezone is True
+
+
+# --- assessment / human_decision -- [M5-03] --------------------------------
+
+
+@pytest.mark.unit
+def test_assessment_table_name_and_primary_key() -> None:
+    assert AssessmentRow.__tablename__ == "assessment"
+    assert [c.name for c in _ASSESSMENT_TABLE.primary_key.columns] == ["assessment_id"]
+
+
+@pytest.mark.unit
+def test_assessment_mirrors_every_record_field() -> None:
+    # The aggregate's fields, minus the nested `decision` (its own table) and
+    # the identity that is the PK, must each have a column.
+    expected = {
+        "assessment_id",
+        "claim_id",
+        "verdict",
+        "reasoning",
+        "recommended_action",
+        "confidence",
+        "context_sufficient",
+        "clarification_exhausted",
+        "missing_information",
+        "citations",
+        "consistency_flags",
+        "status",
+        "created_at",
+    }
+    assert expected == set(_ASSESSMENT_TABLE.c.keys())
+
+
+@pytest.mark.unit
+def test_assessment_context_sufficient_is_the_only_nullable_column() -> None:
+    # `context_sufficient` is genuinely tri-state; everything else is required.
+    nullable = {c.name for c in _ASSESSMENT_TABLE.c if c.nullable}
+    assert nullable == {"context_sufficient"}
+
+
+@pytest.mark.unit
+def test_assessment_check_constraints_match_the_domain_enums() -> None:
+    assert _check_constraint_values(
+        "ck_assessment_verdict_valid", _ASSESSMENT_TABLE
+    ) == {member.value for member in Verdict}
+    assert _check_constraint_values(
+        "ck_assessment_status_valid", _ASSESSMENT_TABLE
+    ) == {member.value for member in AssessmentStatus}
+
+
+@pytest.mark.unit
+def test_assessment_indexes_the_columns_list_queries_by() -> None:
+    assert {str(index.name) for index in _ASSESSMENT_TABLE.indexes} == {
+        "ix_assessment_claim_id",
+        "ix_assessment_status",
+        "ix_assessment_created_at",
+    }
+
+
+@pytest.mark.unit
+def test_assessment_created_at_is_timezone_aware() -> None:
+    column_type = _ASSESSMENT_TABLE.c.created_at.type
+    assert isinstance(column_type, DateTime)
+    assert column_type.timezone is True
+
+
+@pytest.mark.unit
+def test_human_decision_is_keyed_and_foreign_keyed_to_its_assessment() -> None:
+    assert HumanDecisionRow.__tablename__ == "human_decision"
+    assert [c.name for c in _DECISION_TABLE.primary_key.columns] == ["assessment_id"]
+    foreign_keys = list(_DECISION_TABLE.c.assessment_id.foreign_keys)
+    assert len(foreign_keys) == 1
+    assert foreign_keys[0].column.table.name == "assessment"
+
+
+@pytest.mark.unit
+def test_human_decision_check_constraint_matches_the_decision_enum() -> None:
+    assert _check_constraint_values(
+        "ck_human_decision_decision_valid", _DECISION_TABLE
+    ) == {member.value for member in DecisionOutcome}
+
+
+@pytest.mark.unit
+def test_human_decision_pairs_edited_assessment_with_the_edit_outcome() -> None:
+    # Mirrors `HumanDecision._check_edit_carries_a_revision`.
+    names = {
+        str(c.name)
+        for c in _DECISION_TABLE.constraints
+        if isinstance(c, CheckConstraint)
+    }
+    assert "ck_human_decision_edited_assessment_iff_edit" in names
+    assert _DECISION_TABLE.c.edited_assessment.nullable is True
+
+
+@pytest.mark.unit
+def test_human_decision_decided_at_is_timezone_aware() -> None:
+    column_type = _DECISION_TABLE.c.decided_at.type
     assert isinstance(column_type, DateTime)
     assert column_type.timezone is True
