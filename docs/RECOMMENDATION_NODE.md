@@ -193,6 +193,16 @@ assessed path only (see Limitations).
   quoted ids. A real faithfulness judge over the justification is [M4-10]; if it
   confirms the pattern, the prompt should insist on the id inline.
 
+  **[M4-10] did not confirm it — no prompt change is warranted.** Running the
+  whole graph over the 51 synthetic claims, the justification named a clause id
+  inline on **100% of settled verdicts** (24/24 in the headline arm, 9/9 in the
+  baseline arm), and an independent judge scored the assertions behind those
+  justifications **93.8% supported** across three passes. The 43.8% above was
+  measured on golden *questions*, where the node is handed a question with its
+  document pre-resolved; on claim narratives the same prompt cites inline every
+  time. The finding stands as a property of that input distribution, not of the
+  prompt. See `docs/END_TO_END_EVALUATION.md`.
+
 ---
 
 ## What this means downstream

@@ -388,6 +388,58 @@ Python code rather than at an LLM's discretion.
 - The deterministic/LLM boundary in the consistency node is documented in
   `docs/ARCHITECTURE.md`.
 
+**[M4-10] measurement (2026-09-02).** The whole compiled graph was run over all
+**51** synthetic claims (40 + 11 product/claim mismatch; the criterion's "30" is
+M2-era drift, noted the same way [M4-02] notes it). Full method, three-arm
+tables, failure catalogue and judge results: `docs/END_TO_END_EVALUATION.md`.
+
+| exit criterion | measured | verdict |
+| --- | --- | --- |
+| Graph completes on 100% of the claim set | 51/51, 0 unhandled exceptions, in both completed arms | **met** |
+| End-to-end 3-class accuracy, reference ≥75% | **56.9%** | **below**, catalogued |
+| Citation coverage 100%, enforced automatically | 91/91 assertions; CI step `make validate-citation-coverage` | **met** |
+| Checkpoint survives a process restart | [M4-09]'s two-process integration test | **met** |
+| Consistency deterministic/LLM boundary documented | `docs/ARCHITECTURE.md` ([M4-06]) | **met** |
+
+**The measurement found a defect and fixed it in the same pass**, under the
+protocol this document sets out. The retrieval pre-filter ANDed a stated SUSEP
+process with intake's narrative-derived product line — two fields that answer
+different questions ("which product was bought" vs "what did the claimant
+describe") and that disagree by construction on a product/claim mismatch. The
+conjunction then selected nothing at all. A database count settled the mechanism
+with no model involved: **all 11 mismatch claims had an empty search space**, as
+would 9 of the 13 documents the main claim set targets whenever intake reads the
+event as CASCO. Both states are published:
+
+| | overall | compatible | incompatible | insufficient_information | mismatch |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| before the fix | 35.3% | 28.6% | 15.4% | 92.3% | **0.0%** |
+| after the fix | **56.9%** | 42.9% | 53.8% | 84.6% | **45.5%** |
+
+**Why 56.9% is below the bar, stated rather than explained away.** 11 of the 22
+remaining errors are retrieval misses — now a ranking problem, not an empty-set
+one: the system reaches the right document 78.4% of the time but surfaces a
+labelled clause for only 33.3% of claims. An independent judge (a different
+model family, three passes) scored the assertions **93.8% faithful** against
+**59.3% context relevance**, which says the same thing from the other end: what
+the system asserts is nearly always supported by the clause it cites, and about
+two in five retrieved clauses have no bearing on the claim. The characteristic
+error is abstention — `incompatible` precision 92.3% at 50.0% recall — which for
+a system a human reviews before anything is recorded is the direction to err in.
+
+**Two of six pre-registered predictions missed and are published unedited** (the
+mismatch cohort recovered to 5/11 against a predicted ≥7/11; overall accuracy
+landed at 56.9% against a predicted 60–80%). A third arm — the same measurement
+with no policy reference in the claim text, which would price what the
+pre-filter is worth — was attempted twice and abandoned both times to provider
+rate limiting (HTTP 429); no number from it is reported, and that question stays
+open.
+
+**Explicit call: M4's disposition is the project owner's.** Four of five exit
+criteria are met; the fifth is measured, below its reference value, and
+catalogued — the case this document's opening explicitly permits a milestone to
+close on. The status table is left at `todo` pending that call.
+
 ## M5 — Service and hardening
 
 The notebook-to-service crossing. Wrap the graph in a FastAPI service

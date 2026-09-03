@@ -226,6 +226,33 @@ plain `(state, runtime)` function with `_`-prefixed helpers, no LLM schema);
 
 Full method and the committed measurement: `docs/RETRIEVAL_NODE.md`.
 
+**A stated SUSEP process outranks the narrative-derived product line — [M4-10].**
+`_build_filter` originally ANDed the two whenever intake produced both. That is
+wrong, and [M4-10]'s end-to-end run is what exposed it. The two fields do not
+describe the same thing: a SUSEP process names the **registered product the
+claim was filed against**, while `product_line` is intake's classification of
+the **event the claimant described**. On a product/claim mismatch — the case
+`data/synthetic_claims/product_claim_mismatch.jsonl` exists to test — those two
+disagree *by construction*, so their conjunction selects nothing, the [M3-07]
+gate fires on an empty result, and a knowable `incompatible` degrades to
+`insufficient_information`.
+
+The mechanism is not a matter of model behaviour, and the evidence for it is
+LLM-free: counting chunks in the database under each filter shows **11 of 11**
+mismatch claims have an empty search space under the conjunction (their process
+alone selects 19–117 chunks), and **9 of the 13** documents the main claim set
+targets empty out too if intake reads the event as CASCO — which is the reading
+the corpus invites, since 3,244 of its 4,540 chunks are CASCO. The defect was
+never confined to the cohort that revealed it.
+
+So when a process is stated it wins alone; the product line constrains only the
+fallback path, where no process was read from the claim. This restores what
+`infrastructure/rag/retrieval_filter.py`'s own docstring already asserted — "a
+claims analyst works a case for a known policy" — and it narrows rather than
+widens the search: a process selects one document, a product line selects a
+whole segment of the corpus. Measured both ways in
+`docs/END_TO_END_EVALUATION.md`, under a prediction registered before the run.
+
 ---
 
 ## The compatibility node grounds every assertion in a retrieved clause — [M4-05]

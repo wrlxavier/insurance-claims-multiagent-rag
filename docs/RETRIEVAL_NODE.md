@@ -11,8 +11,9 @@ Code:
 
 - `app/src/infrastructure/graph/nodes/retrieval.py` — the node, plus
   `_build_query` (joins `event_type` / `description` / `vehicle_info`) and
-  `_build_filter` (SUSEP process when stated + product line; `None` when
-  neither is known).
+  `_build_filter` (SUSEP process when stated, else the product line — the
+  [M4-10] amendment below replaced the original conjunction of the two;
+  `None` when neither is known).
 - `app/src/infrastructure/rag/retrieved_clause.py` — `RetrievedClause`, the
   port's return type (clause id + provenance + reranker score).
 - `app/src/infrastructure/rag/graph_retrieval_adapter.py` —
@@ -38,8 +39,9 @@ not touch the graph. What this issue does **not** own:
   built by this eval script and by tests.
 - The insurer CNPJ half of the pre-filter. Intake extracts a SUSEP process only
   "if stated"; it never extracts a CNPJ. So the node's filter is SUSEP process
-  (often absent) + product line, one field weaker than the M3 eval harness's
-  SUSEP-process + CNPJ default path. On `golden-set-v1` this costs nothing (see
+  (often absent), else the product line — see the [M4-10] amendment below, which
+  replaced the original conjunction of the two — one field weaker than the M3
+  eval harness's SUSEP-process + CNPJ default path. On `golden-set-v1` this costs nothing (see
   below), because within a SUSEP process the CNPJ is redundant; a real claim
   with no stated process falls back to the product-line-only or unconstrained
   path, which [M4-10] will exercise.
@@ -54,7 +56,9 @@ not touch the graph. What this issue does **not** own:
 question is fed as `entities.description`, with `entities.susep_process` and
 `entities.product_line` taken from `data/policies/manifest.csv` for the
 question's target document — so `_build_query` returns the question text and
-`_build_filter` returns that document's process + product line. The
+`_build_filter` returns that document's process (plus, before the [M4-10]
+amendment below, its product line; within one process the two select the same
+chunks, so the measured numbers are the same either way). The
 entity→query composition (multi-field join, fallback, null handling) is
 unit-tested in `tests/unit/infrastructure/graph/test_retrieval.py`; this run
 measures retrieval quality and the gate wiring.
@@ -136,6 +140,27 @@ also runs, never re-scores rank-1, so the gate's signal is unchanged.
   targets one document and the process/CNPJ pair is 1:1 within it, so dropping
   CNPJ from the node's filter is invisible here. The claims path where a
   process is not stated is [M4-10]'s to measure.
+
+## Amended by [M4-10]: the filter is no longer a conjunction
+
+This document described `_build_filter` as "SUSEP process when stated plus the
+product line". [M4-10]'s end-to-end run over the synthetic claims showed that
+ANDing them is a defect, and the node was changed: **a stated process now wins
+alone**, and the product line constrains only the no-process fallback.
+
+The reason `golden-set-v1` could not see this is the same reason it cannot
+separate the CNPJ filter's value, stated above. Every golden question targets
+one document *and* carries the manifest's own product line, so intake's
+classification and the process never disagree there. They disagree exactly on a
+product/claim mismatch — a CASCO-type event filed against an RCF-A / ASSIST /
+GAR.EST / CARTA VERDE policy — which `golden-set-v1` contains none of and
+`data/synthetic_claims/product_claim_mismatch.jsonl` contains eleven of. Under
+the conjunction all eleven selected **zero chunks** before any ranking ran.
+
+Nothing in this document's measured numbers changes: on `golden-set-v1` the two
+filters select the same chunks, so the Results above still stand as the node's
+retrieval-transparency check. The reasoning and the before/after are in
+`docs/END_TO_END_EVALUATION.md`; the rule itself is in `docs/ARCHITECTURE.md`.
 
 ## What this means downstream
 

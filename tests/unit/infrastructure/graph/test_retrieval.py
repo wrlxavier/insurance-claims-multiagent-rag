@@ -129,13 +129,36 @@ def test_build_query_falls_back_only_when_entities_carry_no_text() -> None:
 
 
 @pytest.mark.unit
-def test_build_filter_uses_the_classification() -> None:
+def test_a_stated_process_filters_alone_not_anded_with_the_product_line() -> None:
+    # [M4-10]: the process names the product the claim was FILED AGAINST; the
+    # product line classifies the EVENT the claimant described. On a
+    # product/claim mismatch the two disagree by construction, and ANDing them
+    # selected zero chunks -- turning a knowable `incompatible` into
+    # `insufficient_information`. See `_build_filter`'s docstring.
     entities = ExtractedEntities(
         susep_process="15414.900000/2013-00", product_line="CASCO"
     )
     assert _build_filter(entities) == RetrievalFilter(
-        susep_process="15414.900000/2013-00", product_line="CASCO"
+        susep_process="15414.900000/2013-00"
     )
+
+
+@pytest.mark.unit
+def test_the_product_line_filters_only_when_no_process_was_stated() -> None:
+    assert _build_filter(ExtractedEntities(product_line="RCF-A")) == RetrievalFilter(
+        product_line="RCF-A"
+    )
+
+
+@pytest.mark.unit
+def test_a_mismatched_product_line_cannot_empty_the_search_space() -> None:
+    # The regression this fix exists to prevent: an RCF-A policy with a
+    # CASCO-looking narrative must still search the RCF-A document.
+    filter_ = _build_filter(
+        ExtractedEntities(susep_process="15414.900000/2013-00", product_line="CASCO")
+    )
+    assert filter_ is not None
+    assert filter_.product_line is None
 
 
 @pytest.mark.unit
@@ -161,7 +184,7 @@ def test_retrieval_passes_the_built_query_and_filter_to_the_port() -> None:
     assert retriever.question == "colisão com mureta"
     assert retriever.k == RETRIEVAL_K
     assert retriever.metadata_filter == RetrievalFilter(
-        susep_process="15414.900000/2013-00", product_line="CASCO"
+        susep_process="15414.900000/2013-00"
     )
 
 
