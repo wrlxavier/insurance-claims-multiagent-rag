@@ -573,3 +573,68 @@ without passing the checkpoint); `tests/integration/test_human_checkpoint.py`
 paused run survives a restart).
 
 Full contract, the verified `interrupt()` semantics and the table: `docs/HUMAN_CHECKPOINT.md`.
+
+---
+
+## Domain entities are frozen dataclasses that validate on construction — [M5-01]
+
+**Decision.** The business layer (`app/src/domain/`) is `Policy`, `PolicyClause`,
+`Claim`, `Assessment`, `HumanDecision`, the `Citation` value object and the
+`SusepProcess` / `Cnpj` identifier value objects — every one a
+`@dataclass(frozen=True)` whose `__post_init__` raises if the invariant it owns
+is broken. Closed vocabularies are `enum.Enum` (`Verdict` reused unchanged from
+[M4-01], `DecisionOutcome` new). Value objects take a strict constructor
+(already-canonical input) plus a lenient `parse()` classmethod that normalises
+I/O forms — `Cnpj.parse` applies the 14-digit zero-pad the upstream SUSEP
+catalogue needs; `SusepProcess.parse` accepts the 17-digit filename stem. One
+`domain/errors.py` holds the exception hierarchy. Standard library and typing
+only — no Pydantic, no SQLAlchemy, no LangGraph.
+
+**Why validate in `__post_init__`, and why the enum field still needs a guard.**
+A frozen dataclass gives immutability and structural equality for free but does
+**not** check its field types at runtime, so `Assessment(verdict="compatible",
+…)` would construct happily and the DoD's "a verdict is one of the three
+permitted values" invariant would be unenforced. Each entity therefore
+`isinstance`-guards its enum fields explicitly (`VerdictNotPermittedError`) and
+checks its cross-field rules (an assessment has ≥1 citation always — including
+for `insufficient_information`; a `HumanDecision` always carries the
+`assessment_id` it acted on, and an `edited_assessment` must revise that same
+id). `Cnpj` verifies the real mod-11 check digits — a public, stable algorithm,
+and a wrong-length or transposed-digit CNPJ is exactly the upstream-data bug
+class the value object exists to catch; `SusepProcess` is format-only, because
+SUSEP's process check-digit algorithm is not a published spec and a false
+rejection of a real filing is unrecoverable.
+
+**Why a twin of `infrastructure/graph/state.py`, not a move.** `state.py` is
+Pydantic (LangGraph needs it) and forbidden in `domain/` by
+`tests/architecture/test_layer_boundaries.py`. The graph keeps producing its
+`CompatibilityAssessment` / `HumanDecision` inside a run; the domain dataclasses
+are what the application ports ([M5-02]) and repositories ([M5-03]) speak in,
+with the mappers between the two owned by [M5-03]. `Verdict` is the one type
+already shared across both.
+
+**Deviation on record.** (a) The DoD names the clause entity `Clause`; it ships
+as `PolicyClause` so it does not shadow the existing 18-field parse-tree
+`Clause` (`domain/clause_tree.py`) — the two are never imported together, and
+both module docstrings state the split. (b) `domain/errors.py` centralises the
+exception hierarchy, unlike the per-module `OrphanTextExceedsThresholdError`
+pattern elsewhere in `domain/`: M5-01's errors are a cluster the API boundary
+catches as one group. (c) `Assessment` omits consistency signals — no M5-01
+invariant touches them; persisting `ConsistencyReport` is [M5-03]'s call. (d)
+The ≥1-citation invariant is unconditional, so the compatibility node's
+abstain-on-empty-retrieval output is not a persistable `Assessment` — it stays
+in claim state and the audit trail, a fact [M5-02]/[M5-03] account for.
+`ClauseProvenance` is left untouched; `Policy` is additive.
+
+**Enforcement.** `tests/unit/domain/` — one `test_<module>.py` per entity, every
+invariant with its rejection case (`test_assessment.py` on the ≥1-citation and
+verdict-type rules, `test_human_decision.py` on the assessment reference and the
+edit-consistency rules, `test_cnpj.py` parametrized over all 30 manifest CNPJs).
+`tests/architecture/test_layer_boundaries.py` already AST-scans all of
+`app/src/domain/` for a forbidden import and needs no change — the new
+stdlib-only modules are covered automatically.
+`tests/architecture/test_scope_vocabulary.py` now scans the whole `domain/`
+package, not just `verdict.py`.
+
+Full field tables, the invariant list and the relationship to `state.py`:
+`docs/DOMAIN.md`.
