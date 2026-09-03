@@ -25,3 +25,13 @@ incompatible, insufficient_information. Use insufficient_information \
 whenever the retrieved context does not settle the question, rather than \
 guessing.\
 """
+
+
+def with_scope_preamble(body: str) -> str:
+    """Prepend ``SCOPE_PREAMBLE`` to a node prompt body.
+
+    The one machine-checked way to satisfy this package's rule that every node
+    prompt carries the scope constraint: ``build_<node>_prompt`` returns
+    ``with_scope_preamble(...)`` rather than its own concatenation.
+    """
+    return f"{SCOPE_PREAMBLE}\n\n{body}"

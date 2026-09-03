@@ -4,8 +4,13 @@ Postgres with pgvector, Alembic migrations, and the integration-test path.
 Landed by [M0-08], which creates the database *capability* — the schema
 belongs to the issues that need it: the `chunk` table to [M3-02] (its
 `embedding` vector column follows in the same issue's embedding-pipeline
-half), the checkpointer tables to [M4-09], the domain and audit tables to
-[M5-03].
+half), the checkpointer tables **and** the `audit_event` table to [M4-09], the
+domain tables to [M5-03].
+
+The audit table moved forward from [M5-03] deliberately: [M4-09]'s DoD requires
+the audit trail to be durable *and* separate from graph state, which is the
+table. [M5-03] keeps `Assessment` / `HumanDecision` and adds the database-level
+append-only enforcement.
 
 The initial migration creates the `vector` extension and nothing else.
 
@@ -15,9 +20,13 @@ The initial migration creates the `vector` extension and nothing else.
 cp .env.example .env
 docker compose up -d postgres
 make migrate
+make setup-checkpointer
 ```
 
-`docker-compose.yaml` currently holds one service. [M5-09] adds `api`, `redis`
+`make setup-checkpointer` is the second half of the schema, and it is separate
+for a reason — see "The checkpointer owns its own schema" below.
+
+`compose.yaml` currently holds one service. [M5-09] adds `api`, `redis`
 and `langfuse` to that same file; the Postgres block is written so they are
 appended rather than requiring it to be rewritten.
 
@@ -232,6 +241,78 @@ proof of its filtered-search behaviour and the `hnsw.iterative_scan` fix.
   migrations — the HNSW definition lives in `infrastructure.rag.ann_index` and
   [M3-02]'s benchmark found the composite `(susep_process, cnpj)` btree +
   exact sort is what the planner picks for the default path anyway (~0.6 ms).
+
+## The checkpointer owns its own schema ([M4-09])
+
+`PostgresSaver` creates and migrates its own tables — `checkpoints`,
+`checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations` — through
+`setup()`, tracking its versions in a table of its own. Alembic knows nothing
+about them, and folding them into a migration would mean either importing
+LangGraph into a migration file (which `20260827_02` explicitly rules out for
+app code, for the same reason) or hand-copying a schema this project does not
+own and would have to re-copy on every upgrade.
+
+So a database with `alembic upgrade head` applied is still not ready for the
+graph, and the bring-up has two steps:
+
+```bash
+make migrate              # the application schema, incl. audit_event
+make setup-checkpointer   # the checkpointer's own tables
+```
+
+`make setup-checkpointer` runs `scripts/setup_checkpointer.py`, which is the one
+place `setup()` is called — the way `make migrate` is the one place Alembic runs.
+It is idempotent, and it reads the same `DATABASE_URL` (or discrete `DATABASE_*`)
+settings as everything else, which is what "the checkpointer uses the same
+database as the rest of the service" means in practice. Every other caller of
+`infrastructure.graph.checkpointer.open_claim_checkpointer` gets
+`assert_checkpointer_ready` instead, which names this command rather than letting
+a missing table surface as a psycopg `UndefinedTable` from inside a graph run.
+
+**Alembic must be told to ignore them.** Two tools now write to the same
+database, and autogenerate compares the database against `Base.metadata`: it
+reads four tables it cannot account for as tables the models *dropped*, and
+proposes a migration that deletes the checkpointer — and every paused run with
+it. `alembic/env.py` therefore passes an `include_name` filter listing those
+tables, and `alembic check` is clean with them present. The list is a plain
+literal there, like the enum value sets in `20260827_02`, so `env.py` imports no
+app code; `tests/unit/infrastructure/graph/test_checkpointer.py` ties it back to
+`infrastructure.graph.checkpointer.CHECKPOINTER_TABLES`, and
+`tests/integration/test_human_checkpoint.py` runs `alembic check` against a
+database that has both schemas.
+
+One consequence for tests: `tests/integration/conftest.py` drops **every**
+reflected table between tests, checkpoint tables included, and the Alembic replay
+does not bring them back. A checkpointer test creates them itself — which is also
+how `tests/integration/test_human_checkpoint.py` proves `setup()` builds the
+schema from nothing.
+
+## The audit_event table ([M4-09])
+
+`AuditEventRow` is the persistence representation of
+`infrastructure.graph.state.AuditEvent`, the same way `ChunkRow` is of a
+`ChunkRecord`: one row per event a graph run produced, written once by the human
+checkpoint when the analyst decides.
+
+Primary key `(thread_id, sequence)` rather than an invented event id. The
+checkpoint node re-runs from the top whenever its thread is resumed, so the write
+has to be repeatable; an event's position in its thread's trail is already
+deterministic, which makes `ON CONFLICT DO NOTHING` sufficient. `claim_id` is
+indexed because that is what a human searches by; `thread_id` is already covered
+by the key. A nullable `payload` JSONB column carries the analyst's whole
+`HumanDecision` on the one row that has one, so "what the human decided" is a
+`SELECT` rather than a checkpoint deserialization.
+
+No CHECK constraints, unlike `chunk`: none of these columns is a closed enum —
+`node` and `action` are free-form strings each node chooses, and constraining
+them would turn adding a node into a migration.
+
+The trail is append-only by construction — `infrastructure/database/audit_repository.py`
+offers an insert and nothing else — but not yet by the database. The rule or
+trigger rejecting `UPDATE`/`DELETE` is [M5-03]'s, along with its test.
+
+Rationale and the interrupt contract that produces these rows:
+`docs/HUMAN_CHECKPOINT.md`.
 
 ## Integration tests
 

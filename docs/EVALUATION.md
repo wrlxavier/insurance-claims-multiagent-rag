@@ -195,6 +195,17 @@ among the 23 `unanswerable` questions, which are excluded from scoring.
 Broadening scorable-question coverage to the other three product lines is
 new golden-set authoring work, out of scope for [M2-06] and this document.
 
+**Verdict scoring is a different metric family, measured elsewhere.** These
+four are retrieval-ranking metrics over `reference_clause_ids`. Whether the
+system's *answer* is right is scored against the three-class
+`expected_verdict` vocabulary by
+[`infrastructure.evaluation.verdict_metrics`](../app/src/infrastructure/evaluation/verdict_metrics.py)
+— a confusion matrix with per-class precision and recall — used by [M4-05]'s
+node measurement (`docs/COMPATIBILITY_ASSESSMENT.md`) and by [M4-10]'s
+end-to-end run over the synthetic claims (`docs/END_TO_END_EVALUATION.md`),
+which is also where faithfulness and context relevance are measured and where
+the committed judge prompt lives.
+
 The Jaccard/F1 clause-id-overlap statistics reported below, under
 "Independent second-reviewer pass," are a different measurement —
 reviewer/author label agreement, not retrieval scoring — computed

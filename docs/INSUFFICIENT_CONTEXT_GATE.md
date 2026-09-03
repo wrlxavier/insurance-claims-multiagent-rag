@@ -308,8 +308,11 @@ answer before it starts, and on the evidence available it does.
 
 ## Deferred / handed to later issues
 
-- **Wiring into the LangGraph retrieval node** and the routing decision —
-  [M4-04].
+- **Wiring into the LangGraph retrieval node** and the routing decision — done:
+  [M4-04]. The retrieval node assembles the `GateSignals` from its hybrid +
+  rerank pipeline, calls `evaluate_gate`, writes `context_sufficient`, and
+  `route_after_retrieval` branches on it. Re-measured through the node: 100%
+  recall / 0 false abstentions on `golden-set-v1` (`docs/RETRIEVAL_NODE.md`).
 - **A held-out unanswerable set** — a `golden-set-v2` authoring task; the gate
   cannot be *evaluated* (as opposed to calibrated) without one.
 - **A real query-intent classifier** to replace the `needs_verified_instance_value`

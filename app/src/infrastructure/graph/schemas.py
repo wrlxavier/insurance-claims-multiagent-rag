@@ -1,0 +1,342 @@
+"""Structured-output schemas for graph nodes -- [M4-01b].
+
+One frozen Pydantic ``<Node>Output`` per LLM node -- the exact shape passed to
+``llm.with_structured_output(...)``. Kept separate from the state sub-models in
+``state.py``: the node maps its output schema onto the state model (for
+example, the model returns clause-id strings and the node hydrates ``Citation``
+objects with the retrieved clauses' provenance).
+
+``IntakeOutput`` ([M4-02]) is the first: it maps onto ``ExtractedEntities`` and
+routes ``missing_information`` to its own ``ClaimState`` channel.
+``ClarificationOutput`` ([M4-03]) is the second: the clarification node maps
+each ``ClarificationQuestionItem`` onto a ``state.ClarificationQuestion``.
+``CompatibilityOutput`` ([M4-05]) is the third: the compatibility node maps its
+``verdict`` onto ``domain.verdict.Verdict``, renders its ``assertions`` into the
+plain ``reasoning`` string ``state.CompatibilityAssessment`` holds, and hydrates
+a ``state.Citation`` per cited clause id from the clauses retrieval put in state.
+``ConsistencyOutput`` ([M4-06]) is the fourth and covers only the *semantic*
+half of that node: the node maps each ``ConsistencySignalItem`` onto a
+``state.ConsistencySignal`` with ``source="llm"``, and concatenates them after
+the deterministic signals ``infrastructure.graph.consistency_checks`` produced.
+It carries no verdict -- the consistency node signals, it does not decide.
+``RecommendationOutput`` ([M4-08]) is the fifth and the narrowest: it maps onto
+``state.Recommendation`` and carries **only** ``justification``. The
+recommendation node computes every other field of ``state.Recommendation``
+(``recommended_action``, ``citations``, ``consistency_flags``, ``confidence``)
+deterministically from upstream state -- the model is asked for the prose
+summary and nothing load-bearing, so it can neither invent a citation nor turn
+an ``insufficient_information`` verdict into a confident one.
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+# The five product lines in the corpus. Canonical source is the ``product_line``
+# column of ``data/policies/manifest.csv`` -- there is no enum in the codebase.
+# The intake node ([M4-02]) classifies each claim's event against this closed
+# set.
+ProductLineCode = Literal["CASCO", "RCF-A", "ASSIST", "GAR.EST", "CARTA VERDE"]
+
+# The load-bearing facts an intake pass can find missing from a claim narrative,
+# before any retrieval runs. The string values match
+# ``infrastructure.evaluation.synthetic_claims_schema.MissingFactType`` verbatim
+# so the [M4-10] eval can score intake's output against each synthetic claim's
+# labelled ``missing_fact_type`` -- redeclared here rather than imported, to keep
+# the graph package independent of the evaluation package. A unit test
+# (``tests/unit/infrastructure/graph/test_intake.py``) guards the match.
+MissingInfoTag = Literal[
+    "ambito_geografico",
+    "uso_do_veiculo",
+    "data_evento_vigencia",
+    "valor_franquia_limite",
+    "tipo_evento_condicao",
+]
+
+
+class IntakeOutput(BaseModel):
+    """The intake node's ([M4-02]) structured read of the raw claim narrative.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)``. The
+    node copies the entity fields onto ``state.ExtractedEntities`` and sends
+    ``missing_information`` to its own ``ClaimState`` channel. Every entity
+    field is optional: the model leaves it ``None`` when the narrative does not
+    state the fact, rather than inventing a value.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    event_type: str | None = Field(
+        default=None,
+        description=(
+            "The kind of event described -- e.g. collision, theft, fire, glass "
+            "breakage, mechanical failure, a roadside assistance request. Null "
+            "when the narrative does not make the event type clear."
+        ),
+    )
+    event_date: str | None = Field(
+        default=None,
+        description=(
+            "When the event happened, as stated -- an absolute date or the "
+            "relative phrase the narrative uses ('faz umas duas semanas'). "
+            "Null only when there is no time reference at all. Do not infer a "
+            "date."
+        ),
+    )
+    description: str | None = Field(
+        default=None,
+        description=(
+            "A concise, neutral summary of what happened, including where it "
+            "happened when the narrative says so. Null only when the narrative "
+            "carries no detail."
+        ),
+    )
+    estimated_amount: float | None = Field(
+        default=None,
+        description=(
+            "The estimated loss amount in BRL, as a number, only when the "
+            "narrative states one. Null otherwise -- do not estimate."
+        ),
+    )
+    vehicle_info: str | None = Field(
+        default=None,
+        description=(
+            "What the narrative says about the vehicle: make, model, year, how "
+            "it was being used (private, app-based transport, cargo), or its "
+            "condition. Null when the narrative says nothing about the vehicle."
+        ),
+    )
+    susep_process: str | None = Field(
+        default=None,
+        description=(
+            "The SUSEP process number (format NNNNN.NNNNNN/NNNN-NN) only when "
+            "the narrative explicitly states one. Null otherwise -- never guess "
+            "a process, an insurer, or a policy."
+        ),
+    )
+    product_line: ProductLineCode | None = Field(
+        default=None,
+        description=(
+            "Which registered product line the described event belongs to, "
+            "read from the event itself rather than copied from the text. Null "
+            "only when the event fits none of the five lines or is too vague to "
+            "place. Damage to the insured's own vehicle is CASCO even when the "
+            "person is writing about a different product."
+        ),
+    )
+    missing_information: list[MissingInfoTag] = Field(
+        default_factory=list,
+        description=(
+            "The load-bearing facts needed to judge whether the event is "
+            "consistent with a registered product's conditions and which the "
+            "narrative does not provide. Add a tag only when the fact is both "
+            "absent and material; an empty list means the narrative is "
+            "complete enough to proceed."
+        ),
+    )
+
+
+class ClarificationQuestionItem(BaseModel):
+    """One (gap, question) pair the clarification node ([M4-03]) produces.
+
+    ``field`` is the ``missing_information`` tag the question is meant to
+    close; ``question`` is the concrete thing to ask the claimant. The node
+    maps this onto ``state.ClarificationQuestion`` and guarantees exactly one
+    item per input gap -- filling any tag the model omits from a per-tag
+    fallback template.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field: MissingInfoTag
+    question: str = Field(
+        description=(
+            "One specific question, in informal Brazilian Portuguese, whose "
+            "answer would close exactly this gap and no other. Refer to what "
+            "the claimant already said. Never a generic 'send more details'."
+        )
+    )
+
+
+class ClarificationOutput(BaseModel):
+    """The clarification node's ([M4-03]) structured set of questions.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)`` -- one
+    ``ClarificationQuestionItem`` per gap in the current ``missing_information``
+    list.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    questions: list[ClarificationQuestionItem]
+
+
+# The M0-06 verdict vocabulary, redeclared as a ``Literal`` for the structured
+# output rather than imported from ``domain.verdict.Verdict`` -- same reason
+# ``MissingInfoTag`` is redeclared: ``schemas.py`` stays free of cross-package
+# imports, and the compatibility node ([M4-05]) maps the string onto ``Verdict``.
+# ``tests/unit/infrastructure/graph/test_compatibility.py`` guards the match.
+CompatibilityVerdict = Literal["compatible", "incompatible", "insufficient_information"]
+
+
+class ReasonedAssertion(BaseModel):
+    """One statement the compatibility node ([M4-05]) makes, with its clause backing.
+
+    The DoD's hard rule -- "every assertion in the reasoning references at least
+    one clause id" -- is enforced on this object: the node rejects a
+    ``compatible`` / ``incompatible`` output carrying an assertion whose
+    ``clause_ids`` is empty or names a clause retrieval did not return, and
+    retries. Modelling the reasoning as a list of (statement, clause_ids) pairs
+    makes that a field check rather than a parse of free prose.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    statement: str = Field(
+        description=(
+            "One factual claim, in Brazilian Portuguese, about whether the "
+            "described event is consistent with the registered product's "
+            "conditions. Keep each assertion to a single point."
+        )
+    )
+    clause_ids: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The ids of the retrieved clauses that support THIS statement, "
+            "copied verbatim from the numbered clause list. At least one for "
+            "every statement, unless the verdict is insufficient_information."
+        ),
+    )
+
+
+class CompatibilityOutput(BaseModel):
+    """The compatibility node's ([M4-05]) structured verdict.
+
+    The exact shape passed to ``reasoning_model.with_structured_output(...)``.
+    The node maps ``verdict`` onto ``domain.verdict.Verdict``, renders
+    ``assertions`` into the plain ``reasoning`` string that
+    ``state.CompatibilityAssessment`` holds, and hydrates a ``state.Citation``
+    for every clause id the assertions cite from the clauses in
+    ``ClaimState.citations``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    verdict: CompatibilityVerdict = Field(
+        description=(
+            "compatible when the retrieved clauses show the event fits the "
+            "product's conditions; incompatible when a retrieved clause "
+            "(typically an exclusion) rules it out; insufficient_information "
+            "when the retrieved clauses do not settle the question -- never a "
+            "guess."
+        )
+    )
+    assertions: list[ReasonedAssertion] = Field(
+        default_factory=list,
+        description=(
+            "The reasoning, one assertion at a time. When both a coverage "
+            "clause and an exclusion were retrieved, weigh them against each "
+            "other explicitly in the assertions and cite both. Empty only for "
+            "insufficient_information when nothing relevant was retrieved."
+        ),
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="How firmly the retrieved clauses settle the question, 0-1.",
+    )
+
+
+# The semantic-judgement categories the consistency node ([M4-06]) asks the fast
+# model for -- narrative coherence, description vs. stated event type, and
+# vagueness where a figure or a detail would be expected. Constrained to a
+# ``Literal`` (not free ``str``) so ``scripts/eval_consistency.py`` can aggregate
+# the signal distribution by category rather than by whatever label the model
+# invents. The deterministic checks in
+# ``infrastructure.graph.consistency_checks`` emit their own stable names.
+ConsistencyCheckName = Literal[
+    "narrative_coherence",
+    "description_event_type_mismatch",
+    "unexpected_vagueness",
+]
+
+
+class ConsistencySignalItem(BaseModel):
+    """One semantic inconsistency the consistency node ([M4-06]) flags.
+
+    The node maps this onto ``state.ConsistencySignal`` with ``source="llm"``.
+    There is no verdict field here or on ``ConsistencyOutput``: this node
+    signals for human attention and decides nothing.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    check: ConsistencyCheckName = Field(
+        description=(
+            "Which kind of inconsistency this is: narrative_coherence (the "
+            "described sequence of events does not hold together), "
+            "description_event_type_mismatch (the free description does not "
+            "match the stated event type), or unexpected_vagueness (a "
+            "material loss is described with no detail a claimant would "
+            "normally give)."
+        )
+    )
+    severity: Literal["info", "attention"] = Field(
+        description=(
+            "attention when a reviewer should look before proceeding; info "
+            "when it is a minor note."
+        )
+    )
+    detail: str = Field(
+        description=(
+            "One sentence, in Brazilian Portuguese, naming the specific "
+            "inconsistency for a human reviewer. No verdict, no speculation "
+            "about intent."
+        )
+    )
+
+
+class ConsistencyOutput(BaseModel):
+    """The consistency node's ([M4-06]) semantic-judgement output.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)``. A
+    short list -- often empty -- of ``ConsistencySignalItem``. No verdict: the
+    node returns signals for a human, never a decision.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    signals: list[ConsistencySignalItem] = Field(
+        default_factory=list,
+        description=(
+            "The internal inconsistencies you found, at most a handful. Empty "
+            "when the narrative is internally coherent -- which is the common "
+            "case. Never a verdict on the claim."
+        ),
+    )
+
+
+class RecommendationOutput(BaseModel):
+    """The recommendation node's ([M4-08]) prose summary -- and nothing else.
+
+    The exact shape passed to ``fast_model.with_structured_output(...)``. The
+    node maps ``justification`` straight onto ``state.Recommendation.justification``
+    and fills the model's other fields itself. There is deliberately no citation
+    field, no verdict field and no confidence field here: a citation the model
+    named would be one no upstream node produced, and a confidence it reported
+    could contradict an ``insufficient_information`` upstream verdict -- so the
+    node owns both.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    justification: str = Field(
+        description=(
+            "One short paragraph, in Brazilian Portuguese, for a reviewer "
+            "scanning the case in seconds: the compatibility finding first, then "
+            "the clause ids it rests on, then the consistency attention points "
+            "as caveats. State only what the compatibility and consistency steps "
+            "found -- no real-world coverage outcome, no new facts, and no "
+            "clause id that is not in the list you were given."
+        )
+    )
