@@ -18,9 +18,11 @@ microseconds, with no graph, no database and no HTTP.
 Pydantic *twins* of several of these types (`Citation`, `CompatibilityAssessment`,
 `HumanDecision`, …) — it has to, because LangGraph needs Pydantic and Pydantic is
 forbidden in `domain/`. The graph keeps producing those inside a run; the domain
-dataclasses are the persisted, API-facing shape. The mappers between the two are
-[M5-03]'s deliverable. `domain.verdict.Verdict` is the one type already shared by
-both, unchanged since [M4-01].
+dataclasses are the persisted, API-facing shape. The aggregate ↔ ORM-row mapper
+is [M5-03]'s (`infrastructure/database/assessment_mapper.py`); the graph-state ↔
+domain mapper is [M5-04]'s, with the orchestrator adapter that needs it (see
+"Deferred"). `domain.verdict.Verdict` is the one type already shared by both,
+unchanged since [M4-01].
 
 ---
 
@@ -98,8 +100,11 @@ One clause of a registered product, as the service layer sees it: a stable id,
 its business type, its text. **Distinct from `domain.clause_tree.Clause`** — that
 is an 18-field parse-tree node (parent/child pointers, page spans, per-line page
 attribution), a build-time artifact cached to Parquet and never persisted.
-[M5-02]'s `ClauseRepository` returns `PolicyClause`; [M5-03]'s mapper builds one
-from a `clause_tree.Clause` + its `TypedClause` classification + `ClauseProvenance`.
+[M5-02]'s `ClauseRepository` returns `PolicyClause`; [M5-03]'s
+`SqlAlchemyClauseRepository` projects one from the `chunk` table (grouping the
+rows whose `source_clause_ids` carries the wanted id), not from the clause tree —
+the corpus is already indexed there and that is the granularity a `Citation`
+refers to.
 
 The DoD names this entity `Clause`; it is `PolicyClause` to avoid shadowing the
 existing name (`docs/ARCHITECTURE.md` records the deviation).
@@ -212,6 +217,11 @@ the rest of `domain/`.
   unchanged.
 - **`ExtractedEntities`** — stays graph working state in `infrastructure/graph/
   state.py`; not a DoD entity.
-- **Mappers** — domain ↔ ORM row, and domain ↔ `state.py` Pydantic — are [M5-03].
+- **Mappers** — domain/aggregate ↔ ORM row landed in [M5-03]
+  (`app/src/infrastructure/database/assessment_mapper.py`). The domain ↔
+  `state.py` Pydantic mapper is deferred to [M5-04]: its only consumer is the
+  LangGraph orchestrator adapter, and `AssessmentRecord.from_orchestrator_result`
+  already bridges the graph-free DTO — this codebase does not land a mapper
+  ahead of its caller (the same call that dropped `RetrievalService` in [M5-02]).
 - **`Claim.policy_ref` as a required field** — [M5-04], when the submission API
   takes it explicitly.

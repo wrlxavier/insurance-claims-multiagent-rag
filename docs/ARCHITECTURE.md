@@ -719,12 +719,60 @@ LLM, no database, no graph; `test_assessment_record.py` on the projection and
 the status/decision pairing;
 `tests/architecture/test_layer_boundaries.py::test_application_imports_no_infrastructure_or_llm_sdk`.
 
-**Downstream.** [M5-03] implements the SQLAlchemy `AssessmentRepository` (two
-bindings — a read adapter on a fresh session, a write adapter bound to the
-`UnitOfWork` session), the `UnitOfWork`, the assessment/decision migrations, the
-append-only audit enforcement, and folds the record write into the audit-sink
-transaction (closing the narrow window where a persist failure after a
-successful resume diverges the record from the checkpoint). [M5-04] adds the
-FastAPI endpoints, the LangGraph orchestrator adapter, `SystemClock`, the
-`policy_ref` → retrieval-filter path, and the domain/application-error → HTTP
-status mapping.
+**Downstream.** [M5-03] implements the SQLAlchemy adapters behind these ports
+(see the next section). [M5-04] adds the FastAPI endpoints, the LangGraph
+orchestrator adapter, `SystemClock`, the `policy_ref` → retrieval-filter path,
+and the domain/application-error → HTTP status mapping.
+
+---
+
+## Persistence adapters mirror the ports; the audit trail is append-only in the database — [M5-03]
+
+**Decision.** `app/src/infrastructure/database/` gains the SQLAlchemy
+implementations of the [M5-02] ports: `SqlAlchemyAssessmentRepository`,
+`SqlAlchemyClauseRepository`, `SqlAlchemyUnitOfWork` (+
+`sqlalchemy_unit_of_work_factory`), the `assessment` / `human_decision` tables
+(`models.py`, migration `20260903_01`), and the row ↔ aggregate mapper
+(`assessment_mapper.py`). `audit_event` becomes append-only at the database via
+a `BEFORE UPDATE OR DELETE` trigger (migration `20260903_02`). Full column
+rationale: `docs/DATABASE.md`.
+
+**Why `citations` / `consistency_flags` are `JSONB`, not child tables.** They
+are frozen value-object tuples with no identity, read whole with the record and
+never queried by field — the same call as `audit_event.payload`. A normalised
+child table buys nothing here and costs a join, an ordering column and a mapper
+layer. `decisions` *is* its own table, as the DoD enumerates, because a decision
+has a lifecycle (it settles a specific assessment) and its own foreign key.
+
+**Why the `ClauseRepository` reads `chunk`.** There is no separate `clause`
+table and [M5-02]'s port docstring already commits to this. A `PolicyClause` is
+projected from the chunk rows whose `source_clause_ids` contains the wanted id —
+the same reconstruction `graph_retrieval_adapter.build_clause_index` does, and
+the id a `Citation` carries.
+
+**Why a trigger, not a rule, for append-only.** An `ON UPDATE … DO INSTEAD
+NOTHING` rule swallows the write silently; the trigger `RAISE`s, so a tamper
+attempt fails loudly and the DoD's "cannot be updated" test can assert it. The
+`INSERT … ON CONFLICT DO NOTHING` insert path never fires an `UPDATE`, so the
+checkpoint node's idempotent re-write is unaffected.
+
+**Two DoD items met differently, both recorded.** (a) "Alembic migrations: …
+checkpointer tables" — met by `make setup-checkpointer` ([M4-09]), not a
+migration duplicating `PostgresSaver.setup()`; the split is a settled decision
+(`alembic/env.py`'s `UNMANAGED_TABLES` filter, `docs/DATABASE.md`). (b) "folds
+the record write into the audit-sink transaction" — **deferred to [M5-04]**.
+The audit sink writes inside the `human_review` graph node; wrapping that write
+and the use case's record write in one transaction needs the orchestrator
+adapter and the composition root to coordinate, neither of which exists until
+[M5-04]. The `state.py` ↔ domain mapper (`docs/DOMAIN.md` "Deferred") is
+[M5-04]'s for the same reason — no [M5-03] consumer.
+
+**Enforcement.** `tests/unit/infrastructure/database/test_models.py` (the
+`CHECK` sets tie back to the domain enums; column/nullable/index/FK assertions);
+`tests/unit/infrastructure/database/test_assessment_mapper.py` (round-trip on
+grounded / abstain / every decision outcome, no DB);
+`tests/integration/test_assessment_repository.py`,
+`test_clause_repository.py`, `test_unit_of_work.py`,
+`test_audit_event_append_only.py` (real Postgres, one per repository plus the
+append-only guarantee). `make test-integration` and CI's `integration` job pick
+these up from the directory.

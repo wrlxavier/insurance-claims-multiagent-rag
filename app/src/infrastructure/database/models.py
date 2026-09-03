@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models -- [M3-02], [M4-09].
+"""SQLAlchemy ORM models -- [M3-02], [M4-09], [M5-03].
 
 ``ChunkRow`` is the persistence representation of [domain.chunk.Chunk] /
 [infrastructure.rag.chunk_schema.ChunkRecord]: the chunk corpus indexed in
@@ -15,18 +15,39 @@ ANN-vs-exact measurement and the verdict are in docs/EMBEDDINGS.md.
 
 ``AuditEventRow`` ([M4-09]) is the same idea applied to the graph's audit trail:
 the persistence representation of [infrastructure.graph.state.AuditEvent].
+
+``AssessmentRow`` / ``HumanDecisionRow`` ([M5-03]) are the persistence
+representation of the servable aggregate
+[application.assessment_record.AssessmentRecord] and the analyst's
+[domain.human_decision.HumanDecision] recorded beside it. ``citations`` and
+``consistency_flags`` are ``JSONB`` rather than child tables: they are frozen
+value-object tuples read back whole with the record and never queried by field
+(the same call as ``AuditEventRow.payload``). The domain <-> row mapper lives in
+``infrastructure.database.assessment_mapper``.
 """
 
 from collections.abc import Iterable
 from datetime import datetime
 
 from pgvector.sqlalchemy import HALFVEC
-from sqlalchemy import CheckConstraint, DateTime, Float, Index, Integer, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from application.assessment_record import AssessmentStatus
 from domain.chunk import ChunkRule
 from domain.clause_classification import ClauseType, TypeSource
+from domain.human_decision import DecisionOutcome
+from domain.verdict import Verdict
 from infrastructure.database.base import Base
 from infrastructure.rag.embedding_config import EMBEDDING_DIMENSIONS
 
@@ -193,3 +214,115 @@ class AuditEventRow(Base):
     payload: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (Index("ix_audit_event_claim_id", "claim_id"),)
+
+
+class AssessmentRow(Base):
+    """One claim's assessment across its whole lifecycle -- [M5-03].
+
+    The persistence representation of
+    [application.assessment_record.AssessmentRecord] (the servable aggregate,
+    *not* the grounded [domain.assessment.Assessment] -- an abstain outcome has
+    no citations and still has to be stored and served). Column per field, so a
+    reader can query the trail in SQL; the domain <-> row mapper is in
+    [infrastructure.database.assessment_mapper].
+
+    ``citations`` and ``consistency_flags`` are ``JSONB`` arrays of objects, not
+    child tables: both are frozen value-object tuples with no identity of their
+    own, always loaded whole with the record and never filtered by field -- the
+    same reasoning as ``AuditEventRow.payload``. ``missing_information`` is a
+    plain ``TEXT[]`` (like ``ChunkRow.source_clause_ids``).
+
+    The enum-valued columns (``verdict``, ``status``) are ``TEXT`` + a named
+    ``CHECK``, matching ``ChunkRow``'s precedent -- no native PG enums in this
+    project. ``context_sufficient`` is genuinely tri-state
+    (``True``/``False``/``None`` -- retrieval succeeded / gated / never ran).
+    """
+
+    __tablename__ = "assessment"
+
+    assessment_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    claim_id: Mapped[str] = mapped_column(Text, nullable=False)
+
+    verdict: Mapped[str] = mapped_column(Text, nullable=False)
+    reasoning: Mapped[str] = mapped_column(Text, nullable=False)
+    recommended_action: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Tri-state on purpose -- see the class docstring.
+    context_sufficient: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    clarification_exhausted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    missing_information: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+
+    citations: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    consistency_flags: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, nullable=False
+    )
+
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            _in_clause("verdict", (member.value for member in Verdict)),
+            name="verdict_valid",
+        ),
+        CheckConstraint(
+            _in_clause("status", (member.value for member in AssessmentStatus)),
+            name="status_valid",
+        ),
+        # `claim_id` -- every assessment of one claim ([List] filter, and what a
+        # human searches by). `status` -- the awaiting-review queue. `created_at`
+        # -- `AssessmentRepository.list` orders by it (newest first).
+        Index("ix_assessment_claim_id", "claim_id"),
+        Index("ix_assessment_status", "status"),
+        Index("ix_assessment_created_at", "created_at"),
+    )
+
+
+class HumanDecisionRow(Base):
+    """The analyst's decision on one assessment -- [M5-03].
+
+    The persistence representation of [domain.human_decision.HumanDecision]: one
+    row per *settled* assessment, recorded beside the system's opinion, never
+    over it. The primary key is also a foreign key to ``assessment`` -- a
+    decision "always references the assessment it acted on" is the M5-01
+    invariant, made structural here.
+
+    ``edited_assessment`` is the analyst's revised [domain.assessment.Assessment]
+    as ``JSONB``, present exactly when ``decision = 'edit'`` -- a ``CHECK``
+    enforces the biconditional, mirroring ``HumanDecision``'s own validator.
+    """
+
+    __tablename__ = "human_decision"
+
+    assessment_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("assessment.assessment_id"),
+        primary_key=True,
+    )
+    decision: Mapped[str] = mapped_column(Text, nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    notes: Mapped[str] = mapped_column(Text, nullable=False)
+    # `none_as_null`: a Python `None` must become SQL NULL, not the JSON value
+    # `null` -- otherwise `edited_assessment IS NOT NULL` is true for a
+    # non-`edit` decision and the CHECK below fires.
+    edited_assessment: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            _in_clause("decision", (member.value for member in DecisionOutcome)),
+            name="decision_valid",
+        ),
+        # `edit` carries a revision; nothing else may -- the same rule
+        # `HumanDecision._check_edit_carries_a_revision` enforces in the domain.
+        CheckConstraint(
+            "(decision = 'edit') = (edited_assessment IS NOT NULL)",
+            name="edited_assessment_iff_edit",
+        ),
+    )

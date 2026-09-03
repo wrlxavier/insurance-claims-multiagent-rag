@@ -32,7 +32,11 @@ def test_vector_column_round_trips_and_orders_by_distance(
                 "CREATE TEMPORARY TABLE pgvector_probe ("
                 "  id integer PRIMARY KEY,"
                 "  embedding vector(3)"
-                ")"
+                # `ON COMMIT DROP`: `postgres_engine` is a pooled, session-scoped
+                # fixture, so a plain temp table would outlive this transaction
+                # on the pooled connection and block a later test's
+                # `DROP EXTENSION vector` in the `migrated_database` teardown.
+                ") ON COMMIT DROP"
             )
         )
         connection.execute(

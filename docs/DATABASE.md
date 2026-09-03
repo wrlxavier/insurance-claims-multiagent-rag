@@ -9,8 +9,9 @@ domain tables to [M5-03].
 
 The audit table moved forward from [M5-03] deliberately: [M4-09]'s DoD requires
 the audit trail to be durable *and* separate from graph state, which is the
-table. [M5-03] keeps `Assessment` / `HumanDecision` and adds the database-level
-append-only enforcement.
+table. [M5-03] adds the `assessment` / `human_decision` tables, the repository
+and unit-of-work adapters behind the [M5-02] ports, and the database-level
+append-only enforcement on `audit_event` — see the [M5-03] sections below.
 
 The initial migration creates the `vector` extension and nothing else.
 
@@ -308,11 +309,75 @@ No CHECK constraints, unlike `chunk`: none of these columns is a closed enum —
 them would turn adding a node into a migration.
 
 The trail is append-only by construction — `infrastructure/database/audit_repository.py`
-offers an insert and nothing else — but not yet by the database. The rule or
-trigger rejecting `UPDATE`/`DELETE` is [M5-03]'s, along with its test.
+offers an insert and nothing else — and, since [M5-03], by the database too: see
+"Append-only enforcement" below.
 
 Rationale and the interrupt contract that produces these rows:
 `docs/HUMAN_CHECKPOINT.md`.
+
+## The assessment and human_decision tables ([M5-03])
+
+`AssessmentRow` / `HumanDecisionRow` (`app/src/infrastructure/database/models.py`)
+are the persistence representation of the servable aggregate
+`application.assessment_record.AssessmentRecord` and the analyst's
+`domain.human_decision.HumanDecision` recorded beside it — the same
+one-row-class-per-type pattern as `ChunkRow` and `AuditEventRow`. The
+row ↔ aggregate translation lives entirely in
+`infrastructure.database.assessment_mapper` (`docs/DOMAIN.md` names this mapper
+as [M5-03]'s deliverable). Migration `20260903_01`.
+
+- **`assessment`** — column per aggregate field. `verdict` and `status` are
+  `TEXT` + a named `CHECK` against the domain enum (like `chunk`'s enum columns;
+  `tests/unit/infrastructure/database/test_models.py` ties each `CHECK` set back
+  to the enum). `context_sufficient` is the one nullable column — it is
+  genuinely tri-state (`True` / `False` / `None`: retrieval succeeded / the
+  [M3-07] gate fired / retrieval never ran). Indexed on `claim_id` (a claim's
+  runs, and what a human searches by), `status` (the awaiting-review queue) and
+  `created_at` (`AssessmentRepository.list` orders newest-first).
+
+- **`citations` and `consistency_flags` are `JSONB`, not child tables.** Both
+  are frozen value-object tuples with no identity of their own, always loaded
+  whole with the record and never filtered or joined by field — the same call
+  as `audit_event.payload`. A `citation` child table would add a join, an
+  ordering column and a second mapper layer for no query it would ever serve.
+  `missing_information` is a plain `TEXT[]`, like `chunk.source_clause_ids`.
+
+- **`human_decision`** — one row per *settled* assessment. `assessment_id` is
+  both the primary key and a foreign key to `assessment`: "a decision always
+  references the assessment it acted on" (M5-01) made structural. The
+  `edited_assessment` JSONB holds the analyst's revised `Assessment` and is
+  present exactly when `decision = 'edit'` — a `CHECK`
+  (`(decision = 'edit') = (edited_assessment IS NOT NULL)`) enforces the
+  biconditional, mirroring `HumanDecision`'s own validator. The ORM column uses
+  `JSONB(none_as_null=True)` so a Python `None` becomes SQL `NULL` rather than
+  the JSON value `null`, which the `CHECK` would read as present.
+
+The clause corpus is **not** a new table — `SqlAlchemyClauseRepository`
+(`clause_repository.py`) projects `domain.policy_clause.PolicyClause` from the
+existing `chunk` table, reassembling a clause from every row whose
+`source_clause_ids` array contains its id (a split clause rejoins its
+`display_text` in `chunk_index` order). This is the same reconstruction
+`infrastructure.rag.graph_retrieval_adapter.build_clause_index` does, and the
+id it matches is the one a `Citation` carries.
+
+## Append-only enforcement ([M5-03])
+
+`audit_event` rejects `UPDATE` and `DELETE` at the database. Migration
+`20260903_02` installs a `plpgsql` function that `RAISE EXCEPTION`s and a
+`BEFORE UPDATE OR DELETE ON audit_event` trigger that calls it.
+
+A trigger, not an `ON UPDATE ... DO INSTEAD NOTHING` rule: a rule swallows the
+write silently, so a bug (or a compromised connection) trying to rewrite history
+would look like it succeeded. The trigger fails loudly — which is also what
+`tests/integration/test_audit_event_append_only.py` asserts. The insert path is
+untouched: `append_audit_events` uses `INSERT ... ON CONFLICT DO NOTHING`, which
+never fires an `UPDATE`, so the checkpoint node's idempotent re-write on resume
+still works.
+
+The checkpointer's own tables stay outside Alembic (see "The checkpointer owns
+its own schema" above); [M5-03]'s DoD line about migrating them is met by
+`make setup-checkpointer`, built in [M4-09], not a migration that would
+duplicate `PostgresSaver.setup()`.
 
 ## Integration tests
 
