@@ -19,6 +19,21 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
+# The project's one verdict vocabulary now lives in the domain layer
+# (domain.verdict.Verdict). Re-exported under its historical name -- listed in
+# __all__ so it is an explicit export -- because the evaluation schemas and
+# the M2 draft scripts still import ExpectedVerdict from here. The enum values
+# are unchanged, so golden-set-v1 JSONL and its validation are unaffected.
+from domain.verdict import Verdict as ExpectedVerdict
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "QuestionType",
+    "Difficulty",
+    "ExpectedVerdict",
+    "GoldenQuestion",
+]
+
 SCHEMA_VERSION = "v1"
 
 _NonEmptyStr = Annotated[str, Field(min_length=1)]
@@ -40,20 +55,6 @@ class Difficulty(Enum):
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
-
-
-class ExpectedVerdict(Enum):
-    """The project's one verdict vocabulary, reused verbatim.
-
-    Canonical source: ``SCOPE_PREAMBLE`` in
-    [infrastructure.graph.prompts.scope_preamble] -- "Every verdict you
-    produce must be exactly one of: compatible, incompatible,
-    insufficient_information."
-    """
-
-    COMPATIBLE = "compatible"
-    INCOMPATIBLE = "incompatible"
-    INSUFFICIENT_INFORMATION = "insufficient_information"
 
 
 class GoldenQuestion(BaseModel):

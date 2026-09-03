@@ -61,12 +61,16 @@ the audit trail. Bring it up locally, in this order, on a clean clone:
 cp .env.example .env
 docker compose up -d postgres
 make migrate
+make setup-checkpointer
 ```
 
 The `.env.example` defaults match the Compose service, so the sequence works
 as written without editing anything first. `make migrate` applies the Alembic
 migrations (the first one enables the `vector` extension); `make migrate-down`
-rolls the latest one back.
+rolls the latest one back. `make setup-checkpointer` is the second half of the
+schema: the LangGraph checkpointer creates and migrates its own tables outside
+Alembic, so a database with `make migrate` applied is still not ready to run the
+graph. It is idempotent and reads the same `DATABASE_URL`.
 
 Run the database-backed tests with:
 
@@ -79,7 +83,9 @@ the Compose service on first boot — before running `pytest -m integration`.
 
 See [`docs/DATABASE.md`](docs/DATABASE.md) for the pinned pgvector version and
 why, how `CREATE EXTENSION vector` is executed and what privilege it needs,
-and the sync-vs-async engine decision.
+the sync-vs-async engine decision, and why the checkpointer's schema is a
+separate step. The human checkpoint that uses it is
+[`docs/HUMAN_CHECKPOINT.md`](docs/HUMAN_CHECKPOINT.md).
 
 ### Index the corpus
 

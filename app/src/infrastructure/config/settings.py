@@ -165,17 +165,47 @@ class LlmSettings(BaseSettings):
     llm_model_reasoning: str = Field(alias="LLM_MODEL_REASONING")
     llm_model_vision: str | None = Field(alias="LLM_MODEL_VISION", default=None)
 
-    # Matches the vision model's required OpenRouter route -- reused by both
+    # Matches the vision model's required OpenRouter route
+    # (google/gemini-3.7-flash via google-vertex/global) -- reused by both
     # scripts/validate_parsing_quality_sample.py and
     # scripts/escalate_vision_boundaries.py rather than reinvented per
     # script. Fallback disabled so a transient provider outage surfaces as
     # an exception (caught and retried by each caller) instead of silently
     # rerouting to a different, unvalidated upstream.
     llm_vision_provider_order: list[str] = Field(
-        alias="LLM_VISION_PROVIDER_ORDER", default_factory=lambda: ["google-vertex"]
+        alias="LLM_VISION_PROVIDER_ORDER",
+        default_factory=lambda: ["google-vertex/global"],
     )
     llm_vision_allow_fallbacks: bool = Field(
         alias="LLM_VISION_ALLOW_FALLBACKS", default=False
+    )
+
+    # The reasoning model (deepseek/deepseek-v4-pro-0813) is pinned to the
+    # streamlake OpenRouter route, fallback disabled -- same rationale as the
+    # vision and classification pins above. No consumer yet; M4's assessment
+    # node ([M4-05]) is the first. Kept here so the pin is decided at the
+    # point the model is chosen, like every other model in the project.
+    llm_reasoning_provider_order: list[str] = Field(
+        alias="LLM_REASONING_PROVIDER_ORDER",
+        default_factory=lambda: ["streamlake"],
+    )
+    llm_reasoning_allow_fallbacks: bool = Field(
+        alias="LLM_REASONING_ALLOW_FALLBACKS", default=False
+    )
+
+    # The fast model (deepseek/deepseek-v4-flash-0731) reused outside the corpus
+    # classification pass -- first by M4's intake node ([M4-02]). baidu/fp8 is
+    # the same OpenRouter route [M1-08b] validated for this model, fallback
+    # disabled -- same rationale as the pins above: a transient provider outage
+    # should surface as an exception the caller retries, not a silent reroute to
+    # an unvalidated upstream. Kept here so the pin is decided where the model
+    # is chosen, like every other model in the project.
+    llm_fast_provider_order: list[str] = Field(
+        alias="LLM_FAST_PROVIDER_ORDER",
+        default_factory=lambda: ["baidu/fp8"],
+    )
+    llm_fast_allow_fallbacks: bool = Field(
+        alias="LLM_FAST_ALLOW_FALLBACKS", default=False
     )
 
     # Rough, provider-published per-1M-token prices at time of writing --

@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
 	@echo "  migrate           - Apply Alembic migrations to the configured database"
 	@echo "  migrate-down      - Roll back the latest Alembic migration"
+	@echo "  setup-checkpointer - M4-09: run the LangGraph Postgres checkpointer's own migrations (its tables live outside Alembic); idempotent, acts on the same DATABASE_URL as make migrate"
 	@echo "  extract-text      - Extract and cache text from the policy corpus"
 	@echo "  remove-boilerplate - Remove boilerplate from the cached extraction"
 	@echo "  build-clause-tree - Recover the clause tree from the cleaned corpus"
@@ -55,6 +56,15 @@ help:
 	@echo "  eval-retrieval-co-retrieval - M3-06: score hybrid RRF + rerank + exclusion co-retrieval with the SUSEP-process+CNPJ pre-filter (same Postgres + embed-group requirement); reserves top-k slots for the exclusion clauses linked to each retrieved coverage clause; writes eval/runs/retrieval_eval_hybrid_rrf_rerank_co-retrieval_filter-default.{md,json}. Rule: docs/ARCHITECTURE.md; measurement: docs/EXCLUSION_CO_RETRIEVAL.md"
 	@echo "  eval-retrieval-matrix - M3-08: run every retrieval configuration (lexical / dense / hybrid RRF / +rerank / +co-retrieval / weighted+rerank+co-retrieval) on the SUSEP-process+CNPJ path in one pass, with per-query latency (same Postgres + embed-group requirement); writes eval/runs/retrieval_benchmark_matrix.{md,json}. Committed table and verdict: docs/RETRIEVAL_BENCHMARK.md"
 	@echo "  eval-insufficient-context-gate - M3-07: calibrate the insufficient-context gate on retrieval signals over the 23 unanswerable golden questions (hybrid RRF + rerank, SUSEP-process+CNPJ filter; same Postgres + embed-group requirement); sweeps the abstain threshold, reports precision/recall + the false-negative cases; writes eval/runs/insufficient_context_gate.{md,json} + the committed snapshot eval/insufficient_context_gate_signals.json. Verdict: docs/INSUFFICIENT_CONTEXT_GATE.md"
+	@echo "  eval-intake       - M4-02: run the intake node over every synthetic claim with the real fast model and report product-line accuracy, missing-info recall/false-positives and field population (needs LLM_* in .env); writes eval/runs/intake_extraction.{md,json} + a per-claim predictions JSONL. Analysis: docs/INTAKE_EXTRACTION.md"
+	@echo "  eval-clarification - M4-03: run the clarification loop over the 13 incomplete synthetic claims with the real fast model; report live termination + rounds distribution and the generated question per missing fact, flagging generic phrasing (needs LLM_* in .env); writes eval/runs/clarification_loop.{md,json} + clarification_questions.jsonl. Analysis: docs/CLARIFICATION_LOOP.md"
+	@echo "  eval-retrieval-node - M4-04: run the retrieval node over golden-set-v1 (LLM-free; question as query + manifest SUSEP process/product line as the pre-filter), retriever = hybrid RRF + rerank + co-retrieval; report Recall@10/MRR/nDCG@10/foreign-doc rate and the M3-07 gate's recall over the unanswerable subset (same Postgres + embed-group requirement); writes eval/runs/retrieval_node.{md,json}. Analysis: docs/RETRIEVAL_NODE.md"
+	@echo "  eval-compatibility - M4-05: run the retrieval node + the compatibility node (real reasoning model) over the 42 verdict-labelled golden questions (coverage_with_exclusion + unanswerable); report the 3x3 verdict confusion matrix, per-class precision/recall, citation grounding and reference overlap (needs LLM_* in .env + same Postgres + embed-group requirement); writes eval/runs/compatibility.{md,json} + compatibility_predictions.jsonl. Analysis: docs/COMPATIBILITY_ASSESSMENT.md"
+	@echo "  eval-consistency  - M4-06: run the intake node + the consistency node (real fast model) over all 51 synthetic claims; report deterministic false-positive discipline on the compatible cohort, signal counts by check x cohort and the LLM category distribution (needs LLM_* in .env; no retrieval stack); writes eval/runs/consistency.{md,json} + consistency_signals.jsonl. Analysis: docs/CONSISTENCY_NODE.md"
+	@echo "  eval-parallel-assessment - M4-07: time the compatibility + consistency nodes sequentially vs as the fixed parallel branches over the synthetic claims and report the wall-clock gain, absolute saving and mean per-node latencies (needs LLM_* in .env + build/chunks.jsonl; no retrieval stack); writes eval/runs/parallel_assessment.{md,json} + parallel_assessment_timings.jsonl. Analysis: docs/PARALLEL_ASSESSMENT.md"
+	@echo "  eval-recommendation - M4-08: run retrieval + compatibility + consistency + the recommendation node (real models) over the 42 verdict-labelled golden questions; re-check the structural guarantees live (citation grounding rate, max confidence on an insufficient_information posture, consistency-flag pass-through) plus posture-vs-verdict agreement and confidence by posture (needs LLM_* in .env + same Postgres + embed-group requirement); writes eval/runs/recommendation.{md,json} + recommendation_predictions.jsonl. Analysis: docs/RECOMMENDATION_NODE.md"
+	@echo "  eval-end-to-end   - M4-10: run the WHOLE compiled graph (intake -> clarification -> retrieval -> parallel assessment -> recommendation -> the M4-09 checkpoint, resumed with an automatic approve) over all 51 synthetic claims; report the 3x3 verdict confusion matrix overall and per cohort (the product/claim mismatch subset separately), the failure catalogue, reference-clause recall and the faithfulness / context-relevance judge (needs LLM_* in .env + same Postgres + embed-group requirement); writes eval/runs/end_to_end.{md,json} + end_to_end_predictions.jsonl and the committed eval/end_to_end_citations.json. Analysis: docs/END_TO_END_EVALUATION.md"
+	@echo "  validate-citation-coverage - M4-10: replay eval/end_to_end_citations.json and fail if any assertion on a settled verdict carries no clause id, if any cited id is absent from build/parsed_clauses.jsonl, or if a recommendation cites a clause retrieval never returned (offline; no DB, no LLM). Runs in CI after fetch-corpus-artifacts."
 	@echo "  tune-reranking    - M3-05: sweep the reranker candidate depth on the golden set and record the metrics + latency curve (same Postgres + embed-group requirement); writes eval/runs/rerank_tuning.{md,json}. Curve and chosen depth: docs/RERANKING.md"
 	@echo "  tune-exclusion-co-retrieval - M3-06: sweep the reserved exclusion-slot count on the golden set (pure-Python replay over one cached rerank pass; same Postgres + embed-group requirement for that pass); writes eval/runs/exclusion_co_retrieval_tuning.{md,json}. Curve and chosen count: docs/EXCLUSION_CO_RETRIEVAL.md"
 	@echo "  review-golden-set-sample - Independent second-reviewer pass over a stratified golden-set-v1 sample (--dry-run prints the sample composition, no model calls); writes data/golden_set/review/review_v1.jsonl and eval/runs/golden_set_review_v1.{md,json}"
@@ -90,6 +100,9 @@ migrate:
 
 migrate-down:
 	PYTHONPATH=app/src uv run alembic downgrade -1
+
+setup-checkpointer:
+	PYTHONPATH=app/src uv run python -m scripts.setup_checkpointer
 
 extract-text:
 	PYTHONPATH=app/src uv run python scripts/extract_text.py
@@ -235,6 +248,35 @@ eval-retrieval-matrix:
 
 eval-insufficient-context-gate:
 	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_insufficient_context_gate
+
+eval-intake:
+	PYTHONPATH=app/src uv run python -m scripts.eval_intake
+
+eval-clarification:
+	PYTHONPATH=app/src uv run python -m scripts.eval_clarification
+
+eval-retrieval-node:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_retrieval_node
+
+eval-compatibility:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_compatibility
+
+eval-consistency:
+	PYTHONPATH=app/src uv run python -m scripts.eval_consistency
+
+eval-parallel-assessment:
+	PYTHONPATH=app/src uv run python -m scripts.eval_parallel_assessment
+
+eval-recommendation:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_recommendation
+
+# The headline arm. The baseline (filter as-is) and no-policy-header arms are
+# the same module with flags -- see docs/END_TO_END_EVALUATION.md.
+eval-end-to-end:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_end_to_end --judge --write-snapshot
+
+validate-citation-coverage:
+	PYTHONPATH=app/src uv run python -m scripts.validate_citation_coverage
 
 tune-reranking:
 	PYTHONPATH=app/src uv run --group embed python -m scripts.tune_reranking

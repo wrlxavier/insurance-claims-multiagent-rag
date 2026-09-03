@@ -51,6 +51,13 @@ jobs:
       - name: Validate golden set
         run: make validate-golden-set
 
+      # [M4-10]: the DoD's "100% of assertions carry a clause id, and every id
+      # exists in the corpus -- CI fails otherwise". Its own step rather than a
+      # unit test because it needs the corpus, which the step above fetches;
+      # `pytest -m unit` runs before that and must stay dependency-free.
+      - name: Validate citation coverage
+        run: make validate-citation-coverage
+
   integration:
     name: Integration tests (Postgres + pgvector)
     runs-on: ubuntu-latest
@@ -60,7 +67,7 @@ jobs:
     # failure.
     services:
       postgres:
-        # Same pin as docker-compose.yaml -- Postgres major and pgvector
+        # Same pin as compose.yaml -- Postgres major and pgvector
         # version both explicit. See docs/DATABASE.md.
         image: pgvector/pgvector:0.8.6-pg17-bookworm
         env:

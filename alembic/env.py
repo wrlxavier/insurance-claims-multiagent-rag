@@ -7,6 +7,7 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
+from alembic.runtime.environment import NameFilterParentNames, NameFilterType
 from sqlalchemy import MetaData, engine_from_config, pool
 from sqlalchemy.engine import Connection
 
@@ -20,6 +21,36 @@ config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Tables LangGraph's PostgresSaver creates and migrates itself ([M4-09],
+# `make setup-checkpointer`). They live in the same database but not in
+# `Base.metadata`, so without this filter `--autogenerate` reads them as tables
+# the models dropped and emits a migration that DELETES the checkpointer --
+# taking every paused run with it.
+#
+# Kept as plain literals, like the enum value sets in `20260827_02`, so this
+# file imports no app code that could move under it;
+# `tests/unit/infrastructure/graph/test_checkpointer.py` ties them back to
+# `infrastructure.graph.checkpointer.CHECKPOINTER_TABLES`.
+UNMANAGED_TABLES = frozenset(
+    {
+        "checkpoints",
+        "checkpoint_blobs",
+        "checkpoint_writes",
+        "checkpoint_migrations",
+    }
+)
+
+
+def include_name(
+    name: str | None,
+    type_: NameFilterType,
+    parent_names: NameFilterParentNames,
+) -> bool:
+    """Hide the tables Alembic does not own from autogenerate."""
+    if type_ == "table":
+        return name not in UNMANAGED_TABLES
+    return True
 
 
 def load_target_metadata() -> MetaData:
@@ -58,6 +89,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_name=include_name,
     )
 
     with context.begin_transaction():
@@ -70,6 +102,7 @@ def run_migrations_with_connection(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        include_name=include_name,
     )
 
     with context.begin_transaction():

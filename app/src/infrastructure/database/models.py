@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models -- [M3-02].
+"""SQLAlchemy ORM models -- [M3-02], [M4-09].
 
 ``ChunkRow`` is the persistence representation of [domain.chunk.Chunk] /
 [infrastructure.rag.chunk_schema.ChunkRecord]: the chunk corpus indexed in
@@ -12,13 +12,17 @@ Scope note: the ``embedding`` column is the ``halfvec(768)`` vector the [M3-02]
 embedding pipeline fills. Its HNSW ANN index is defined in
 ``infrastructure.rag.ann_index`` -- deliberately not a migration; the
 ANN-vs-exact measurement and the verdict are in docs/EMBEDDINGS.md.
+
+``AuditEventRow`` ([M4-09]) is the same idea applied to the graph's audit trail:
+the persistence representation of [infrastructure.graph.state.AuditEvent].
 """
 
 from collections.abc import Iterable
+from datetime import datetime
 
 from pgvector.sqlalchemy import HALFVEC
-from sqlalchemy import CheckConstraint, Float, Index, Integer, Text
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import CheckConstraint, DateTime, Float, Index, Integer, Text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from domain.chunk import ChunkRule
@@ -133,3 +137,59 @@ class ChunkRow(Base):
         Index("ix_chunk_product_line", "product_line"),
         Index("ix_chunk_susep_process_cnpj", "susep_process", "cnpj"),
     )
+
+
+class AuditEventRow(Base):
+    """One entry of a graph run's audit trail, as a durable row -- [M4-09].
+
+    The persistence representation of
+    [infrastructure.graph.state.AuditEvent], the same way ``ChunkRow`` is the
+    persistence representation of a ``ChunkRecord``: column per field, so the
+    trail is auditable in SQL without going through LangGraph's checkpoint serde.
+
+    Three fields have no counterpart in ``AuditEvent`` and are added here:
+
+    * ``thread_id`` / ``sequence`` -- the composite primary key, and the whole
+      idempotency story. The checkpoint node that writes this trail runs again
+      every time its thread is resumed ([M4-09]'s re-execution semantics), so the
+      write has to be safe to repeat; position within a thread's trail is
+      deterministic, which makes an ``ON CONFLICT DO NOTHING`` insert enough and
+      spares the table an invented event id.
+    * ``claim_id`` -- what a human searches by. Indexed; ``thread_id`` is already
+      covered by the primary key.
+    * ``payload`` -- optional JSON detail the flat event has no field for. The
+      human-review event fills it with the analyst's whole ``HumanDecision``.
+
+    ``AuditEvent.token_usage`` is flattened into three nullable integer columns
+    rather than nested: a single-row-per-event table keeps the trail queryable
+    with plain aggregates, and ``TokenUsage`` is a closed three-field record.
+
+    Scope note: this table is [M4-09]'s, moved forward from [M5-03] because
+    [M4-09]'s DoD requires the trail to be durable and separate from graph state.
+    [M5-03] keeps the domain tables (assessments, decisions) and adds the
+    database-level append-only enforcement its own DoD asks for -- there is no
+    update path in [infrastructure.database.audit_repository] in the meantime.
+    """
+
+    __tablename__ = "audit_event"
+
+    thread_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    sequence: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    claim_id: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Mirrors `AuditEvent` field for field from here down.
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    node: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    node_input: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    payload: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+
+    __table_args__ = (Index("ix_audit_event_claim_id", "claim_id"),)

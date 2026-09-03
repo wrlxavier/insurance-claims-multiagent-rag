@@ -1,0 +1,1876 @@
+{
+  "provenance": {
+    "generated_by": "scripts/eval_end_to_end.py",
+    "command": "make eval-end-to-end",
+    "schema_version": "v1",
+    "generated_at_utc": "2026-09-02T22:55:31.389801+00:00",
+    "reasoning_model": "deepseek/deepseek-v4-pro-0813",
+    "fast_model": "deepseek/deepseek-v4-flash-0731",
+    "policy_header": true,
+    "claim_count": 51,
+    "note": "Every assertion on a settled verdict must carry >=1 clause id, and every id here must exist in build/parsed_clauses.jsonl."
+  },
+  "claims": [
+    {
+      "claim_id": "compatible-001",
+      "cohort": "compatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A cláusula do resultado describe-se à substituição de retrovisores, incluindo a carcaça e também de faróis, de modo que o danos relatados podem ser considerados no âmbito dessa cobertura.",
+          "clause_ids": [
+            "1:clausulas-adicionais/1/1.1/1.1.2"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "1:clausulas-adicionais/1/1.1/1.1.2"
+      ],
+      "retrieved_clause_ids": [
+        "1:clausulas-adicionais/1/1.1",
+        "1:clausulas-adicionais/1/1.1/1.1.2",
+        "1:clausulas-adicionais/1/1.1/1.1.4",
+        "1:clausulas-adicionais/1/1.1/1.1.6",
+        "1:clausulas-adicionais/1/1.1/1.1.7",
+        "1:clausulas-adicionais/1/1.1/1.1.8",
+        "1:clausulas-adicionais/1/1.1/1.1.10",
+        "1:clausulas-adicionais/1/1.1/1.1.12",
+        "1:clausulas-adicionais/1/1.1/1.1.13",
+        "1:clausulas-adicionais/1/1.3"
+      ]
+    },
+    {
+      "claim_id": "compatible-002",
+      "cohort": "compatible",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "compatible-003",
+      "cohort": "compatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "As cláusulas de cobertura preveem expressamente \"Colisão, abalroamento ou capotagem acidental\"; o relato de colisão contra guard-rail seguida de capotagem se enquadra, em tese, nesse risco descrito.",
+          "clause_ids": [
+            "3:condicoes-especiais-cobertura-basica-a/1",
+            "3:cobertura-basica-b/1"
+          ]
+        },
+        {
+          "statement": "A cláusula de objetivo limita a cobertura a eventos ocorridos \"durante o percurso do veículo segurado em autoestrada\", \"durante o período de cobertura contratado\" e \"conforme monitoramento por aplicativo\"; o relato menciona apenas \"rodovia\" e \"faz umas duas semanas\", sem confirmar esses requisitos.",
+          "clause_ids": [
+            "3:objetivo-do-seguro"
+          ]
+        },
+        {
+          "statement": "A cláusula de objetivo também define sinistro apenas quando os danos materiais atingirem ou ultrapassarem 75%; o relato descreve danos graves, mas não informa percentual de dano.",
+          "clause_ids": [
+            "3:objetivo-do-seguro"
+          ]
+        },
+        {
+          "statement": "Embora a natureza do evento seja compatível com a cobertura de colisão/capotagem, as condições específicas do produto não estão suficientemente demonstradas no relato, de modo que não é possível concluir pela compatibilidade integral.",
+          "clause_ids": [
+            "3:objetivo-do-seguro",
+            "3:condicoes-especiais-cobertura-basica-a/1",
+            "3:cobertura-basica-b/1"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "3:condicoes-especiais-cobertura-basica-a/1",
+        "3:cobertura-basica-b/1",
+        "3:objetivo-do-seguro"
+      ],
+      "retrieved_clause_ids": [
+        "3:condicoes-especiais-cobertura-basica-a/1",
+        "3:cobertura-basica-b/1",
+        "3:procedimentos-em-caso-de-sinistro",
+        "3:objetivo-do-seguro",
+        "3:salvados",
+        "3:riscos-excluidos-a-seguradora-isenta-se-de-qualquer-obrigacao-nos-seguintes-casos/2",
+        "3:condicoes-gerais-definicoes/33",
+        "3:condicoes-gerais-definicoes/43",
+        "3:condicoes-gerais-definicoes",
+        "3:cobertura-basica-b/2"
+      ]
+    },
+    {
+      "claim_id": "compatible-004",
+      "cohort": "compatible",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "compatible-005",
+      "cohort": "compatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A cobertura básica de Danos Corporais garante, até o Limite Máximo de Indenização contratado, a indenização por danos corporais involuntários causados a Terceiros pelo veículo segurado.",
+          "clause_ids": [
+            "16:condicoes-especiais-2/1"
+          ]
+        },
+        {
+          "statement": "A descrição do evento como colisão involuntária com pedestre que sofreu braço quebrado se enquadra, em tese, na Cláusula 1.1 desta cobertura.",
+          "clause_ids": [
+            "16:condicoes-especiais-2/1"
+          ]
+        },
+        {
+          "statement": "O acordo com a família do pedestre, para ser indenizável, precisaria de anuência prévia e expressa da Seguradora.",
+          "clause_ids": [
+            "16:condicoes-especiais-2/1"
+          ]
+        },
+        {
+          "statement": "A exclusão referente a pessoas transportadas no veículo segurado não se aplica ao evento, pois a vítima descrita é pedestre, não pessoa transportada.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1"
+          ]
+        },
+        {
+          "statement": "A exclusão para atos ilícitos dolosos ou culpa grave equiparável ao dolo não está evidenciada na descrição do evento, que é relatado como colisão involuntária.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1"
+          ]
+        },
+        {
+          "statement": "O objetivo do seguro RCF-V é reembolsar o segurado pelas reparações de danos involuntários, materiais e/ou corporais, causados a terceiros pelo veículo segurado, pelas quais ele seja civilmente responsabilizado.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/3"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "16:condicoes-especiais-2/1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/3",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1"
+      ],
+      "retrieved_clause_ids": [
+        "16:condicoes-especiais-2/1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/16",
+        "16:condicoes-especiais-3/1",
+        "16:condicoes-especiais/1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/2",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/3",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/20",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/17",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1",
+        "16:condicoes-especiais-2/2"
+      ]
+    },
+    {
+      "claim_id": "compatible-006",
+      "cohort": "compatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A colisão traseira descrita, causada por escorregada do pé no pedal molhado ao frear, é um acontecimento súbito e imprevisto do qual resultaram danos a bens de terceiro, enquadrando-se na definição de acidente do bilhete.",
+          "clause_ids": [
+            "17:situacao-data-base-da-exigibilidade/11"
+          ]
+        },
+        {
+          "statement": "As condições registradas preveem reembolso de indenizações por danos materiais causados involuntariamente a terceiros em decorrência de acidente de trânsito envolvendo o veículo segurado, o que é compatível com os danos descritos no para-choque e na lanterna do carro prata.",
+          "clause_ids": [
+            "17:clausula-particular-no-2-contrato-de-aposentados/2",
+            "17:clausula-particular-no-2-contrato-de-aposentados/2-2"
+          ]
+        },
+        {
+          "statement": "As exclusões gerais e específicas listadas não afastam o evento descrito, pois não há roubo/furto, vandalismo, agressão, briga, discussão, competição, e o veículo de terceiro atingido não estava sob guarda/custódia nem sendo utilizado ou transportado pelo segurado.",
+          "clause_ids": [
+            "17:disposicoes-gerais/6",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "17:disposicoes-gerais/6",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-2",
+        "17:situacao-data-base-da-exigibilidade/11"
+      ],
+      "retrieved_clause_ids": [
+        "17:disposicoes-gerais/6",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-4",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2/2.3",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-2",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-2/1.3-2",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-5",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-5/1.3-2",
+        "17:situacao-data-base-da-exigibilidade/11"
+      ]
+    },
+    {
+      "claim_id": "compatible-007",
+      "cohort": "compatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cláusula de Riscos Excluídos da Condição Especial exclui danos relativos a 'Qualquer Equipamento de Mobilidade individual'.",
+          "clause_ids": [
+            "18:9/12.3"
+          ]
+        },
+        {
+          "statement": "A definição contratual de Mobilidade Individual inclui expressamente os patinetes entre os equipamentos de mobilidade individual.",
+          "clause_ids": [
+            "18:3/3.39"
+          ]
+        },
+        {
+          "statement": "O evento descrito decorre do uso de patinete elétrico, equipamento que se enquadra na definição de mobilidade individual e está abrangido pela exclusão da Condição Especial.",
+          "clause_ids": [
+            "18:9/12.3",
+            "18:3/3.39"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "18:9/12.3",
+        "18:3/3.39"
+      ],
+      "retrieved_clause_ids": [
+        "18:3/3.11",
+        "18:9/12.3",
+        "18:3/3.39",
+        "18:3",
+        "18:3/3.6",
+        "18:3/3.7",
+        "18:3/3.9",
+        "18:3/3.10",
+        "18:3/3.21",
+        "18:3/3.23"
+      ]
+    },
+    {
+      "claim_id": "compatible-008",
+      "cohort": "compatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A Cláusula 3.1.2 garante o reparo e a substituição de partes mecânicas e elétricas em caso de Pane e/ou Avaria decorrente de falha espontânea de componentes que, mesmo submetidos a manutenções periódicas, venham a apresentar defeito. O relato de pane elétrica/mecânica espontânea na bomba de combustível se enquadra nessa hipótese.",
+          "clause_ids": [
+            "24:3/3.1/3.1.2"
+          ]
+        },
+        {
+          "statement": "O trecho recuperado da Cláusula 3.1.4 lista componentes cobertos e não menciona expressamente a bomba de combustível, mas a Cláusula 3.1.2 descreve de forma ampla a cobertura de partes mecânicas e elétricas, não havendo no trecho recuperado uma limitação expressa que exclua essa peça.",
+          "clause_ids": [
+            "24:3/3.1/3.1.4",
+            "24:3/3.1/3.1.2"
+          ]
+        },
+        {
+          "statement": "A exclusão da Cláusula 3.2.3 relaciona peças não cobertas, como velas, cabos, mangueiras, correias, bateria e chicote, e não inclui a bomba de combustível; portanto, essa exclusão não afasta a compatibilidade do evento.",
+          "clause_ids": [
+            "24:3/3.2/3.2.3"
+          ]
+        },
+        {
+          "statement": "A exclusão da Cláusula 3.2.4(b) afasta a cobertura para sinistros ocorridos durante a garantia original do fabricante; como o relato não informa que o veículo estava nesse período, essa exclusão não pode ser considerada aplicável, prevalecendo a descrição de cobertura da Cláusula 3.1.2 para fins de compatibilidade.",
+          "clause_ids": [
+            "24:3/3.1/3.1.2",
+            "24:3/3.2/3.2.4"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "24:3/3.1/3.1.2",
+        "24:3/3.1/3.1.4",
+        "24:3/3.2/3.2.4",
+        "24:3/3.2/3.2.3"
+      ],
+      "retrieved_clause_ids": [
+        "24:3/3.1/3.1.2",
+        "24:3/3.1/3.1.4",
+        "24:3/3.2/3.2.4",
+        "24:1/1.2",
+        "24:4/4.1/4.1.1",
+        "24:4/4.1/4.1.1/4.1.1.1",
+        "24:4/4.1/4.1.1/4.1.1.2",
+        "24:4/4.1/4.1.1/4.1.1.3",
+        "24:3/3.2/3.2.3",
+        "24:3/3.2"
+      ]
+    },
+    {
+      "claim_id": "compatible-009",
+      "cohort": "compatible",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "compatible-010",
+      "cohort": "compatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "O objetivo do seguro é garantir, até o limite contratado, o reembolso de despesas comprovadas da empresa locadora decorrentes de evento coberto com o veículo segurado durante a locação. O relato descreve dano a veículo alugado durante viagem, o que se insere nesse objetivo em abstrato.",
+          "clause_ids": [
+            "26:3"
+          ]
+        },
+        {
+          "statement": "A cláusula 6a cobre expressamente 'Danos à carroceria' e 'Danos aos para-brisas, vidros laterais e traseiro...'. A trinca no para-brisa e o amassado do capô descritos correspondem, pelo tipo de dano, a essas coberturas listadas.",
+          "clause_ids": [
+            "26:6"
+          ]
+        },
+        {
+          "statement": "As exclusões recuperadas tratam de descumprimento de disposição essencial do contrato de locação, infração legal ou regulamentar relevante com nexo, ausência de documento, alegação de pagamento em dinheiro sem comprovantes idôneos, entre outras. No relato não há descumprimento contratual, infração ou essas hipóteses, portanto tais exclusões não tornam o evento incompatível.",
+          "clause_ids": [
+            "26:2-2",
+            "26:3-3",
+            "26:4-2"
+          ]
+        },
+        {
+          "statement": "A cláusula 23 trata de acidentes envolvendo outro veículo e de sub-rogação/ressarcimento. Ela não exclui o dano relatado; apenas impõe apresentação de informações e medidas de ressarcimento quando cabíveis.",
+          "clause_ids": [
+            "26:23"
+          ]
+        },
+        {
+          "statement": "Os trechos recuperados não listam expressamente reboque, taxas administrativas ou dias parados como despesas cobertas, de modo que a cobertura desses itens específicos não fica estabelecida pelos trechos; porém isso não torna o dano físico à carroceria/para-brisa incompatível.",
+          "clause_ids": [
+            "26:6"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "26:6",
+        "26:23",
+        "26:3",
+        "26:2-2",
+        "26:3-3",
+        "26:4-2"
+      ],
+      "retrieved_clause_ids": [
+        "26:6",
+        "26:23",
+        "26:21",
+        "26:3",
+        "26:9",
+        "26:2-2",
+        "26:3-3",
+        "26:4-2",
+        "26:3-2",
+        "26:1-2"
+      ]
+    },
+    {
+      "claim_id": "compatible-011",
+      "cohort": "compatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7/23.7.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.16",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.3",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.4",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/22"
+      ]
+    },
+    {
+      "claim_id": "compatible-012",
+      "cohort": "compatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "As peças citadas no relato (biela, virabrequim e bomba de óleo) estão expressamente listadas como componentes internos e lubrificados do motor nas coberturas de extensão reduzida e de complementação de garantia, o que indica compatibilidade em nível de peças.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1",
+            "29:25-atualizacao-de-valores/3/3.1"
+          ]
+        },
+        {
+          "statement": "As coberturas são condicionadas ao Bilhete de Seguro e, na complementação, às peças que não estejam cobertas pela garantia do fabricante, mas o Bilhete de Seguro não foi recuperado, portanto não é possível confirmar se essas coberturas estão efetivamente contratadas para o veículo.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1",
+            "29:25-atualizacao-de-valores/3/3.1"
+          ]
+        },
+        {
+          "statement": "A cláusula de exclusão afasta danos decorrentes de eventos não caracterizados como eventos previstos ou cobertos nos termos do subitem 2.1.3, porém o subitem 2.1.3 não foi recuperado, impedindo verificar se falha por desgaste interno é tratada como evento coberto ou excluído.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+          ]
+        },
+        {
+          "statement": "A definição de avaria preexistente menciona danos existentes antes da contratação do seguro e/ou danos não decorrentes do sinistro, mas o contexto recuperado não permite concluir que o desgaste interno relatado se enquadre nessa hipótese.",
+          "clause_ids": [
+            "29:3"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "29:25-atualizacao-de-valores/2/2.1",
+        "29:25-atualizacao-de-valores/3/3.1",
+        "29:3",
+        "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+      ],
+      "retrieved_clause_ids": [
+        "29:25-atualizacao-de-valores/2/2.1",
+        "29:25-atualizacao-de-valores/2/2.1/1.1.3",
+        "29:25-atualizacao-de-valores/3/3.1",
+        "29:25-atualizacao-de-valores/3/3.1/3.1.3",
+        "29:3",
+        "29:12-limite-maximo-de-indenizacao",
+        "29:12-limite-maximo-de-indenizacao/16.19",
+        "29:12-limite-maximo-de-indenizacao/20.1",
+        "29:12-limite-maximo-de-indenizacao/20.3",
+        "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+      ]
+    },
+    {
+      "claim_id": "compatible-013",
+      "cohort": "compatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A cláusula 2 considera risco coberto a responsabilidade civil por danos materiais a terceiros não transportados pelo veículo segurado, decorrentes de acidente de trânsito; a colisão traseira narrada causou danos materiais ao veículo do terceiro, que não era transportado pelo veículo segurado.",
+          "clause_ids": [
+            "30:2"
+          ]
+        },
+        {
+          "statement": "A cláusula 1 prevê indenizar terceiros ou reembolsar o segurado por danos materiais causados a terceiros não transportados; o conserto do para-choque traseiro e da lanterna do veículo local se insere nessa categoria de danos materiais a terceiro.",
+          "clause_ids": [
+            "30:1"
+          ]
+        },
+        {
+          "statement": "A cláusula 2 exige que o veículo segurado seja de passeio particular ou de aluguel e não licenciado no país de ingresso; o relato descreve uso particular em viagem a passeio e se refere ao outro veículo como 'carro local', sem indicar que o veículo do segurado fosse licenciado no Uruguai.",
+          "clause_ids": [
+            "30:2"
+          ]
+        },
+        {
+          "statement": "A cláusula 3 delimita a aplicação territorial a países do MERCOSUL e a eventos fora do território do país de matrícula; o acidente em Montevidéu, capital do Uruguai, país integrante do MERCOSUL, é compatível com esse âmbito territorial.",
+          "clause_ids": [
+            "30:3"
+          ]
+        },
+        {
+          "statement": "A cláusula 4 exclui dolo ou culpa grave do segurado; o relato descreve distração momentânea com o GPS e falha na frenagem, sem elementos que caracterizem dolo ou culpa grave, de modo que essa exclusão não afasta a compatibilidade do evento com as coberturas descritas nas cláusulas 1 e 2.",
+          "clause_ids": [
+            "30:4",
+            "30:1",
+            "30:2"
+          ]
+        },
+        {
+          "statement": "A cláusula 7 exclui reclamações resultantes de reconhecimento de culpabilidade ou transações formalizadas sem autorização escrita do segurador; o relato apenas menciona a intenção de acionar a cobertura, não um reconhecimento formal ou transação, logo essa exclusão não torna o evento incompatível.",
+          "clause_ids": [
+            "30:7"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "30:2",
+        "30:1",
+        "30:7",
+        "30:4",
+        "30:3"
+      ],
+      "retrieved_clause_ids": [
+        "30:2",
+        "30:9",
+        "30:8/8.4",
+        "30:1",
+        "30:10",
+        "30:7",
+        "30:8/8.5",
+        "30:4",
+        "30:3",
+        "30:5"
+      ]
+    },
+    {
+      "claim_id": "compatible-014",
+      "cohort": "compatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "30:1",
+        "30:2",
+        "30:9",
+        "30:8/8.2",
+        "30:5",
+        "30:10",
+        "30:8/8.4",
+        "30:8",
+        "30:4",
+        "30:7"
+      ]
+    },
+    {
+      "claim_id": "incompatible-001",
+      "cohort": "incompatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A cláusula de riscos cobertos prevê expressamente indenização por danos materiais ao veículo segurado provenientes de colisão, abalroamento ou capotagem acidentais.",
+          "clause_ids": [
+            "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/9/9.1.2"
+          ]
+        },
+        {
+          "statement": "O relato descreve colisão sofrida em estrada após outro motorista frear bruscamente, causando amassamento da estrutura do veículo, o que se enquadra no risco de colisão acidental previsto na cláusula 9.1.2.",
+          "clause_ids": [
+            "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/9/9.1.2"
+          ]
+        },
+        {
+          "statement": "A cláusula 27 apresenta rol de riscos/categorias não aceitos, mas seu trecho recuperado não menciona suspensão rebaixada nem kit turbo, portanto não exclui expressamente o evento com base nessas modificações.",
+          "clause_ids": [
+            "1:de-acessorios-perda-parcial-rado-outros-roubo-furto-veiculo-segu-veiculo-segu-indenizacao-indenizacao-indenizacao-integral-do-integral-do-integral-do-veiculo-ter-bo-furto-rado-rou-eventos-rcf-dm-rcf-dc-ceiro/27"
+          ]
+        },
+        {
+          "statement": "A cláusula 12 prevê perda de direitos por declarações falsas ou omissas, mas o relato não permite concluir, com base no trecho recuperado, se as modificações foram informadas ou omitidas na contratação.",
+          "clause_ids": [
+            "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/12"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/9/9.1.2",
+        "1:de-acessorios-perda-parcial-rado-outros-roubo-furto-veiculo-segu-veiculo-segu-indenizacao-indenizacao-indenizacao-integral-do-integral-do-integral-do-veiculo-ter-bo-furto-rado-rou-eventos-rcf-dm-rcf-dc-ceiro/27",
+        "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/12"
+      ],
+      "retrieved_clause_ids": [
+        "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/9/9.1.2",
+        "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/13/13.1/13.1.1",
+        "1:procedimentos-em-caso-de-sinistro",
+        "1:de-acessorios-perda-parcial-rado-outros-roubo-furto-veiculo-segu-veiculo-segu-indenizacao-indenizacao-indenizacao-integral-do-integral-do-integral-do-veiculo-ter-bo-furto-rado-rou-eventos-rcf-dm-rcf-dc-ceiro/27",
+        "1:de-acessorios-perda-parcial-rado-outros-roubo-furto-veiculo-segu-veiculo-segu-indenizacao-indenizacao-indenizacao-integral-do-integral-do-integral-do-veiculo-ter-bo-furto-rado-rou-eventos-rcf-dm-rcf-dc-ceiro",
+        "1:de-acessorios-perda-parcial-rado-outros-roubo-furto-veiculo-segu-veiculo-segu-indenizacao-indenizacao-indenizacao-integral-do-integral-do-integral-do-veiculo-ter-bo-furto-rado-rou-eventos-rcf-dm-rcf-dc-ceiro/23",
+        "1:de-acessorios-perda-parcial-rado-outros-roubo-furto-veiculo-segu-veiculo-segu-indenizacao-indenizacao-indenizacao-integral-do-integral-do-integral-do-veiculo-ter-bo-furto-rado-rou-eventos-rcf-dm-rcf-dc-ceiro/24",
+        "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/12",
+        "1:glossario",
+        "1:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-disposicoes-preliminares/10"
+      ]
+    },
+    {
+      "claim_id": "incompatible-002",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cobertura de despesas de salvamento prevê indenizar despesas comprovadamente incorridas com medidas necessárias, emergenciais e imediatas de contenção de danos ou salvamento do objeto segurado, visando evitar sinistro iminente ou diminuir as consequências de sinistro coberto, o que poderia, em tese, alcançar a contratação emergencial de drenagem da via durante a tempestade.",
+          "clause_ids": [
+            "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20",
+            "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.5"
+          ]
+        },
+        {
+          "statement": "A cláusula 20.6 exclui expressamente despesas de contenção ou salvamento relativas à prevenção ordinária, incluindo qualquer tipo de manutenção, atribuindo-as ao segurado; a manutenção preventiva nas borrachas, vedações e rolamentos descrita no evento se enquadra nessa exclusão.",
+          "clause_ids": [
+            "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6"
+          ]
+        },
+        {
+          "statement": "A cláusula adicional de riscos excluídos também afasta expressamente a realização de qualquer tipo de manutenção preventiva, reforçando que os gastos com revisão mecânica preventiva não estão amparados pelo produto.",
+          "clause_ids": [
+            "2:clausulas-adicionais/1/1.1/1.1.16/1.1.16.1"
+          ]
+        },
+        {
+          "statement": "Sopesando a aparente cobertura de despesas de salvamento com as exclusões aplicáveis: ainda que a drenagem emergencial da rua pudesse ser discutida como medida de contenção, o evento também pede reembolso de manutenção preventiva e ordinária do veículo, que as cláusulas excluem de forma clara; portanto o evento descrito não é compatível com as condições do produto.",
+          "clause_ids": [
+            "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20",
+            "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6",
+            "2:clausulas-adicionais/1/1.1/1.1.16/1.1.16.1"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.5",
+        "2:clausulas-adicionais/1/1.1/1.1.16/1.1.16.1"
+      ],
+      "retrieved_clause_ids": [
+        "2:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-processo-susep-no-15414-603040-2022-37-cnpj-33-448-150-0001-11-disposicoes-preliminares/8/8.1/8.1.1",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.6",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/19.8/19.8.4",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/20/20.5",
+        "2:clausulas-adicionais/1/1.1/1.1.16/1.1.16.1",
+        "2:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-processo-susep-no-15414-603040-2022-37-cnpj-33-448-150-0001-11-disposicoes-preliminares/9",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/19.6/19.6.2",
+        "2:proprietarios-de-veiculos-automotores-de-vias-terrestres/28",
+        "2:condicoes-contratuais-gerais-para-as-coberturas-de-automovel-rcfv-processo-susep-no-15414-603040-2022-37-cnpj-33-448-150-0001-11-disposicoes-preliminares/10"
+      ]
+    },
+    {
+      "claim_id": "incompatible-003",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cobertura básica garante apenas \"Colisão, abalroamento ou capotagem acidental\", ou seja, não abrange colisão provocada deliberadamente pelo segurado.",
+          "clause_ids": [
+            "3:condicoes-especiais-cobertura-basica-a/1",
+            "3:cobertura-basica-b/1"
+          ]
+        },
+        {
+          "statement": "O contrato define ACIDENTE como \"Acontecimento imprevisto e involuntário\"; a conduta descrita — acelerar e jogar o carro de propósito contra outro veículo — é voluntária e, portanto, incompatível com esse requisito.",
+          "clause_ids": [
+            "3:condicoes-gerais-definicoes"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "3:condicoes-especiais-cobertura-basica-a/1",
+        "3:cobertura-basica-b/1",
+        "3:condicoes-gerais-definicoes"
+      ],
+      "retrieved_clause_ids": [
+        "3:objetivo-do-seguro",
+        "3:condicoes-especiais-cobertura-basica-a/1",
+        "3:cobertura-basica-b/1",
+        "3:procedimentos-em-caso-de-sinistro",
+        "3:condicoes-gerais-definicoes",
+        "3:riscos-excluidos-a-seguradora-isenta-se-de-qualquer-obrigacao-nos-seguintes-casos/2",
+        "3:condicoes-especiais-cobertura-basica-a/2",
+        "3:cobertura-basica-b/2",
+        "3:vigencia-do-seguro-e-vigencia-da-cobertura"
+      ]
+    },
+    {
+      "claim_id": "incompatible-004",
+      "cohort": "incompatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "4:10",
+        "4:10/10.3",
+        "4:10/10.4",
+        "4:9",
+        "4:9/9.3",
+        "4:9/9.4",
+        "4:3",
+        "4:3/3.35",
+        "4:3/3.36",
+        "4:10/10.3/10.3.1"
+      ]
+    },
+    {
+      "claim_id": "incompatible-005",
+      "cohort": "incompatible",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "incompatible-006",
+      "cohort": "incompatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "O glossário define \"Acidente\" como \"Acontecimento súbito e imprevisto do qual resultem em danos a pessoas ou bens\". A colisão ao dar ré contra um carro estacionado, com amassamento na porta e raspagem no para-choque, corresponde a essa definição geral de acidente.",
+          "clause_ids": [
+            "17:situacao-data-base-da-exigibilidade/11"
+          ]
+        },
+        {
+          "statement": "As exclusões gerais recuperadas referem-se a prejuízos causados por roubo/apropriação dolosa, atos de vandalismo, agressão, brigas ou discussões e participação em competições, apostas e provas de velocidade. Elas não preveem expressamente colisão em manobra de ré contra veículo parado.",
+          "clause_ids": [
+            "17:disposicoes-gerais/6"
+          ]
+        },
+        {
+          "statement": "A exclusão específica da cobertura RCF-V GU afasta danos a bens de terceiros \"sob guarda e/ou custódia\" ou utilizados pelo segurado/condutor. O relato diz apenas que o carro do filho estava estacionado atrás, sem indicar guarda, custódia ou uso pela segurada, de modo que essa exclusão não é claramente aplicável com base nas informações fornecidas.",
+          "clause_ids": [
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3"
+          ]
+        },
+        {
+          "statement": "Os dispositivos recuperados da cobertura são de documentação para regulação do sinistro, e a cláusula particular condiciona o direito à indenização à comprovação de vínculo do segurado ou parente com a empresa de aposentados, circunstância não demonstrada no relato. Não há, entre as cláusulas recuperadas, norma afirmativa que contemple expressamente a cobertura do dano material ao veículo do filho.",
+          "clause_ids": [
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6",
+            "17:clausula-particular-no-2-contrato-de-aposentados"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "17:disposicoes-gerais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3",
+        "17:situacao-data-base-da-exigibilidade/11",
+        "17:clausula-particular-no-2-contrato-de-aposentados"
+      ],
+      "retrieved_clause_ids": [
+        "17:disposicoes-gerais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2-3",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.1",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3",
+        "17:situacao-data-base-da-exigibilidade/11",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/3",
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/3-2",
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/3",
+        "17:clausula-particular-no-2-contrato-de-aposentados"
+      ]
+    },
+    {
+      "claim_id": "incompatible-007",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "O deslocamento foi feito com patinete elétrico em rodovia expressa proibida para patinetes e bicicletas; a cláusula exclui riscos decorrentes de uso inadequado do equipamento, inclusive trânsito em lugar indevido ou proibido pelas regras de mobilidade urbana.",
+          "clause_ids": [
+            "18:6"
+          ]
+        },
+        {
+          "statement": "A colisão ocorreu em meio a chuva e asfalto molhado; as condições especial e geral excluem acidentes provocados por fenômenos da natureza, tais como chuva.",
+          "clause_ids": [
+            "18:9/12.3",
+            "18:11/11.2"
+          ]
+        },
+        {
+          "statement": "O tempo aguardando no local e a perda do compromisso configuram prejuízo patrimonial/lucros cessantes não resultante diretamente de danos corporais ou materiais cobertos, também expressamente excluído.",
+          "clause_ids": [
+            "18:9/12.3",
+            "18:11/11.2",
+            "18:6"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "18:9/12.3",
+        "18:11/11.2",
+        "18:6"
+      ],
+      "retrieved_clause_ids": [
+        "18:9/12.3",
+        "18:11/11.2",
+        "18:6",
+        "18:3/3.11",
+        "18:3/3.39",
+        "18:3",
+        "18:3/3.6",
+        "18:3/3.7",
+        "18:3/3.9",
+        "18:3/3.10"
+      ]
+    },
+    {
+      "claim_id": "incompatible-008",
+      "cohort": "incompatible",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "A cláusula 3.4.2 indica que, para um sinistro amparado, as despesas de salvamento comprovadas e os danos causados pelo segurado ou por terceiros na tentativa de minorar o dano ou salvar a coisa compõem o prejuízo total.",
+          "clause_ids": [
+            "24:3/3.4/3.4.2"
+          ]
+        },
+        {
+          "statement": "Porém, essa mesma cláusula pressupõe a existência de 'qualquer Sinistro amparado por este seguro'; ela, por si só, não demonstra que o deslizamento/atolamento na lama e os danos causados durante a manobra de resgate estejam cobertos pelo produto.",
+          "clause_ids": [
+            "24:3/3.4/3.4.2"
+          ]
+        },
+        {
+          "statement": "A cláusula 3.2.4 enumera exclusões para operações periódicas preventivas, sinistros ocorridos durante a garantia original do fabricante e defeito de série/projeto, hipóteses que não se relacionam diretamente com o evento narrado, de modo que não o afastam expressamente.",
+          "clause_ids": [
+            "24:3/3.2/3.2.4"
+          ]
+        },
+        {
+          "statement": "A cláusula 6.3.5 trata de despesas de salvamento ou contenção quando a seguradora recomenda ou aprova previamente a medida, e de limites de valor, mas não resolve claramente se a manobra emergencial de resgate narrada, sem menção a essa aprovação prévia, estaria ou não amparada.",
+          "clause_ids": [
+            "24:6/6.1-2/6.3.5"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "24:3/3.2/3.2.4",
+        "24:3/3.4/3.4.2",
+        "24:6/6.1-2/6.3.5"
+      ],
+      "retrieved_clause_ids": [
+        "24:3/3.2/3.2.4",
+        "24:3/3.4/3.4.2",
+        "24:6/6.1-2/6.3.5",
+        "24:4/4.1/4.1.1",
+        "24:4/4.1/4.1.1/4.1.1.1",
+        "24:4/4.1/4.1.1/4.1.1.2",
+        "24:6/6.2",
+        "24:6/6.2/6.2.14",
+        "24:6/6.2/6.2.15",
+        "24:6/6.2/6.2.12.1"
+      ]
+    },
+    {
+      "claim_id": "incompatible-009",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "As condições preveem que os serviços de reparo são realizados exclusivamente na Rede Referenciada e que, fora dela, os reparos não estão cobertos pelo seguro, ficando os custos por conta do Segurado.",
+          "clause_ids": [
+            "25:pela-seguradora-e-realizados-exclusivamente-na-rede"
+          ]
+        },
+        {
+          "statement": "O relato afirma que o veículo foi levado a mecânico de confiança e as peças de desgaste foram trocadas por esse caminho, sem indicar utilização da Rede Referenciada; isso atrai a consequência de não cobertura prevista na condição.",
+          "clause_ids": [
+            "25:pela-seguradora-e-realizados-exclusivamente-na-rede"
+          ]
+        },
+        {
+          "statement": "A exigência de Nota Fiscal para liquidação não supera a restrição anterior de que o reparo deve ter sido realizado exclusivamente na Rede Referenciada.",
+          "clause_ids": [
+            "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.11"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.11",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede"
+      ],
+      "retrieved_clause_ids": [
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.11",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.3",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.4",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.5",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.8",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.9",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.12",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/15"
+      ]
+    },
+    {
+      "claim_id": "incompatible-010",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cláusula de cobertura prevê, até o limite máximo de indenização contratado, despesas decorrentes de danos à carroceria e a espelhos retrovisores, além de vandalismo. O relato de lataria amassada e retrovisor quebrado se amolda, em tese, a esses itens.",
+          "clause_ids": [
+            "26:6"
+          ]
+        },
+        {
+          "statement": "A cláusula de exclusão afasta os prejuízos verificados em consequência, direta ou indireta, de greve, motim, atos de hostilidade e, em geral, todo e qualquer ato ou consequência dessas ocorrências.",
+          "clause_ids": [
+            "26:1-2"
+          ]
+        },
+        {
+          "statement": "O evento narrado ocorreu durante uma greve/protesto, e os arremessos de pedras e paus contra o carro alugado são consequência dessa ocorrência, o que atrai a excludente.",
+          "clause_ids": [
+            "26:1-2"
+          ]
+        },
+        {
+          "statement": "Embora a cobertura descreva danos semelhantes aos relatados, a exclusão expressa para greve e consequências dessas ocorrências prevalece sobre a previsão de cobertura.",
+          "clause_ids": [
+            "26:6",
+            "26:1-2"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "26:6",
+        "26:1-2"
+      ],
+      "retrieved_clause_ids": [
+        "26:6",
+        "26:3-3",
+        "26:4-2",
+        "26:2-2",
+        "26:26",
+        "26:1-2",
+        "26:1-4",
+        "26:21",
+        "26:27"
+      ]
+    },
+    {
+      "claim_id": "incompatible-011",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cláusula de cobertura prevê apenas reparar, substituir ou indenizar o bem na ocorrência de eventos previstos e cobertos pelo contrato.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5"
+          ]
+        },
+        {
+          "statement": "A cláusula de exclusão afasta os custos decorrentes de uso do bem de maneira não recomendada pelo fabricante.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1"
+          ]
+        },
+        {
+          "statement": "Embora haja previsão genérica de cobertura, a exclusão por uso não recomendado pelo fabricante prevalece no relato, pois o motorista prosseguiu por cerca de cinquenta quilômetros com luz de óleo e superaquecimento, barulho metálico, fumaça e falhas até o motor travar.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5",
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5"
+      ],
+      "retrieved_clause_ids": [
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/5",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.3",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.4",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.5",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.9",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8"
+      ]
+    },
+    {
+      "claim_id": "incompatible-012",
+      "cohort": "incompatible",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "Os riscos cobertos estão limitados às peças/componentes descritos, e a lista de peças de motor contempla apenas componentes internos e lubrificados do motor, sem mencionar caixa de câmbio, engrenagens de câmbio ou rolamentos de câmbio.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1",
+            "29:25-atualizacao-de-valores/3/3.1"
+          ]
+        },
+        {
+          "statement": "O evento descrito é travamento da caixa de câmbio e o pedido envolve troca de engrenagens e rolamentos do câmbio, itens não listados entre as peças cobertas.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1",
+            "29:25-atualizacao-de-valores/3/3.1"
+          ]
+        },
+        {
+          "statement": "As condições especiais excluem expressamente danos ou perdas decorrentes de eventos não caracterizados como eventos previstos ou cobertos.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+          ]
+        },
+        {
+          "statement": "Como a falha narrada se refere a componente de câmbio não contemplado na lista de cobertura e a exclusão afasta eventos não caracterizados como cobertos, o evento é incompatível com as condições do produto.",
+          "clause_ids": [
+            "29:25-atualizacao-de-valores/2/2.1",
+            "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "29:25-atualizacao-de-valores/2/2.1",
+        "29:25-atualizacao-de-valores/3/3.1",
+        "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+      ],
+      "retrieved_clause_ids": [
+        "29:25-atualizacao-de-valores/2/2.1",
+        "29:25-atualizacao-de-valores/2/2.1/1.1.3",
+        "29:25-atualizacao-de-valores/3/3.1",
+        "29:25-atualizacao-de-valores/3/3.1/3.1.3",
+        "29:3",
+        "29:12-limite-maximo-de-indenizacao",
+        "29:12-limite-maximo-de-indenizacao/16.19",
+        "29:12-limite-maximo-de-indenizacao/20.1",
+        "29:12-limite-maximo-de-indenizacao/20.3",
+        "29:25-atualizacao-de-valores/2/2.1/1.1.4"
+      ]
+    },
+    {
+      "claim_id": "incompatible-013",
+      "cohort": "incompatible",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "O seguro tem por objeto indenizar terceiros ou reembolsar o segurado por danos materiais causados a terceiros não transportados, nos termos da cláusula 1.",
+          "clause_ids": [
+            "30:1"
+          ]
+        },
+        {
+          "statement": "Considera-se risco coberto a responsabilidade civil do segurado por danos materiais a terceiros não transportados pelo veículo segurado, em acidente de trânsito causado pelo veículo descrito.",
+          "clause_ids": [
+            "30:2"
+          ]
+        },
+        {
+          "statement": "No relato, o carro do irmão foi atingido pela manobra de ré do veículo segurado; o irmão estava em outro veículo e não era transportado pelo veículo segurado, o que se enquadra como dano material a terceiro não transportado.",
+          "clause_ids": [
+            "30:1",
+            "30:2"
+          ]
+        },
+        {
+          "statement": "A exclusão da cláusula 4.1(c) refere-se a danos sofridos pelo veículo segurado; o dano narrado ocorreu no veículo do irmão, portanto não é a hipótese dessa exclusão.",
+          "clause_ids": [
+            "30:4"
+          ]
+        },
+        {
+          "statement": "A exclusão da cláusula 4.1(a) limita-se a dolo ou culpa grave; o relato descreve desatenção em manobra de ré, sem indicar expressamente conduta dolosa ou de culpa grave.",
+          "clause_ids": [
+            "30:4"
+          ]
+        },
+        {
+          "statement": "A cláusula 7(a) torna não indenizáveis reconhecimento de culpabilidade ou transações sem autorização escrita do segurador; o relato não descreve acordo já formalizado, apenas a intenção de acionar o seguro.",
+          "clause_ids": [
+            "30:7"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "30:1",
+        "30:2",
+        "30:4",
+        "30:7"
+      ],
+      "retrieved_clause_ids": [
+        "30:1",
+        "30:2",
+        "30:8/8.4",
+        "30:8/8.5",
+        "30:9",
+        "30:10",
+        "30:4",
+        "30:5",
+        "30:8/8.1",
+        "30:7"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-001",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "insufficient_information-002",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "insufficient_information-003",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "insufficient_information-004",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "4:2-4",
+        "4:9",
+        "4:9/9.3",
+        "4:6",
+        "4:3/3.3.1",
+        "4:3",
+        "4:3/3.35",
+        "4:3/3.36",
+        "4:3/3.37",
+        "4:2-4/2.3.2"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-005",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A definição de acidente abrange evento danoso súbito e inesperado, sendo compatível com uma colisão lateral ao sair do supermercado.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/2"
+          ]
+        },
+        {
+          "statement": "A cobertura específica de danos morais garante, até o limite contratado, a indenização de quantias por danos morais causados involuntariamente a terceiros por veículo segurado, incluindo o acordo pactuado com o terceiro, desde que com anuência prévia e expressa da seguradora.",
+          "clause_ids": [
+            "16:condicoes-especiais-3/1"
+          ]
+        },
+        {
+          "statement": "A cobertura de danos corporais garante a indenização por danos corporais involuntários causados a terceiros por veículo segurado, também mediante acordo com anuência prévia e expressa; os ferimentos leves da passageira enquadram-se nessa previsão de dano corporal.",
+          "clause_ids": [
+            "16:condicoes-especiais-2/1"
+          ]
+        },
+        {
+          "statement": "A cláusula de danos morais indica que sua aplicação se dá, ao menos, quando os danos morais decorrem direta e estritamente de danos corporais, hipótese apontada na descrição do evento.",
+          "clause_ids": [
+            "16:condicoes-especiais-3/1"
+          ]
+        },
+        {
+          "statement": "A exclusão de danos sofridos por pessoas transportadas no veículo segurado não afasta a situação, pois a passageira ferida estava no outro veículo, não no veículo do segurado.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1"
+          ]
+        },
+        {
+          "statement": "A pretensão de obter anuência prévia e expressa da seguradora para o acordo amigável de danos morais é compatível com as condições registradas, pois o acordo está expressamente previsto como hipótese de indenização.",
+          "clause_ids": [
+            "16:condicoes-especiais-3/1"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/2",
+        "16:condicoes-especiais-3/1",
+        "16:condicoes-especiais-2/1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1"
+      ],
+      "retrieved_clause_ids": [
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/2",
+        "16:condicoes-especiais-3/1",
+        "16:condicoes-especiais-2/1",
+        "16:condicoes-especiais/1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/16",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/25",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/8",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/14",
+        "16:condicoes-especiais-2/2"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-006",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "As coberturas básicas recuperadas preveem o reembolso por danos materiais causados involuntariamente a terceiros em decorrência de acidente de trânsito com o veículo segurado, o que, em princípio, alcançaria danos à lataria de outro veículo.",
+          "clause_ids": [
+            "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2-3/2.2",
+            "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2"
+          ]
+        },
+        {
+          "statement": "Há cláusula particular recuperada que garante exclusivamente danos corporais, com extensão a danos morais, não contemplando danos materiais à lataria de terceiro.",
+          "clause_ids": [
+            "17:clausula-particular-no-2-contrato-de-aposentados/2-5",
+            "17:clausula-particular-no-2-contrato-de-aposentados/2-5/1.3-2"
+          ]
+        },
+        {
+          "statement": "Os trechos recuperados mostram, de um lado, cobertura geral para danos materiais e, de outro, cláusula particular de cobertura exclusiva para danos corporais/morais; como não há indicação de qual cobertura ou cláusula foi efetivamente contratada no bilhete, não é possível definir qual regime prevalece para o sinistro.",
+          "clause_ids": [
+            "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2",
+            "17:clausula-particular-no-2-contrato-de-aposentados/2-5"
+          ]
+        },
+        {
+          "statement": "As cláusulas de cobertura informam que o reembolso respeita o limite máximo contratado no bilhete, e o contexto recuperado não informa esse limite, de modo que não há como verificar se o valor de quase R$ 2.000,00 estaria abrangido.",
+          "clause_ids": [
+            "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2"
+          ]
+        },
+        {
+          "statement": "As cláusulas falam em reembolso das indenizações que o segurado for obrigado a pagar, mas os trechos recuperados não disciplinam se um acerto combinado diretamente entre os motoristas, sem demonstração de obrigação e sem anuência da seguradora, está coberto.",
+          "clause_ids": [
+            "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2"
+          ]
+        },
+        {
+          "statement": "As exclusões gerais reproduzidas afastam expressamente hipóteses como roubo/furto/apropriação dolosa, vandalismo/agressão/brigas/discussões e participação em competições; a descrição de batida leve no centro não se enquadra nas hipóteses visíveis, mas isso não resolve a dúvida sobre qual cobertura contratada se aplica.",
+          "clause_ids": [
+            "17:disposicoes-gerais/6"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2-3/2.2",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-5",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-5/1.3-2",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2",
+        "17:disposicoes-gerais/6"
+      ],
+      "retrieved_clause_ids": [
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/2-3/2.2",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/2/2.2",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-5",
+        "17:clausula-particular-no-2-contrato-de-aposentados/2-5/1.3-2",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2/2.2",
+        "17:disposicoes-gerais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/3",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/3"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-007",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "insufficient_information-008",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "A cláusula exclui veículos usados para fins comerciais, competição, locação, serviços públicos etc., e o relato não informa esse tipo de uso do veículo.",
+          "clause_ids": [
+            "24:3/3.2/3.2.1"
+          ]
+        },
+        {
+          "statement": "A cláusula trata de exclusões como borra no óleo, peças de desgaste, elementos filtrantes, mangueiras, bateria etc., e não menciona danos decorrentes de colisão contra mureta ou danos estéticos em portas e capa de retrovisor.",
+          "clause_ids": [
+            "24:3/3.2/3.2.3"
+          ]
+        },
+        {
+          "statement": "A cláusula exclui operações preventivas, sinistros durante a garantia original do fabricante e defeitos de série/projeto, hipóteses distintas da colisão ao manobrar descrita.",
+          "clause_ids": [
+            "24:3/3.2/3.2.4"
+          ]
+        },
+        {
+          "statement": "As cláusulas 6.2 são procedimentais, tratando de regulação e liquidação de sinistros, e não definem que a colisão contra mureta de concreto esteja coberta pelo produto.",
+          "clause_ids": [
+            "24:6/6.2"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "24:3/3.2/3.2.4",
+        "24:3/3.2/3.2.3",
+        "24:3/3.2/3.2.1",
+        "24:6/6.2"
+      ],
+      "retrieved_clause_ids": [
+        "24:3/3.2/3.2.4",
+        "24:3/3.2/3.2.3",
+        "24:2/2.4",
+        "24:2/2.4/2.4.7",
+        "24:2/2.4/2.4.7/2.4.7.1",
+        "24:3/3.2/3.2.1",
+        "24:6/6.2",
+        "24:6/6.2/6.2.14",
+        "24:6/6.2/6.2.15",
+        "24:6/6.2/6.2.12.1"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-009",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "A cláusula 3.1 exclui expressamente danos causados por influências externas, como acidentes em geral, fenômenos naturais e de ordem pública, mas não trata especificamente de quebra de engrenagem interna da transmissão mecânica.",
+          "clause_ids": [
+            "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1"
+          ]
+        },
+        {
+          "statement": "As cláusulas 12 e seguintes condicionam os serviços de reparo a execução exclusiva na Rede Referenciada, sob pena de os custos não estarem cobertos pelo seguro.",
+          "clause_ids": [
+            "25:pela-seguradora-e-realizados-exclusivamente-na-rede"
+          ]
+        },
+        {
+          "statement": "A descrição do evento menciona apenas que o veículo foi deixado em uma 'oficina', sem confirmar se ela pertence à Rede Referenciada, de modo que não é possível verificar o cumprimento dessa condição.",
+          "clause_ids": [
+            "25:pela-seguradora-e-realizados-exclusivamente-na-rede"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede"
+      ],
+      "retrieved_clause_ids": [
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.3",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.4",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.5",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.8",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.9",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.12",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/15",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/16"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-010",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "O evento narrado — raspão/choque contra coluna de concreto durante manobra no estacionamento — enquadra-se na definição de acidente ou colisão: evento súbito, inesperado, causado por algo externo e visível, com danos ao veículo.",
+          "clause_ids": [
+            "26:30"
+          ]
+        },
+        {
+          "statement": "Os danos relatados em porta traseira e para-lama inserem-se em danos à carroceria, risco expressamente previsto como coberto.",
+          "clause_ids": [
+            "26:6"
+          ]
+        },
+        {
+          "statement": "As exclusões listadas não afastam, pelos fatos relatados, o enquadramento do evento: referem-se a descumprimento de contrato de locação, infração legal ou regulamentar relevante, fraude/dolo, falta de comunicação, atos de guerra etc., e não há relato de tais circunstâncias no evento.",
+          "clause_ids": [
+            "26:2-2",
+            "26:3-3",
+            "26:4-2",
+            "26:1-4",
+            "26:1-2"
+          ]
+        },
+        {
+          "statement": "A cláusula de acidentes envolvendo outro veículo não é aplicável, pois o relato não indica envolvimento de veículo de terceiro.",
+          "clause_ids": [
+            "26:23"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "26:6",
+        "26:2-2",
+        "26:23",
+        "26:3-3",
+        "26:4-2",
+        "26:1-4",
+        "26:30",
+        "26:1-2"
+      ],
+      "retrieved_clause_ids": [
+        "26:6",
+        "26:2-2",
+        "26:23",
+        "26:3-3",
+        "26:4-2",
+        "26:3-2",
+        "26:21",
+        "26:1-4",
+        "26:30",
+        "26:1-2"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-011",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "A cláusula 23.7 prevê que, nas hipóteses de indenização, poderá haver reparo, reposição ou pagamento em dinheiro, mas não define que falha mecânica no sistema de injeção seja um risco coberto por este seguro.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7",
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7/23.7.1"
+          ]
+        },
+        {
+          "statement": "A cláusula 7(b) remete as demais exclusões à garantia do fabricante/fornecedor, conforme certificado de garantia e manual, e a cláusula 8.1(a) exclui custos decorrentes de defeitos não cobertos pela garantia; logo, saber se a falha do sistema de injeção está coberta depende dos termos da garantia do fabricante/fornecedor, que não constam nas cláusulas recuperadas.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/7",
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1"
+          ]
+        },
+        {
+          "statement": "A cláusula 22 condiciona a exclusão por perda da garantia do fornecedor à comprovação por laudo técnico ou outro meio idôneo; o relato não informa a existência desse laudo ou de violação às regras de garantia, portanto essa exclusão não pode ser aplicada de forma conclusiva com os dados disponíveis.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/22"
+          ]
+        },
+        {
+          "statement": "As cláusulas recuperadas não contêm regra específica que enquadre ou exclua expressamente falha mecânica no sistema de injeção durante viagem de férias; a conclusão depende de documento não recuperado, como o certificado de garantia do fabricante/fornecedor ou o bilhete do seguro.",
+          "clause_ids": [
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/7",
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1",
+            "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7/23.7.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/22"
+      ],
+      "retrieved_clause_ids": [
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/8/8.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.7/23.7.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.3/23.3.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/23/23.3/23.3.1/23.3.1.2",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/19",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/22"
+      ]
+    },
+    {
+      "claim_id": "insufficient_information-012",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "insufficient_information-013",
+      "cohort": "insufficient_information",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "mismatch-001",
+      "cohort": "mismatch",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "As condições recuperadas tratam de Responsabilidade Civil Facultativa de Veículos. A cláusula 22.1 condiciona o reembolso ao segurado à existência de reclamação formal de Terceiro por danos/prejuízos sofridos e à caracterização da responsabilidade civil do segurado, o que não corresponde ao roubo do próprio veículo do segurado.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/22"
+          ]
+        },
+        {
+          "statement": "Para os itens pessoais levados no veículo, a cláusula 6.1 exclui danos sofridos por bens ou mercadorias transportados no veículo segurado, afastando amparo para esses pertences nas condições listadas.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1"
+          ]
+        },
+        {
+          "statement": "O boletim de ocorrência registrado na manhã seguinte é tratado como documento básico para análise do sinistro, mas essa previsão é meramente procedimental e não cria cobertura para o roubo do veículo.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/21"
+          ]
+        },
+        {
+          "statement": "Sob as cláusulas recuperadas, o evento descrito — roubo do veículo do próprio segurado, sem reclamação de terceiro — é incompatível com a modalidade de liquidação prevista para responsabilidade civil perante terceiros.",
+          "clause_ids": [
+            "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/22"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/21",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/22"
+      ],
+      "retrieved_clause_ids": [
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/21",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/21/21.1.5",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/20",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/21/21.1.1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/2",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/21/21.2.3",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/6/6.1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/7/7.1",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/12",
+        "16:condicoes-gerais-de-responsabilidade-civil-facultativa-de-veiculos-rcf-v/22"
+      ]
+    },
+    {
+      "claim_id": "mismatch-002",
+      "cohort": "mismatch",
+      "compatibility_verdict": "insufficient_information",
+      "assertions": [
+        {
+          "statement": "As cláusulas recuperadas tratam principalmente de documentação básica para regulação de sinistro em coberturas de Responsabilidade Civil Facultativa de Veículo (RCF-V), e não definem cobertura de incêndio ou danos ao próprio veículo do segurado.",
+          "clause_ids": [
+            "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6",
+            "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6-2",
+            "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/6",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6-2",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.1",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.2",
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.4"
+          ]
+        },
+        {
+          "statement": "A cláusula de exclusões gerais recuperada lista riscos excluídos aplicáveis a todas as coberturas, mas no trecho fornecido não há menção expressa a incêndio, fogo ou danos ao motor decorrentes de incêndio.",
+          "clause_ids": [
+            "17:disposicoes-gerais/6"
+          ]
+        },
+        {
+          "statement": "A exclusão específica recuperada para RCF-V Garantia Única com Danos Morais refere-se a despesas médicas, terrenos, jazigos e indenizações, não disciplinando incêndio no veículo segurado.",
+          "clause_ids": [
+            "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2-3"
+          ]
+        },
+        {
+          "statement": "Nenhuma cláusula recuperada estabelece expressamente que incêndio no veículo durante a condução seja risco coberto, nem o exclui de forma expressa; portanto, o conjunto recuperado não permite decidir se o evento é compatível ou incompatível com o produto.",
+          "clause_ids": [
+            "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6",
+            "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/6",
+            "17:disposicoes-gerais/6"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6",
+        "17:disposicoes-gerais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6-2",
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6-2",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.1",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.2",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.4",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2-3"
+      ],
+      "retrieved_clause_ids": [
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6",
+        "17:disposicoes-gerais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6-2",
+        "17:cobertura-basica-01-responsabilidade-civil-facultativa-de-veiculo-rcf-v/6-2",
+        "17:cobertura-basica-03-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.1",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.2",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/6/1.4",
+        "17:cobertura-basica-04-responsabilidade-civil-facultativa-de-veiculo-em-garantia-unica-rcf-v-gu-com-danos-morais/2-3"
+      ]
+    },
+    {
+      "claim_id": "mismatch-003",
+      "cohort": "mismatch",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "18:6",
+        "18:3",
+        "18:3/3.6",
+        "18:3/3.7",
+        "18:3/3.9",
+        "18:3/3.10",
+        "18:3/3.21",
+        "18:3/3.23",
+        "18:3/3.25",
+        "18:3/3.27"
+      ]
+    },
+    {
+      "claim_id": "mismatch-004",
+      "cohort": "mismatch",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cláusula impõe ao segurado comunicar o sinistro à seguradora tão logo tome conhecimento, sob pena de perda do direito à indenização, e dar imediato aviso com informações detalhadas.",
+          "clause_ids": [
+            "21:11-obrigacoes-do-segurado/11.3"
+          ]
+        },
+        {
+          "statement": "O relato indica que o evento ocorreu cerca de dez dias antes do registro e que o dia exato não foi anotado, o que conflita com a exigência de aviso imediato e detalhado prevista na cláusula.",
+          "clause_ids": [
+            "21:11-obrigacoes-do-segurado/11.3"
+          ]
+        },
+        {
+          "statement": "A cláusula 13.3 prevê procedimentos específicos para colisão, mas trata de deveres como sinalizar e não assumir culpa, sem alterar ou excepcionar o dever de comunicação imediata contido na cláusula 11.3.",
+          "clause_ids": [
+            "21:13-procedimentos-em-caso-de-sinistro/13.3",
+            "21:11-obrigacoes-do-segurado/11.3"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "21:13-procedimentos-em-caso-de-sinistro/13.3",
+        "21:11-obrigacoes-do-segurado/11.3"
+      ],
+      "retrieved_clause_ids": [
+        "21:13-procedimentos-em-caso-de-sinistro/13.3",
+        "21:11-obrigacoes-do-segurado/11.3",
+        "21:16-documentos-necessarios-para-a-liquidacao-do-sinistro/27/27.3",
+        "21:16-documentos-necessarios-para-a-liquidacao-do-sinistro/27/27.1",
+        "21:16-documentos-necessarios-para-a-liquidacao-do-sinistro/27/27.2",
+        "21:glossario/7",
+        "21:glossario",
+        "21:glossario/6",
+        "21:glossario/6/6.1",
+        "21:glossario/6/6.2"
+      ]
+    },
+    {
+      "claim_id": "mismatch-005",
+      "cohort": "mismatch",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "22:19",
+        "22:7/7.1",
+        "22:23/23.1",
+        "22:23/23.1/23.1.1",
+        "22:23/23.1/23.1.3",
+        "22:19/19.6/19.6.3/19.6.3.1",
+        "22:condicao-especial-da-cobertura-adicional-para-danos-morais",
+        "22:6/6.1/6.1.1/6.1.1.5",
+        "22:10/10.1",
+        "22:3"
+      ]
+    },
+    {
+      "claim_id": "mismatch-006",
+      "cohort": "mismatch",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "O evento descrito é uma colisão do veículo contra um muro, e a cláusula exclui expressamente os casos em que a Pane ou Avaria seja causada por colisão.",
+          "clause_ids": [
+            "24:3/3.2/3.2.2"
+          ]
+        },
+        {
+          "statement": "Os danos relatados — lateral dianteira amassada, farol quebrado e para-choque solto — são avarias decorrentes dessa colisão, enquadrando-se na hipótese de exclusão.",
+          "clause_ids": [
+            "24:3/3.2/3.2.2"
+          ]
+        },
+        {
+          "statement": "As cláusulas de procedimento, documentação, sub-rogação e regulação recuperadas não contêm previsão que afaste a exclusão de colisão.",
+          "clause_ids": [
+            "24:4/4.1/4.1.1/4.1.1.10",
+            "24:4/4.5/4.5.2",
+            "24:6/6.2"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "24:3/3.2/3.2.2",
+        "24:4/4.1/4.1.1/4.1.1.10",
+        "24:4/4.5/4.5.2",
+        "24:6/6.2"
+      ],
+      "retrieved_clause_ids": [
+        "24:3/3.2/3.2.4",
+        "24:4/4.1/4.1.1/4.1.1.8",
+        "24:4/4.1/4.1.1/4.1.1.8/4.1.1.8.1",
+        "24:3/3.2/3.2.2",
+        "24:3/3.2/3.2.3",
+        "24:4/4.1/4.1.1/4.1.1.10",
+        "24:4/4.5/4.5.2",
+        "24:4/4.5/4.5.3",
+        "24:1/1.2",
+        "24:6/6.2"
+      ]
+    },
+    {
+      "claim_id": "mismatch-007",
+      "cohort": "mismatch",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "A cláusula 3.1 exclui expressamente de todas as coberturas do seguro os danos causados por influências externas, listando 'granizo' entre essas causas.",
+          "clause_ids": [
+            "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1"
+          ]
+        },
+        {
+          "statement": "O evento relatado — chuva de granizo que amassou o capô e o teto do veículo — corresponde à hipótese de dano por granizo expressamente excluída.",
+          "clause_ids": [
+            "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1"
+      ],
+      "retrieved_clause_ids": [
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.2",
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/3/3.1",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.3",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.4",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.5",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/12.15",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/17/17.4",
+        "25:condicoes-gerais-seguro-assistencia-e-outras-coberturas-auto/10",
+        "25:pela-seguradora-e-realizados-exclusivamente-na-rede/23"
+      ]
+    },
+    {
+      "claim_id": "mismatch-008",
+      "cohort": "mismatch",
+      "compatibility_verdict": "compatible",
+      "assertions": [
+        {
+          "statement": "A cláusula 6ª prevê cobertura para danos causados por eventos da natureza, citando granizo como exemplo. A enchente/alagamento descrita, causada por temporal, insere-se nesse tipo de risco natural.",
+          "clause_ids": [
+            "26:6"
+          ]
+        },
+        {
+          "statement": "Os danos narrados ao veículo são apresentados como consequência direta da enchente, e a cláusula 15ª estabelece que são indenizáveis os prejuízos decorrentes dos riscos garantidos, observados LMI, franquia e demais condições.",
+          "clause_ids": [
+            "26:6",
+            "26:15"
+          ]
+        },
+        {
+          "statement": "As exclusões recuperadas tratam de situações como guerra/hostilidades, descumprimento de contrato de locação, infração relevante, itens pessoais, danos pessoais/propriedade de terceiros, ausência de documento essencial e sinistro anterior à vigência, não havendo no relato fato que acione essas exclusões para afastar o risco de enchente.",
+          "clause_ids": [
+            "26:1-2",
+            "26:2-2",
+            "26:4-2"
+          ]
+        },
+        {
+          "statement": "A cláusula 6ª delimita a cobertura às despesas da empresa locadora com veículo alugado; a confirmação dessa situação locatícia e dos limites contratados é matéria individual da apólice, não alterando a compatibilidade do risco descrito com a previsão de eventos da natureza.",
+          "clause_ids": [
+            "26:6"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "26:6",
+        "26:15",
+        "26:2-2",
+        "26:4-2",
+        "26:1-2"
+      ],
+      "retrieved_clause_ids": [
+        "26:6",
+        "26:15",
+        "26:9",
+        "26:23",
+        "26:2-2",
+        "26:30",
+        "26:4-2",
+        "26:26",
+        "26:21",
+        "26:1-2"
+      ]
+    },
+    {
+      "claim_id": "mismatch-009",
+      "cohort": "mismatch",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": [
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/19",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.1",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.3",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.4",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.5",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.9",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.11",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/2/2.12",
+        "28:condicoes-gerais-seguro-garantia-estendida-original-auto-moto/15"
+      ]
+    },
+    {
+      "claim_id": "mismatch-010",
+      "cohort": "mismatch",
+      "compatibility_verdict": null,
+      "assertions": [],
+      "recommendation_citation_ids": [],
+      "retrieved_clause_ids": []
+    },
+    {
+      "claim_id": "mismatch-011",
+      "cohort": "mismatch",
+      "compatibility_verdict": "incompatible",
+      "assertions": [
+        {
+          "statement": "O risco coberto descrito é a responsabilidade civil do segurado por danos materiais e/ou pessoais a terceiros não transportados pelo veículo segurado, em consequência de acidente de trânsito.",
+          "clause_ids": [
+            "30:2"
+          ]
+        },
+        {
+          "statement": "O evento relatado é o roubo do carro do segurado, não uma reclamação de terceiros por danos decorrentes de acidente de trânsito causado pelo veículo.",
+          "clause_ids": [
+            "30:2"
+          ]
+        },
+        {
+          "statement": "A exclusão 4.1(c) afasta expressamente 'Furto, roubo ou apropriação indevida ou qualquer dano sofrido pelo veículo segurado'.",
+          "clause_ids": [
+            "30:4"
+          ]
+        },
+        {
+          "statement": "Confrontando a cláusula de cobertura com a exclusão: o item 2 delimita o risco à responsabilidade civil perante terceiros, enquanto o item 4.1(c) exclui expressamente o roubo do veículo do segurado, de modo que a exclusão prevalece para o evento descrito.",
+          "clause_ids": [
+            "30:2",
+            "30:4"
+          ]
+        }
+      ],
+      "recommendation_citation_ids": [
+        "30:2",
+        "30:4"
+      ],
+      "retrieved_clause_ids": [
+        "30:8/8.4",
+        "30:2",
+        "30:8/8.2",
+        "30:4",
+        "30:8/8.5",
+        "30:1",
+        "30:8",
+        "30:8/8.3",
+        "30:9",
+        "30:7"
+      ]
+    }
+  ]
+}
