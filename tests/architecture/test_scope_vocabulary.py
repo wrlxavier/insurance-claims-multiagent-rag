@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROMPTS_DIR = REPO_ROOT / "app" / "src" / "infrastructure" / "graph" / "prompts"
 GRAPH_DIR = REPO_ROOT / "app" / "src" / "infrastructure" / "graph"
 ENUMS_FILE = REPO_ROOT / "app" / "src" / "infrastructure" / "config" / "enums.py"
-VERDICT_FILE = REPO_ROOT / "app" / "src" / "domain" / "verdict.py"
+DOMAIN_DIR = REPO_ROOT / "app" / "src" / "domain"
 
 FORBIDDEN_PATTERN = re.compile(
     r"\b(covered|uncovered|denied|denial|coverage decision)\b", re.IGNORECASE
@@ -53,11 +53,14 @@ def test_no_forbidden_verdict_vocabulary_in_graph() -> None:
 
 
 @pytest.mark.unit
-def test_no_forbidden_verdict_vocabulary_in_verdict_and_enums() -> None:
-    violations = []
-    for enum_file in (ENUMS_FILE, VERDICT_FILE):
-        if enum_file.exists():
-            violations.extend(_scan_file(enum_file))
-    assert not violations, "forbidden verdict vocabulary found in enums:\n" + "\n".join(
-        violations
+def test_no_forbidden_verdict_vocabulary_in_domain_and_enums() -> None:
+    # The whole domain package, not just verdict.py: [M5-01]'s entities carry
+    # the verdict enum reference, the citation types and free-text
+    # ``reasoning`` / ``recommended_action`` semantics on ``Assessment`` -- a
+    # covered/denied literal must not drift into any of them either.
+    violations = _scan_file(ENUMS_FILE) if ENUMS_FILE.exists() else []
+    for py_file in sorted(DOMAIN_DIR.rglob("*.py")):
+        violations.extend(_scan_file(py_file))
+    assert not violations, "forbidden verdict vocabulary found in domain/enums:\n" + (
+        "\n".join(violations)
     )
