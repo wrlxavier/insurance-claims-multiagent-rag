@@ -198,7 +198,18 @@ the rest of `domain/`.
 ## Deferred
 
 - **Consistency signals on `Assessment`** — until a use case needs
-  `ConsistencyReport` persisted ([M5-03]).
+  `ConsistencyReport` persisted ([M5-03]). [M5-02] carries them as
+  `application.consistency_flag.ConsistencyFlag` on the `AssessmentRecord`
+  aggregate, not on the domain entity.
+- **The abstain outcome** — a verdict with no citations is not a domain
+  `Assessment` (the ≥1-citation rule is unconditional). [M5-02] models it as
+  `application.assessment_record.AssessmentRecord`, the servable/persistable
+  aggregate; `AssessmentRecord.as_domain_assessment()` is the grounded
+  projection and raises `CitationRequiredError` on an abstain.
+- **Editing an assessment** — an `edit` `HumanDecision` always carries a
+  *grounded* `Assessment` ([M5-02]'s `SubmitHumanDecision` builds it from the
+  reviewer's payload and validates every cited clause); the domain rule is
+  unchanged.
 - **`ExtractedEntities`** — stays graph working state in `infrastructure/graph/
   state.py`; not a DoD entity.
 - **Mappers** — domain ↔ ORM row, and domain ↔ `state.py` Pydantic — are [M5-03].

@@ -257,10 +257,19 @@ Integration (`make test-integration`, real Postgres):
 
 - **[M4-10]** measures end-to-end verdict accuracy. It runs the graph, so it
   supplies a checkpointer and resumes past the checkpoint like any other caller.
-- **[M5-02]/[M5-04]** put a use case and an endpoint in front of this: the
-  payload above is what `GetAssessment` returns and `SubmitHumanDecision`
-  resumes. Validating the decision payload belongs there too — the node
-  re-validates defensively, but a 422 to the client is better than a re-ask.
+- **[M5-02]** defines the contract: `ClaimAssessmentOrchestrator.resume(*,
+  assessment_id, decision)` hides this node entirely (no `Command`, no
+  `thread_id`, no interrupt payload crosses the port), and `SubmitHumanDecision`
+  validates the decision — building a domain `HumanDecision`, and for an `edit`
+  a grounded `Assessment` with every clause checked against `ClauseRepository` —
+  before the run is resumed. `GetAssessment` returns an `AssessmentRecord` that
+  already carries what a reviewer needs, so the read never re-enters the graph.
+  The fields the interrupt payload above exposes (`recommendation`,
+  `context_sufficient`, `clarification_exhausted`, `missing_information`) are
+  all on that record.
+- **[M5-04]** builds the concrete LangGraph-backed orchestrator adapter and the
+  HTTP endpoints on top: `POST .../decision` maps a 422 to a payload the domain
+  rejects, and resumes the run through the port.
 - **[M5-03]** takes the connection story further. `open_claim_checkpointer` opens
   a single connection, which is right for a script or a test and not for a
   service handling concurrent requests; a `ConnectionPool` is the M5 shape. It

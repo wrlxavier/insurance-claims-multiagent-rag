@@ -638,3 +638,93 @@ package, not just `verdict.py`.
 
 Full field tables, the invariant list and the relationship to `state.py`:
 `docs/DOMAIN.md`.
+
+---
+
+## The application layer is ports + use cases; the orchestrator hides LangGraph — [M5-02]
+
+**Decision.** `app/src/application/` gains the claim-assessment surface: five
+ports (`app/src/application/ports/`), four use-case interactors
+(`app/src/application/use_cases/`), and the DTOs they speak in
+(`app/src/application/{assessment_record,orchestrator_result,consistency_flag,edited_assessment_input,errors}.py`).
+
+- `ClauseRepository` — read-only lookup over the registered-product clause
+  corpus. Stands apart from the transaction: the corpus is reference data the
+  assessment use cases never write.
+- `AssessmentRepository` — persists and queries `AssessmentRecord`. Its writes
+  run inside a `UnitOfWork`; its reads do not.
+- `UnitOfWork` — one transaction, exposing only `assessments`. The use cases
+  take a `UnitOfWorkFactory` (`Callable[[], UnitOfWork]`), so each call opens
+  its own unit — the session-per-transaction shape [M5-03] needs.
+- `Clock` — `now() -> datetime` (tz-aware UTC). Formalises the
+  `now=datetime.now(UTC)` parameter injection `consistency_checks.py` already
+  uses, so the use cases' timestamps are assertable.
+- `ClaimAssessmentOrchestrator` — `start(*, assessment_id, claim)` and
+  `resume(*, assessment_id, decision)`, returning an `OrchestratorResult`.
+  **No graph type crosses it**: no `ClaimState`, `Command`, `interrupt`,
+  `thread_id`, or `infrastructure.graph` model. `assessment_id` is the sole run
+  key (the implementation uses it as the LangGraph `thread_id`), so
+  re-submitting a claim is simply a fresh `assessment_id` — the "one claim, a
+  second thread" case `docs/HUMAN_CHECKPOINT.md` describes.
+
+The use cases (`SubmitClaim`, `GetAssessment`, `SubmitHumanDecision`,
+`ListAssessments`) are frozen-dataclass interactors — ports injected as fields,
+one `__call__` — unlike the earlier pure-function pipeline use cases, because
+they carry dependencies.
+
+**Why `AssessmentRecord`, not `domain.Assessment`, is the stored unit.**
+`Assessment`'s ≥1-citation invariant is unconditional by design (M5-01, above).
+But the graph can finish an insufficient-context or clarification-exhausted run
+with a recommendation that cites nothing, and `GET /v1/assessments/{id}` /
+`ListAssessments` must still serve those — after the LangGraph thread, and its
+checkpoint, may be gone. So the persisted/servable aggregate is
+`application.assessment_record.AssessmentRecord`: the full lifecycle (system
+verdict, prose, citations — possibly empty; the retrieval/clarification signals;
+status; and, once settled, the analyst's `HumanDecision` recorded *beside* the
+system's opinion). `AssessmentRecord.as_domain_assessment()` is the grounded
+projection back — and it raises `CitationRequiredError` for an abstain record,
+which is the invariant doing its job.
+
+**Deviation on record.**
+(a) `RetrievalService` is **not** delivered. No M5-02 use case consumes semantic
+retrieval — the assessment use cases never search, and `Citation.excerpt`
+already carries the hydrated clause text — so a `RetrievalService` port would be
+a contract with no caller. This codebase lands a port with its first real
+consumer (M4-04's `RetrievalPort`/`GraphRetrievalAdapter`, M4-09's
+`AuditTrailSink`/`SqlAlchemyAuditTrailSink`), never ahead of one. Retrieval
+stays internal to the graph (`infrastructure.graph.context.RetrievalPort`,
+satisfied by `GraphRetrievalAdapter`), reached only through
+`ClaimAssessmentOrchestrator`.
+(b) The concrete `ClaimAssessmentOrchestrator` adapter (wrapping
+`build_claim_graph`) and the real `Clock` (`SystemClock`) are **M5-04's**
+composition root — M5-02 is fakes-only per its DoD ("contracts first, adapters
+after"). The port shape is proven sufficient for that adapter: every
+`OrchestratorResult` field maps to a concrete graph source, and both methods
+reduce to one `compiled.invoke(...)` keyed by `assessment_id` (the verdict —
+which `Recommendation` has no field for — is read from the recommendation
+node's audit event).
+(c) An `edit` decision always produces a *grounded* `Assessment` (≥1 citation,
+every cited clause validated against `ClauseRepository` before the graph is
+resumed). Keeping a 0-citation abstain unchanged is an `approve`, not an `edit`.
+(d) The application import check
+(`tests/architecture/test_layer_boundaries.py::test_application_imports_no_infrastructure_or_llm_sdk`)
+adds `infrastructure`, `langchain_core` and `langchain_openai` to a
+layer-scoped forbidden set — `_top_level_module` does not fold the latter two
+into the existing `langchain` root, and LangGraph re-exports `langchain_core`
+types, so "the orchestrator hides LangGraph entirely" needs all three barred.
+
+**Enforcement.** `tests/unit/application/**` — every use case with its rejection
+cases, driven through in-memory fakes (`tests/unit/application/fakes.py`), no
+LLM, no database, no graph; `test_assessment_record.py` on the projection and
+the status/decision pairing;
+`tests/architecture/test_layer_boundaries.py::test_application_imports_no_infrastructure_or_llm_sdk`.
+
+**Downstream.** [M5-03] implements the SQLAlchemy `AssessmentRepository` (two
+bindings — a read adapter on a fresh session, a write adapter bound to the
+`UnitOfWork` session), the `UnitOfWork`, the assessment/decision migrations, the
+append-only audit enforcement, and folds the record write into the audit-sink
+transaction (closing the narrow window where a persist failure after a
+successful resume diverges the record from the checkpoint). [M5-04] adds the
+FastAPI endpoints, the LangGraph orchestrator adapter, `SystemClock`, the
+`policy_ref` → retrieval-filter path, and the domain/application-error → HTTP
+status mapping.
