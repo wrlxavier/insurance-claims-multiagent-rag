@@ -11,7 +11,10 @@ repos:
       - id: mypy
         args: ["--config-file=pyproject.toml"]
         additional_dependencies:
-          # - fastapi>=0.128.0
+          # [M5-04]: presentation/ imports fastapi; tests/ import
+          # starlette.testclient (httpx).
+          - fastapi>=0.128.0
+          - httpx>=0.28.0
           - pydantic>=2.12.5
           - pydantic-settings>=2.12.0
           - pytest>=9.1.1

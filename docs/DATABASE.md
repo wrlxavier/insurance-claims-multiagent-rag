@@ -286,7 +286,19 @@ One consequence for tests: `tests/integration/conftest.py` drops **every**
 reflected table between tests, checkpoint tables included, and the Alembic replay
 does not bring them back. A checkpointer test creates them itself — which is also
 how `tests/integration/test_human_checkpoint.py` proves `setup()` builds the
-schema from nothing.
+schema from nothing (and `tests/integration/test_assessment_api.py` does the same
+before building the API).
+
+**[M5-04]: one checkpointer connection per orchestrator call.**
+`LangGraphClaimAssessmentOrchestrator.start` / `.resume` each open
+`open_claim_checkpointer` (its own autocommit psycopg connection) and a fresh
+SQLAlchemy session for the run, then close both. Concurrent API requests never
+share either. A pooled connection (`ConnectionPool`) is still the M5 shape; the
+[M5-05] worker model revisits it. On `resume`, the `human_review` node's audit
+write no longer commits on its own — the orchestrator captures the trail and
+`SubmitHumanDecision` writes it through `UnitOfWork.audit`
+(`append_audit_entries`, same `ON CONFLICT DO NOTHING` insert path) in the same
+transaction as the settled `assessment` row.
 
 ## The audit_event table ([M4-09])
 

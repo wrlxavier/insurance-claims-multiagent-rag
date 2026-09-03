@@ -776,3 +776,90 @@ grounded / abstain / every decision outcome, no DB);
 `test_audit_event_append_only.py` (real Postgres, one per repository plus the
 append-only guarantee). `make test-integration` and CI's `integration` job pick
 these up from the directory.
+
+---
+
+## The HTTP surface: FastAPI over the use cases, errors mapped at one edge — [M5-04]
+
+**Decision.** `app/src/presentation/` gains the FastAPI app: `app.py`
+(`create_app()` + the `lifespan` composition root), `dependencies.py`
+(`Depends` providers building a use case per request off `app.state.components`),
+`schemas.py` / `mappers.py` (Pydantic request/response models, pure
+dataclass↔schema conversions), `errors.py` (the single error→HTTP edge), and
+`routes/` (`assessments.py` — the five endpoints — and `health.py`). Three
+infrastructure pieces the application layer was designed around land with it:
+`infrastructure/graph/orchestrator.py`
+(`LangGraphClaimAssessmentOrchestrator`, the concrete
+`ClaimAssessmentOrchestrator` wrapping `build_claim_graph`),
+`infrastructure/graph/state_mapper.py` (the `state.py` ↔ domain mapper — its
+only consumer, so it is [M5-04]'s per `docs/DOMAIN.md`), and
+`infrastructure/clock.py` (`SystemClock`). `infrastructure/graph/verdict_readout.py`
+extracts the "read the verdict from the recommendation node's audit event"
+logic that `scripts/eval_end_to_end.py` had inline; `infrastructure/rag/retriever_factory.py`
+consolidates the ad-hoc retrieval-stack assembly the eval scripts each carried.
+The new audit read model is a port (`AuditTrailReader`), a use case
+(`GetAuditTrail`) and an adapter (`SqlAlchemyAuditTrailReader`), landing with its
+first caller like every other port.
+
+**Why.** (a) `POST /v1/assessments` returns **202** but runs the graph
+synchronously in the handler for now — the real Redis queue and the
+`PENDING/RUNNING/FAILED` run states are [M5-05]'s, which owns the queue; the id
+in the 202 body and `Location` always resolves on `GET`. (b) `policy_ref` reaches
+retrieval as a **text header** the adapter prepends to the narrative
+(`[Apólice registrada: processo SUSEP …]`), byte-identical to the measured
+headline arm of `scripts/eval_end_to_end.py::build_claim_text` — intake extracts
+the process, `nodes/retrieval._build_filter` pre-filters on it, no graph change
+and no eval re-run. (c) The orchestrator opens `open_claim_checkpointer` and a
+fresh session **per call**; a pooled connection is "the M5 shape"
+(`docs/DATABASE.md`), deferred to [M5-05]'s worker model. (d) The
+`start`-must-pause / `resume`-must-finish contract stays the **use case's** to
+enforce (per the port docstring) — the adapter reports `awaiting_review` as it
+found it. (e) Errors map at one Starlette exception-handler layer: each
+`application.errors` / `domain.errors` type → an HTTP status + a stable string
+`code`, in the envelope `{"error": {"code", "message", "details"}}`; a client
+branches on `code`, never on a status or a message.
+
+**The transactional fold (the [M5-03]-deferred DoD item).** On the `resume` path
+the composition root gives the graph a `_CapturingAuditSink` instead of the
+committing `SqlAlchemyAuditTrailSink`: the `human_review` node's trail comes back
+in `OrchestratorResult.audit_records`, and `SubmitHumanDecision` writes it
+through the new `UnitOfWork.audit` writer in the **same transaction** as the
+settled record — one `commit()`, both or neither. `resume` does no model calls
+(it re-runs only `human_review`), so nothing long-running is pulled into the
+transaction. The append is idempotent on `(thread_id, sequence)`, so the
+self-healing retry (a second decision on a record still `AWAITING_REVIEW` whose
+thread the first attempt finished) rewrites the same rows harmlessly. `start`
+has no fold — the run pauses before it writes any trail; that window is
+inherent (the checkpoint is a separate psycopg connection) and [M5-05]'s
+run-status closes it.
+
+**Deviation on record.** (a) `POST` blocks behind its 202 (above). (b)
+`GET /v1/assessments/{id}/audit` returns `200 {"entries": []}` for an
+`AWAITING_REVIEW` assessment — the durable trail is written once, in
+`human_review`, after the decision, a deliberate [M4-09] design. (c) An analyst
+`edit` drops the recommendation's consistency flags: an `EditedAssessmentInput` →
+domain `Assessment` carries none, and flags are attention points kept beside the
+verdict, not part of the decision ([M4-08]). (d) The `presentation/` layer is
+not scanned by `test_layer_boundaries.py`; the `langgraph` import stays in
+`infrastructure/`, and `domain` + `application` stay free of FastAPI/SQLAlchemy/
+LangGraph as the M5 exit criteria require.
+
+**Enforcement.** `tests/unit/presentation/**` (every endpoint's happy path and
+every error→status mapping, driven through `tests/unit/application/fakes.py` via
+`app.dependency_overrides` — no Postgres, graph or LLM);
+`tests/unit/infrastructure/graph/test_{state_mapper,verdict_readout,orchestrator}.py`;
+`tests/unit/infrastructure/test_clock.py`;
+`tests/unit/application/test_get_audit_trail.py`;
+`tests/unit/application/use_cases/test_submit_human_decision.py` (the fold — the
+record and the trail roll back together). `tests/integration/test_assessment_api.py`
+runs the whole flow against real Postgres (assessment/decision/audit tables + the
+LangGraph checkpointer) with a fake model and stub retriever: submit → 202 → read
+→ submit a decision → observe the resumed run and its durable trail.
+`make test-integration` and CI's `integration` job pick it up; CI's `quality` job
+runs the presentation unit tests.
+
+**Downstream.** [M5-05] replaces the synchronous 202 with a Redis queue and adds
+run-status states. [M5-06] adds `/ready`, JSON logging and correlation-id
+propagation. [M5-09] adds the Compose `api` service, the Dockerfile and the CI
+image build, and wires the proxy-header / trusted-host middleware from
+`ObservabilitySettings`.

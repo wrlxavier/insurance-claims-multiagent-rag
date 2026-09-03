@@ -14,9 +14,19 @@ becomes a domain ``Assessment`` and therefore always cites at least one clause
 -- and every cited clause is checked against ``ClauseRepository`` before the
 graph is resumed.
 
-Ordering mirrors ``SubmitClaim``: the read and the validation happen first, the
-orchestrator resume (a long call) runs outside any transaction, and only the
-record update is transactional.
+Ordering mirrors ``SubmitClaim``: the read and the validation happen first, then
+the orchestrator resumes the paused run. The resume does no model calls -- it
+re-runs only the ``human_review`` node -- so, unlike ``start``, it is not a long
+call held outside a transaction for its own sake.
+
+The [M5-04] transactional fold: the adapter captures the audit trail the resumed
+run produced (``result.audit_records``) instead of letting the graph node commit
+it, and this use case writes it through ``uow.audit`` in the *same* transaction
+as the settled record. One ``commit()`` persists both, or neither -- closing the
+window where a crash left the trail durable while the record still read
+``AWAITING_REVIEW``. The append is idempotent, so the self-healing retry (a
+second decision on a record still ``AWAITING_REVIEW``, whose thread the first
+attempt already finished) rewrites the same rows harmlessly.
 """
 
 from collections.abc import Sequence
@@ -109,6 +119,11 @@ class SubmitHumanDecision:
 
         with self.uow_factory() as uow:
             uow.assessments.update(updated)
+            uow.audit.append(
+                claim_id=record.claim_id,
+                thread_id=assessment_id,
+                entries=result.audit_records,
+            )
             uow.commit()
 
         return updated

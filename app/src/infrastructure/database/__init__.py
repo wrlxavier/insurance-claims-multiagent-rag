@@ -11,7 +11,12 @@ from infrastructure.database.assessment_mapper import (
 from infrastructure.database.assessment_repository import (
     SqlAlchemyAssessmentRepository,
 )
-from infrastructure.database.audit_repository import append_audit_events
+from infrastructure.database.audit_repository import (
+    append_audit_entries,
+    append_audit_events,
+)
+from infrastructure.database.audit_trail_reader import SqlAlchemyAuditTrailReader
+from infrastructure.database.audit_trail_writer import SqlAlchemyAuditTrailWriter
 from infrastructure.database.base import Base
 from infrastructure.database.chunk_repository import (
     assert_chunk_table_ready,
@@ -45,9 +50,12 @@ __all__ = [
     "ChunkRow",
     "HumanDecisionRow",
     "SqlAlchemyAssessmentRepository",
+    "SqlAlchemyAuditTrailReader",
     "SqlAlchemyAuditTrailSink",
+    "SqlAlchemyAuditTrailWriter",
     "SqlAlchemyClauseRepository",
     "SqlAlchemyUnitOfWork",
+    "append_audit_entries",
     "append_audit_events",
     "assert_chunk_table_ready",
     "create_engine_from_database_url",

@@ -85,20 +85,18 @@ from infrastructure.evaluation.verdict_metrics import (
     per_class_table_lines,
     verdict_metrics,
 )
+from infrastructure.graph import verdict_readout
 from infrastructure.graph.build import build_claim_graph
 from infrastructure.graph.checkpointer import build_checkpoint_serializer
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.reasoning_format import parse_reasoning
 from infrastructure.graph.state import AuditEvent, Citation, Recommendation
-from infrastructure.parsing.corpus_artifact import JSONL_PATH
-from scripts.eval_consistency import load_claims
-from scripts.eval_retrieval import (
-    MANIFEST_PATH,
-    load_chunk_corpus,
-    load_corpus,
-    load_document_metadata,
+from infrastructure.rag.retriever_factory import (
+    build_graph_retriever,
+    load_retriever_components,
 )
-from scripts.eval_retrieval_node import _build_adapter
+from scripts.eval_consistency import load_claims
+from scripts.eval_retrieval import MANIFEST_PATH, load_document_metadata
 
 SCHEMA_VERSION = "v1"
 OUTPUT_DIR = Path("eval/runs")
@@ -117,11 +115,10 @@ _RESUME_DECISION: dict[str, Any] = {
 
 # `Recommendation` carries no verdict field by [M4-08]'s design -- everything
 # load-bearing is derived, and the derivation is recorded in the node's audit
-# event as `posture=... verdict=...`. The effective verdict is read from there
-# directly; the posture map below is the fallback, and says why an abstention
-# happened as well as that it did.
-_POSTURE_RE = re.compile(r"posture=(\S+)")
-_VERDICT_RE = re.compile(r"verdict=(\S+)")
+# event as `posture=... verdict=...`. The read is shared with the [M5-04]
+# orchestrator adapter (`infrastructure.graph.verdict_readout`); the posture map
+# below is this script's fallback, and says why an abstention happened as well
+# as that it did.
 _POSTURE_VERDICT: dict[str, str] = {
     "compatible": "compatible",
     "incompatible": "incompatible",
@@ -307,12 +304,7 @@ def build_claim_text(
 
 
 def _posture_of(audit_trail: Sequence[AuditEvent]) -> str | None:
-    for event in reversed(list(audit_trail)):
-        if event.node == "recommendation" and event.node_input:
-            match = _POSTURE_RE.search(event.node_input)
-            if match:
-                return match.group(1)
-    return None
+    return verdict_readout.posture_of(audit_trail)
 
 
 def _effective_verdict(
@@ -320,15 +312,15 @@ def _effective_verdict(
 ) -> str | None:
     """The end-to-end verdict the recommendation node settled on.
 
-    Read from the node's own audit record rather than re-derived here, so the
-    published accuracy scores what the graph decided and not this script's
-    reading of it. Falls back to the posture map only if the record is missing.
+    Read from the node's own audit record rather than re-derived here (shared
+    with the [M5-04] orchestrator adapter in
+    ``infrastructure.graph.verdict_readout``), so the published accuracy scores
+    what the graph decided and not this script's reading of it. ``posture`` is
+    kept for the fallback map below.
     """
-    for event in reversed(list(audit_trail)):
-        if event.node == "recommendation" and event.node_input:
-            match = _VERDICT_RE.search(event.node_input)
-            if match and match.group(1) in _POSTURE_VERDICT.values():
-                return match.group(1)
+    verdict = verdict_readout.effective_verdict(audit_trail)
+    if verdict is not None:
+        return verdict.value
     return _POSTURE_VERDICT.get(posture or "")
 
 
@@ -563,8 +555,7 @@ def run_end_to_end_eval(
     if limit is not None:
         Random(_SHUFFLE_SEED).shuffle(claims)
         claims = claims[:limit]
-    chunks = load_chunk_corpus()
-    corpus = load_corpus(JSONL_PATH)
+    retriever_components = load_retriever_components()
 
     engine = create_engine_from_settings()
     session = create_session_factory(engine=engine)()
@@ -574,7 +565,7 @@ def run_end_to_end_eval(
     excerpts: dict[str, dict[str, str]] = {}
     try:
         assert_chunk_table_ready(session)
-        adapter = _build_adapter(session, chunks, corpus)
+        adapter = build_graph_retriever(session, retriever_components)
         context = GraphContext(
             fast_model=fast_model,
             reasoning_model=reasoning_model,

@@ -58,21 +58,14 @@ from infrastructure.graph.context import GraphContext
 from infrastructure.graph.nodes.retrieval import RETRIEVAL_K, retrieval
 from infrastructure.graph.state import Citation, ClaimState, ExtractedEntities
 from infrastructure.parsing.corpus_artifact import JSONL_PATH
-from infrastructure.rag.dense_retriever import DenseRetriever
-from infrastructure.rag.embedding_cache import CachingEmbedder
-from infrastructure.rag.exclusion_co_retrieval import ClauseGraph
-from infrastructure.rag.graph_retrieval_adapter import (
-    GraphRetrievalAdapter,
-    build_clause_index,
+from infrastructure.rag.graph_retrieval_adapter import GraphRetrievalAdapter
+from infrastructure.rag.retriever_factory import (
+    build_graph_retriever,
+    retriever_components_from_corpora,
 )
-from infrastructure.rag.hybrid_retriever import HybridRetriever
-from infrastructure.rag.reranker_cache import CachingReranker
 from scripts.eval_retrieval import (
     GOLDEN_SET_DIR,
     MANIFEST_PATH,
-    _load_query_embedder,
-    _load_reranker,
-    build_lexical_retriever,
     load_chunk_corpus,
     load_corpus,
     load_document_metadata,
@@ -187,15 +180,13 @@ def _stub_llm_settings() -> LlmSettings:
 def _build_adapter(
     session: Any, chunks: Sequence[Any], corpus: Sequence[Any]
 ) -> GraphRetrievalAdapter:
-    embedder = CachingEmbedder(_load_query_embedder())
-    dense = DenseRetriever(session, embedder)
-    hybrid = HybridRetriever(build_lexical_retriever(chunks), dense)
-    reranker = CachingReranker(_load_reranker())
-    return GraphRetrievalAdapter(
-        hybrid,
-        reranker,
-        build_clause_index(chunks),
-        co_retrieval=ClauseGraph(corpus),
+    """Compose the [M3-08] retrieval stack (shared with the [M5-04] API root).
+
+    A thin wrapper over ``infrastructure.rag.retriever_factory`` kept because
+    ``eval_compatibility`` / ``eval_recommendation`` import it by this name.
+    """
+    return build_graph_retriever(
+        session, retriever_components_from_corpora(chunks, corpus)
     )
 
 

@@ -13,8 +13,11 @@ The orchestrator runs *before* the transaction opens: the graph is a long call
 and must not hold a database transaction open, and it must pause at the
 checkpoint before there is anything worth persisting. A failure to persist after
 the graph has paused leaves the run recoverable from its checkpoint but without
-a record -- a narrow window [M5-03] closes by writing the record in the same
-transaction as the audit trail.
+a record. Nothing folds that window shut on the ``start`` path -- the graph
+pauses before it writes any audit trail, so there is no second write to share a
+transaction with, and the checkpoint itself is a separate connection. [M5-05]'s
+run-status tracking closes it; the [M5-04] fold is on the ``resume`` path, in
+``SubmitHumanDecision``.
 """
 
 from collections.abc import Callable

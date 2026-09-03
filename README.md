@@ -116,6 +116,20 @@ Score every retrieval configuration on the golden set with
 `make eval-retrieval-matrix` — the committed comparison table and verdict are in
 [`docs/RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md).
 
+### Run the assessment API
+
+Once the schema, the checkpointer and the index are in place:
+
+```bash
+make serve           # uvicorn presentation.app:app on :8000
+```
+
+`POST /v1/assessments` submits a claim, `GET /v1/assessments/{id}` reads its
+state and recommendation, `POST /v1/assessments/{id}/decision` submits the human
+decision and resumes the run, `GET /v1/assessments/{id}/audit` returns the audit
+trail. Endpoint shapes, the error codes and the design notes are in
+[`docs/API.md`](docs/API.md). The Docker Compose stack is [M5-09].
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):

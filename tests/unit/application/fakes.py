@@ -8,9 +8,11 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from application.assessment_record import AssessmentRecord, AssessmentStatus
+from application.audit_trail_entry import AuditTrailEntry
 from application.consistency_flag import ConsistencyFlag
 from application.orchestrator_result import OrchestratorResult
 from application.ports.assessment_repository import AssessmentRepository
+from application.ports.audit_trail_writer import AuditTrailWriter
 from application.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from domain.citation import Citation
 from domain.claim import Claim
@@ -98,6 +100,18 @@ def abstain_result(**overrides: object) -> OrchestratorResult:
     }
     fields.update(overrides)
     return make_orchestrator_result(**fields)
+
+
+def make_audit_entry(**overrides: object) -> AuditTrailEntry:
+    fields: dict[str, object] = {
+        "sequence": 0,
+        "timestamp": FIXED_NOW,
+        "node": "recommendation",
+        "action": "consolidate",
+        "node_input": "posture=compatible verdict=compatible n_clauses=1",
+    }
+    fields.update(overrides)
+    return AuditTrailEntry(**fields)  # type: ignore[arg-type]
 
 
 def make_record(**overrides: object) -> AssessmentRecord:
@@ -222,17 +236,70 @@ class InMemoryAssessmentRepository:
         return tuple(rows[offset : offset + limit])
 
 
-class InMemoryUnitOfWork:
-    """A transaction with real rollback: it snapshots the store on entry."""
+AuditStore = dict[str, list[AuditTrailEntry]]
 
-    def __init__(self, store: dict[str, AssessmentRecord]) -> None:
+
+class InMemoryAuditTrailWriter:
+    """Append captured audit entries to a shared store, idempotent on sequence."""
+
+    def __init__(self, store: AuditStore) -> None:
         self._store = store
-        self.assessments: AssessmentRepository = InMemoryAssessmentRepository(store)
+
+    def append(
+        self,
+        *,
+        claim_id: str,
+        thread_id: str,
+        entries: Sequence[AuditTrailEntry],
+    ) -> None:
+        trail = self._store.setdefault(thread_id, [])
+        seen = {entry.sequence for entry in trail}
+        for entry in entries:
+            if entry.sequence not in seen:
+                trail.append(entry)
+                seen.add(entry.sequence)
+        trail.sort(key=lambda entry: entry.sequence)
+
+
+class InMemoryAuditTrailReader:
+    """Read a thread's captured audit trail from a shared store."""
+
+    def __init__(self, store: AuditStore) -> None:
+        self._store = store
+
+    def get_trail(self, assessment_id: str) -> tuple[AuditTrailEntry, ...]:
+        return tuple(
+            sorted(
+                self._store.get(assessment_id, ()),
+                key=lambda entry: entry.sequence,
+            )
+        )
+
+
+class InMemoryUnitOfWork:
+    """A transaction with real rollback: it snapshots both stores on entry."""
+
+    assessments: AssessmentRepository
+    audit: AuditTrailWriter
+
+    def __init__(
+        self,
+        store: dict[str, AssessmentRecord],
+        audit_store: AuditStore | None = None,
+    ) -> None:
+        self._store = store
+        self._audit_store: AuditStore = {} if audit_store is None else audit_store
+        self.assessments = InMemoryAssessmentRepository(store)
+        self.audit = InMemoryAuditTrailWriter(self._audit_store)
         self._snapshot: dict[str, AssessmentRecord] | None = None
+        self._audit_snapshot: AuditStore | None = None
         self.committed = False
 
     def __enter__(self) -> "UnitOfWork":
         self._snapshot = dict(self._store)
+        self._audit_snapshot = {
+            thread: list(trail) for thread, trail in self._audit_store.items()
+        }
         self.committed = False
         return self
 
@@ -240,6 +307,7 @@ class InMemoryUnitOfWork:
         if not self.committed:
             self.rollback()
         self._snapshot = None
+        self._audit_snapshot = None
 
     def commit(self) -> None:
         self.committed = True
@@ -248,11 +316,19 @@ class InMemoryUnitOfWork:
         if self._snapshot is not None:
             self._store.clear()
             self._store.update(self._snapshot)
+        if self._audit_snapshot is not None:
+            self._audit_store.clear()
+            self._audit_store.update(self._audit_snapshot)
 
 
-def make_uow_factory(store: dict[str, AssessmentRecord]) -> UnitOfWorkFactory:
+def make_uow_factory(
+    store: dict[str, AssessmentRecord],
+    audit_store: AuditStore | None = None,
+) -> UnitOfWorkFactory:
+    shared_audit: AuditStore = {} if audit_store is None else audit_store
+
     def _open() -> InMemoryUnitOfWork:
-        return InMemoryUnitOfWork(store)
+        return InMemoryUnitOfWork(store, shared_audit)
 
     return _open
 
