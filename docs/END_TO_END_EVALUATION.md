@@ -456,6 +456,12 @@ item is answered by arms 1 and 2.
   worth is exactly what arm 3 was for, and it has not run — so the size of the
   cost is still unmeasured, while its existence is not in doubt: without the
   policy the mismatch cohort is unanswerable by construction.
+  *Update ([M5-02]):* `SubmitClaim` now takes `policy_ref: SusepProcess | None`
+  and threads it onto the domain `Claim`, so the port carries the policy as a
+  field. `ClaimState` still has no policy input, so *how* the [M5-04]
+  orchestrator adapter feeds it to retrieval (a header line like this harness,
+  or a new `ClaimState` field) is [M5-04]'s call — the port does not constrain
+  it. `Claim.policy_ref` stays optional until [M5-04] makes it required.
 - **[M6]'s README results table** takes its end-to-end accuracy, and the
   per-cohort figures, from this document — with the `n` beside each, per the
   Limitations above.
