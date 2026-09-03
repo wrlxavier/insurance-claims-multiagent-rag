@@ -219,9 +219,10 @@ the rest of `domain/`.
   state.py`; not a DoD entity.
 - **Mappers** — domain/aggregate ↔ ORM row landed in [M5-03]
   (`app/src/infrastructure/database/assessment_mapper.py`). The domain ↔
-  `state.py` Pydantic mapper is deferred to [M5-04]: its only consumer is the
-  LangGraph orchestrator adapter, and `AssessmentRecord.from_orchestrator_result`
-  already bridges the graph-free DTO — this codebase does not land a mapper
-  ahead of its caller (the same call that dropped `RetrievalService` in [M5-02]).
-- **`Claim.policy_ref` as a required field** — [M5-04], when the submission API
-  takes it explicitly.
+  `state.py` Pydantic mapper landed in [M5-04]
+  (`app/src/infrastructure/graph/state_mapper.py`), with its only consumer, the
+  `LangGraphClaimAssessmentOrchestrator` adapter.
+- **`Claim.policy_ref` as a required field** — still `SusepProcess | None`.
+  [M5-04]'s `POST /v1/assessments` takes it explicitly and the orchestrator
+  prepends it to the narrative as a policy header, but a claim submitted without
+  one is still valid (intake extracts it from the text when present).

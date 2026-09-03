@@ -16,10 +16,13 @@ from domain.human_decision import DecisionOutcome, HumanDecision
 from domain.verdict import Verdict
 from tests.unit.application.fakes import (
     FIXED_NOW,
+    AuditStore,
     FakeClaimAssessmentOrchestrator,
     FixedClock,
     InMemoryAssessmentRepository,
     InMemoryClauseRepository,
+    InMemoryUnitOfWork,
+    make_audit_entry,
     make_citation,
     make_orchestrator_result,
     make_policy_clause,
@@ -35,6 +38,7 @@ def _build(
     record: AssessmentRecord | None = None,
     orchestrator: FakeClaimAssessmentOrchestrator | None = None,
     clauses: InMemoryClauseRepository | None = None,
+    audit_store: AuditStore | None = None,
 ) -> tuple[
     SubmitHumanDecision, dict[str, AssessmentRecord], FakeClaimAssessmentOrchestrator
 ]:
@@ -49,7 +53,7 @@ def _build(
         assessments=InMemoryAssessmentRepository(store),
         clauses=clauses
         or InMemoryClauseRepository([make_policy_clause(clause_id=_KNOWN_CLAUSE_ID)]),
-        uow_factory=make_uow_factory(store),
+        uow_factory=make_uow_factory(store, audit_store),
     )
     return use_case, store, resolved_orch
 
@@ -232,6 +236,60 @@ def test_resume_that_re_pauses_is_a_contract_error() -> None:
         submit_decision(assessment_id="assessment-1", decision=DecisionOutcome.APPROVE)
 
     assert store["assessment-1"].status is AssessmentStatus.AWAITING_REVIEW
+
+
+@pytest.mark.unit
+def test_the_captured_audit_trail_is_persisted_with_the_record() -> None:
+    audit_store: AuditStore = {}
+    orchestrator = FakeClaimAssessmentOrchestrator(
+        resume_result=make_orchestrator_result(
+            awaiting_review=False,
+            audit_records=(
+                make_audit_entry(sequence=0, node="retrieval"),
+                make_audit_entry(
+                    sequence=1, node="human_review", action="human_decision:approve"
+                ),
+            ),
+        )
+    )
+    submit_decision, _, _ = _build(orchestrator=orchestrator, audit_store=audit_store)
+
+    submit_decision(assessment_id="assessment-1", decision=DecisionOutcome.APPROVE)
+
+    assert [e.sequence for e in audit_store["assessment-1"]] == [0, 1]
+
+
+@pytest.mark.unit
+def test_the_fold_is_atomic_record_and_trail_roll_back_together() -> None:
+    seed = make_record(assessment_id="assessment-1")
+    store: dict[str, AssessmentRecord] = {seed.assessment_id: seed}
+    audit_store: AuditStore = {}
+
+    class _FailingUow(InMemoryUnitOfWork):
+        def commit(self) -> None:
+            raise RuntimeError("disk full")
+
+    orchestrator = FakeClaimAssessmentOrchestrator(
+        resume_result=make_orchestrator_result(
+            awaiting_review=False,
+            audit_records=(make_audit_entry(sequence=0),),
+        )
+    )
+    submit_decision = SubmitHumanDecision(
+        clock=FixedClock(),
+        orchestrator=orchestrator,
+        assessments=InMemoryAssessmentRepository(store),
+        clauses=InMemoryClauseRepository([make_policy_clause()]),
+        uow_factory=lambda: _FailingUow(store, audit_store),
+    )
+
+    with pytest.raises(RuntimeError, match="disk full"):
+        submit_decision(assessment_id="assessment-1", decision=DecisionOutcome.APPROVE)
+
+    # both the record update and the audit append ran, then commit failed:
+    # __exit__ rolls both stores back.
+    assert store["assessment-1"].status is AssessmentStatus.AWAITING_REVIEW
+    assert audit_store == {}
 
 
 @pytest.mark.unit

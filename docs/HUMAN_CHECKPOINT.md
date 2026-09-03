@@ -267,9 +267,14 @@ Integration (`make test-integration`, real Postgres):
   The fields the interrupt payload above exposes (`recommendation`,
   `context_sufficient`, `clarification_exhausted`, `missing_information`) are
   all on that record.
-- **[M5-04]** builds the concrete LangGraph-backed orchestrator adapter and the
-  HTTP endpoints on top: `POST .../decision` maps a 422 to a payload the domain
-  rejects, and resumes the run through the port.
+- **[M5-04]** built the concrete LangGraph-backed orchestrator adapter
+  (`infrastructure/graph/orchestrator.py`) and the HTTP endpoints on top:
+  `POST .../decision` maps a payload the domain rejects to a 422 and resumes the
+  run through the port. On the resume path the adapter swaps a
+  `_CapturingAuditSink` in for `SqlAlchemyAuditTrailSink`, so `human_review`'s
+  trail rides back in `OrchestratorResult.audit_records` and
+  `SubmitHumanDecision` commits it in the same transaction as the settled record
+  (`docs/API.md`, `docs/ARCHITECTURE.md` [M5-04]).
 - **[M5-03]** takes the connection story further. `open_claim_checkpointer` opens
   a single connection, which is right for a script or a test and not for a
   service handling concurrent requests; a `ConnectionPool` is the M5 shape. It

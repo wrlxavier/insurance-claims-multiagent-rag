@@ -18,12 +18,20 @@ paths produce a recommendation with no clauses. That is a valid
 ``OrchestratorResult`` and a valid ``AssessmentRecord``; it is only not a
 persistable domain ``Assessment``.
 
-Standard library and domain types only (enforced by
+``audit_records`` is the trail the run produced past the human checkpoint,
+captured by the [M5-04] adapter on the ``resume`` path so ``SubmitHumanDecision``
+can persist it in the same transaction as the settled record. Empty on the
+``start`` path (the run pauses before the audit write) and whenever the adapter
+lets the graph commit its own trail. ``AssessmentRecord.from_orchestrator_result``
+ignores it -- it is not part of the servable aggregate.
+
+Standard library and domain/application DTO types only (enforced by
 tests/architecture/test_layer_boundaries.py).
 """
 
 from dataclasses import dataclass
 
+from application.audit_trail_entry import AuditTrailEntry
 from application.consistency_flag import ConsistencyFlag
 from domain.citation import Citation
 from domain.verdict import Verdict
@@ -43,6 +51,7 @@ class OrchestratorResult:
     clarification_exhausted: bool
     missing_information: tuple[str, ...]
     awaiting_review: bool
+    audit_records: tuple[AuditTrailEntry, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject empty prose, a non-``Verdict`` verdict or a bad confidence."""
