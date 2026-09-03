@@ -114,35 +114,80 @@ uv group. Writes `eval/runs/compatibility.{md,json}` +
 
 ## Results
 
-_Pending the first `make eval-compatibility` run on a configured machine
-(reasoning model + Postgres with embedded chunks). The regenerated numbers land
-in `eval/runs/compatibility.md`; copy the confusion matrix, per-class
-precision/recall and the grounding/overlap figures here._
+Run of 2026-09-02, `data/golden_set` verdict-labelled subset (42 questions),
+reasoning model `deepseek/deepseek-v4-pro-0813` (provider order `['alibaba']`),
+retriever = hybrid RRF + rerank + exclusion co-retrieval. 42/42 scored, 0
+errors. Regenerate with `make eval-compatibility`; the run lands in
+`eval/runs/compatibility.{md,json}`.
+
+**Overall accuracy: 88.1%** (37/42).
 
 ### Verdict accuracy
 
 | verdict | support | precision | recall |
 | --- | ---: | ---: | ---: |
 | compatible | 0 | — | — |
-| incompatible | 19 | _tbd_ | _tbd_ |
-| insufficient_information | 23 | _tbd_ | _tbd_ |
+| incompatible | 19 | 100.0% | 73.7% |
+| insufficient_information | 23 | 85.2% | 100.0% |
+
+| expected \ predicted | compatible | incompatible | insufficient_information |
+| --- | ---: | ---: | ---: |
+| compatible | 0 | 0 | 0 |
+| incompatible | 1 | 14 | 4 |
+| insufficient_information | 0 | 0 | 23 |
+
+By question type: `coverage_with_exclusion` **73.7%** (19),
+`unanswerable` **100.0%** (23).
 
 ### Citation grounding
 
 - Assessments degraded to `insufficient_information` (ungrounded after 3
-  attempts): _tbd_.
+  attempts): **3** — `coverage_with_exclusion-001`, `-014`, `-018`.
 - Every emitted assertion cites a retrieved clause: **by construction**.
 
 ### Reference-clause overlap (`coverage_with_exclusion`)
 
-- All labelled reference clauses cited: _tbd_.
-- At least one reference clause cited: _tbd_.
+- All labelled reference clauses cited: **57.9%** (19 questions).
+- At least one reference clause cited: **84.2%**.
 
 ---
 
 ## Findings
 
-_To be written from the first run._
+- **The abstention is precise and never misses.** All 23 `unanswerable`
+  questions came back `insufficient_information` — recall 100% — and the
+  [M3-07] gate had already set `context_sufficient=False` on all 23, so the
+  node was never asked to settle a question the corpus cannot answer. Nothing
+  in the `incompatible` set was lost to over-abstention *by the gate*: it
+  passed all 19.
+- **What accuracy costs is over-abstention by the node, not by the gate.** Every
+  one of the 5 errors is an `incompatible` question the node declined to settle
+  (4 → `insufficient_information`) or got backwards (1 → `compatible`). Its
+  `insufficient_information` precision, 85.2%, is exactly this: 4 abstentions
+  that should have been verdicts.
+- **3 of those 4 abstentions are the grounding contract working as designed.**
+  `coverage_with_exclusion-001`, `-014` and `-018` degraded after three failed
+  grounding attempts — the node could not tie its reasoning to a retrieved
+  clause, so it refused to answer rather than assert something uncited. That is
+  the [M4-05] DoD's rule producing a *wrong verdict on purpose*, and it is the
+  right trade for a compliance setting: an ungrounded `incompatible` is worse
+  than an honest abstention.
+- **Citation quality is bounded by retrieval, as predicted.** The node cites
+  every labelled reference clause on 57.9% of `coverage_with_exclusion`
+  questions and at least one on 84.2% — the latter equal to [M4-04]'s Recall@10
+  for that question type. The node cannot cite what retrieval did not surface,
+  and it does not try.
+- **This number is not the system's accuracy, and cannot be.** The golden set
+  carries no `compatible`-labelled question, so a third of the vocabulary is
+  untested here and the 88.1% is measured over a two-class problem. The
+  three-class figure over the synthetic claims is [M4-10]'s
+  (`docs/END_TO_END_EVALUATION.md`), and it is much lower — for reasons that
+  live upstream of this node.
+- **Device note.** This run's embedder and cross-encoder ran on CPU rather than
+  the GPU, because [M4-10]'s end-to-end run held the GPU at the time. The two
+  are numerically interchangeable here: CPU-computed embeddings match the stored
+  GPU-computed vectors to a cosine of 0.99999998 (max element difference
+  5.6e-05), far below any margin that could reorder a reranked list.
 
 ## What this means downstream
 

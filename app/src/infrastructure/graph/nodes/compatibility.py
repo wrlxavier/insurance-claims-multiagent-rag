@@ -35,7 +35,8 @@ from application.use_cases.llm_retry_defaults import (
 from domain.verdict import Verdict
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.prompts.compatibility import build_compatibility_prompt
-from infrastructure.graph.schemas import CompatibilityOutput, ReasonedAssertion
+from infrastructure.graph.reasoning_format import render_reasoning
+from infrastructure.graph.schemas import CompatibilityOutput
 from infrastructure.graph.state import (
     AuditEvent,
     ClaimState,
@@ -100,7 +101,7 @@ def compatibility(
 
     assessment = CompatibilityAssessment(
         verdict=verdict,
-        reasoning=_render_reasoning(parsed.assertions),
+        reasoning=render_reasoning(parsed.assertions),
         citations=hydrated,
         confidence=parsed.confidence,
     )
@@ -210,17 +211,6 @@ def _correction_message(errors: list[str]) -> str:
         "If you cannot ground the assessment in the retrieved clauses, return "
         "verdict insufficient_information. Answer again."
     )
-
-
-def _render_reasoning(assertions: list[ReasonedAssertion]) -> str:
-    """Render the assertion list into the plain ``reasoning`` string state holds."""
-    if not assertions:
-        return "Nenhuma afirmação fundamentada foi produzida."
-    lines = []
-    for index, assertion in enumerate(assertions, start=1):
-        cited = ", ".join(assertion.clause_ids) if assertion.clause_ids else "—"
-        lines.append(f"{index}. {assertion.statement.strip()} [cláusulas: {cited}]")
-    return "\n".join(lines)
 
 
 def _invoke_with_retry(

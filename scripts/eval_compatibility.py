@@ -51,6 +51,12 @@ from infrastructure.database import (
     create_session_factory,
 )
 from infrastructure.evaluation.golden_set_schema import GoldenQuestion
+from infrastructure.evaluation.verdict_metrics import (
+    VerdictMetrics,
+    confusion_table_lines,
+    metrics_json,
+    verdict_metrics,
+)
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.nodes.compatibility import compatibility
 from infrastructure.graph.nodes.retrieval import retrieval
@@ -77,7 +83,6 @@ JSON_PATH = OUTPUT_DIR / "compatibility.json"
 MD_PATH = OUTPUT_DIR / "compatibility.md"
 PREDICTIONS_PATH = OUTPUT_DIR / "compatibility_predictions.jsonl"
 
-_VERDICTS: tuple[str, ...] = ("compatible", "incompatible", "insufficient_information")
 _DEGRADED_MARKER = "ungrounded_after"
 
 
@@ -102,20 +107,12 @@ class _QuestionResult:
 
 
 @dataclass(frozen=True)
-class _VerdictMetrics:
-    n: int
-    accuracy: float
-    per_class: dict[str, dict[str, float]]
-    confusion: dict[str, dict[str, int]]
-
-
-@dataclass(frozen=True)
 class CompatibilityEvalResult:
     """Everything ``make eval-compatibility`` produces, for the report + the test."""
 
     meta: dict[str, Any]
-    overall: _VerdictMetrics
-    by_question_type: dict[str, _VerdictMetrics]
+    overall: VerdictMetrics
+    by_question_type: dict[str, VerdictMetrics]
     grounding_degraded_ids: list[str]
     reference_overlap: dict[str, float]
     gate_by_question_type: dict[str, dict[str, int]]
@@ -127,24 +124,15 @@ class CompatibilityEvalResult:
         return {
             "schema_version": SCHEMA_VERSION,
             "meta": self.meta,
-            "overall": _metrics_json(self.overall),
+            "overall": metrics_json(self.overall),
             "by_question_type": {
-                name: _metrics_json(m) for name, m in self.by_question_type.items()
+                name: metrics_json(m) for name, m in self.by_question_type.items()
             },
             "grounding_degraded_ids": self.grounding_degraded_ids,
             "reference_overlap": self.reference_overlap,
             "gate_by_question_type": self.gate_by_question_type,
             "error_question_ids": self.error_question_ids,
         }
-
-
-def _metrics_json(m: _VerdictMetrics) -> dict[str, Any]:
-    return {
-        "n": m.n,
-        "accuracy": m.accuracy,
-        "per_class": m.per_class,
-        "confusion": m.confusion,
-    }
 
 
 def _labelled_questions(questions: Sequence[GoldenQuestion]) -> list[GoldenQuestion]:
@@ -212,34 +200,9 @@ def _score_question(
     )
 
 
-def _verdict_metrics(rows: Sequence[_QuestionResult]) -> _VerdictMetrics:
-    scored = [r for r in rows if r.predicted_verdict is not None]
-    confusion: dict[str, dict[str, int]] = {
-        expected: dict.fromkeys(_VERDICTS, 0) for expected in _VERDICTS
-    }
-    for r in scored:
-        assert r.predicted_verdict is not None
-        confusion[r.expected_verdict][r.predicted_verdict] += 1
-
-    per_class: dict[str, dict[str, float]] = {}
-    for verdict in _VERDICTS:
-        tp = confusion[verdict][verdict]
-        fp = sum(confusion[other][verdict] for other in _VERDICTS if other != verdict)
-        fn = sum(confusion[verdict][other] for other in _VERDICTS if other != verdict)
-        support = tp + fn
-        per_class[verdict] = {
-            "support": float(support),
-            "precision": tp / (tp + fp) if (tp + fp) else 0.0,
-            "recall": tp / support if support else 0.0,
-        }
-
-    correct = sum(1 for r in scored if r.correct)
-    return _VerdictMetrics(
-        n=len(scored),
-        accuracy=correct / len(scored) if scored else 0.0,
-        per_class=per_class,
-        confusion=confusion,
-    )
+def _verdict_metrics(rows: Sequence[_QuestionResult]) -> VerdictMetrics:
+    """Score the rows through the shared [evaluation.verdict_metrics] arithmetic."""
+    return verdict_metrics([(r.expected_verdict, r.predicted_verdict) for r in rows])
 
 
 def _reference_overlap(rows: Sequence[_QuestionResult]) -> dict[str, float]:
@@ -334,7 +297,7 @@ def run_compatibility_eval() -> CompatibilityEvalResult:
         session.close()
         engine.dispose()
 
-    by_type: dict[str, _VerdictMetrics] = {}
+    by_type: dict[str, VerdictMetrics] = {}
     for question_type in sorted({r.question_type for r in rows}):
         subset = [r for r in rows if r.question_type == question_type]
         by_type[question_type] = _verdict_metrics(subset)
@@ -377,16 +340,6 @@ def _pct(value: float) -> str:
     return f"{value:.1%}"
 
 
-def _confusion_table(metrics: _VerdictMetrics) -> list[str]:
-    header = "| expected \\ predicted | " + " | ".join(_VERDICTS) + " |"
-    divider = "| --- | " + " | ".join("---:" for _ in _VERDICTS) + " |"
-    lines = [header, divider]
-    for expected in _VERDICTS:
-        cells = " | ".join(str(metrics.confusion[expected][p]) for p in _VERDICTS)
-        lines.append(f"| {expected} | {cells} |")
-    return lines
-
-
 def render_markdown(result: CompatibilityEvalResult) -> str:
     """Render the run as Markdown; the numbers are copied into the doc."""
     overall = result.overall
@@ -423,7 +376,7 @@ def render_markdown(result: CompatibilityEvalResult) -> str:
             f"{_pct(stats['precision'])} | {_pct(stats['recall'])} |"
         )
     lines += ["", "Confusion matrix (overall):", ""]
-    lines += _confusion_table(overall)
+    lines += confusion_table_lines(overall)
 
     lines += ["", "### By question type", ""]
     for name, metrics in result.by_question_type.items():
@@ -431,7 +384,7 @@ def render_markdown(result: CompatibilityEvalResult) -> str:
             f"**{name}** — accuracy **{_pct(metrics.accuracy)}** ({metrics.n})",
             "",
         ]
-        lines += _confusion_table(metrics)
+        lines += confusion_table_lines(metrics)
         lines.append("")
 
     overlap = result.reference_overlap

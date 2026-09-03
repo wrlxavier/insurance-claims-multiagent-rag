@@ -11,11 +11,12 @@ What it does:
 - builds the retrieval query from the extracted *entities*, not the raw claim
   text ([M4-04] DoD) -- ``_build_query``;
 - builds the metadata pre-filter from intake's classification ([M4-04] DoD) --
-  ``_build_filter``: SUSEP process when stated plus the product line, or an
-  unconstrained search (the [M3-04] unknown-process degradation path). The graph
-  has no insurer CNPJ from intake, so this filter is one field weaker than the
-  M3 eval harness's SUSEP-process + CNPJ default path -- see
-  ``docs/RETRIEVAL_NODE.md``;
+  ``_build_filter``: the SUSEP process when the claim stated one, else the
+  product line, else an unconstrained search (the [M3-04] unknown-process
+  degradation path). The two are deliberately *not* ANDed; [M4-10] measured what
+  that cost, and ``_build_filter``'s docstring has the reason. The graph has no
+  insurer CNPJ from intake, so this filter is one field weaker than the M3 eval
+  harness's SUSEP-process + CNPJ default path -- see ``docs/RETRIEVAL_NODE.md``;
 - calls the port, maps each ``RetrievedClause`` to a typed ``state.Citation``;
 - assembles the [infrastructure.rag.insufficient_context_gate.GateSignals] and
   runs [evaluate_gate] to set ``context_sufficient``. The router
@@ -113,15 +114,27 @@ def _build_query(entities: ExtractedEntities | None, *, fallback: str) -> str:
 def _build_filter(entities: ExtractedEntities | None) -> RetrievalFilter | None:
     """Build the metadata pre-filter from intake's classification.
 
-    SUSEP process (only when intake actually read one from the claim) plus the
-    classified product line. Returns ``None`` when neither is known -- the
-    [M3-04] all-``None`` degradation path is an unconstrained search, not an
-    error.
+    A stated SUSEP process wins **alone**; the classified product line
+    constrains only the fallback, when the claim named no process. Returns
+    ``None`` when neither is known -- the [M3-04] all-``None`` degradation path
+    is an unconstrained search, not an error.
+
+    **Why the two are not ANDed** ([M4-10]). They do not describe the same
+    thing: a process names the registered product the claim was *filed
+    against*, while ``product_line`` is intake's classification of the *event
+    the claimant described*. On a product/claim mismatch those disagree by
+    construction, so the conjunction selects nothing at all, the [M3-07] gate
+    fires on an empty result, and a knowable ``incompatible`` degrades to
+    ``insufficient_information``. Measured: under the conjunction all 11 of
+    ``product_claim_mismatch.jsonl``'s claims had an empty search space, and so
+    would 9 of the 13 documents the main claim set targets whenever intake reads
+    the event as CASCO. The process is also the stricter of the two -- it names
+    one document, where a product line names a whole segment of the corpus.
+    See ``docs/END_TO_END_EVALUATION.md`` and ``docs/ARCHITECTURE.md``.
     """
     if entities is None:
         return None
-    candidate = RetrievalFilter(
-        susep_process=entities.susep_process,
-        product_line=entities.product_line,
-    )
+    if entities.susep_process:
+        return RetrievalFilter(susep_process=entities.susep_process)
+    candidate = RetrievalFilter(product_line=entities.product_line)
     return None if candidate.is_empty else candidate
