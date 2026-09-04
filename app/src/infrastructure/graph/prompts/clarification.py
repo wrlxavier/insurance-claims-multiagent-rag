@@ -11,6 +11,7 @@ the LLM call fails all its retries. A question generator has a sane fallback
 value (unlike intake's extraction), so the loop can always make progress.
 """
 
+from infrastructure.graph.prompts.prompt_fragments import known_facts_block
 from infrastructure.graph.prompts.scope_preamble import with_scope_preamble
 from infrastructure.graph.state import ClarificationQuestion, ExtractedEntities
 
@@ -40,22 +41,6 @@ CLARIFICATION_FALLBACK_TEMPLATES: dict[str, str] = {
 }
 
 
-def _known_facts(entities: ExtractedEntities | None) -> str:
-    if entities is None:
-        return "- (intake ainda não extraiu nada)"
-    pairs = [
-        ("tipo de evento", entities.event_type),
-        ("data", entities.event_date),
-        ("descrição", entities.description),
-        ("valor estimado", entities.estimated_amount),
-        ("veículo", entities.vehicle_info),
-        ("processo SUSEP", entities.susep_process),
-        ("ramo do produto", entities.product_line),
-    ]
-    stated = [f"- {label}: {value}" for label, value in pairs if value is not None]
-    return "\n".join(stated) or "- (nada de concreto no relato)"
-
-
 def build_clarification_prompt(
     entities: ExtractedEntities | None,
     missing_information: list[str],
@@ -73,7 +58,7 @@ load-bearing facts are missing. Your job is to write the questions that would \
 get those facts from the claimant. Do not assess or answer the claim.
 
 What intake already knows:
-{_known_facts(entities)}
+{known_facts_block(entities)}
 
 The missing facts, by tag -- write exactly one question for each:
 {gaps}

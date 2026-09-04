@@ -13,6 +13,11 @@ prompt, and merges this pass's extraction over the previous ``entities`` --
 a new non-null value wins, a previous non-null value fills any gap this pass
 left null. ``missing_information`` is recomputed fresh each pass (an answered
 gap must drop off), which is the last-write-wins the state schema intends.
+
+A response that fails schema validation raises ``SchemaValidationError``
+([M5-08]) rather than being coerced or silently defaulted -- structured
+extraction has no sane fallback value, so a malformed response is a rejection,
+not a partial success.
 """
 
 import time
@@ -28,7 +33,9 @@ from application.use_cases.llm_retry_defaults import (
     DEFAULT_LLM_RETRY_MAX_ATTEMPTS,
 )
 from infrastructure.graph.context import GraphContext
+from infrastructure.graph.errors import SchemaValidationError
 from infrastructure.graph.prompts.intake import build_intake_prompt
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import IntakeOutput
 from infrastructure.graph.state import (
     AuditEvent,
@@ -52,10 +59,14 @@ def intake(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, objec
     )
     messages = [
         SystemMessage(build_intake_prompt(asked_questions)),
-        HumanMessage(raw_claim_text),
+        HumanMessage(wrap_untrusted("claim_narrative", raw_claim_text)),
     ]
     result = _invoke_with_retry(structured, messages)
-    parsed = cast(IntakeOutput, result["parsed"])
+    if (parsed := cast("IntakeOutput | None", result.get("parsed"))) is None:
+        raise SchemaValidationError(
+            "intake: structured output did not validate against IntakeOutput "
+            f"(parsing_error={result.get('parsing_error')!r})"
+        )
 
     entities = _merge_entities(
         prior_entities,

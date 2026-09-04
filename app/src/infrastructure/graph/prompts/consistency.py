@@ -18,25 +18,9 @@ Two things the prompt is careful about:
   node flags internal inconsistencies for a reviewer, nothing more.
 """
 
+from infrastructure.graph.prompts.prompt_fragments import known_facts_block
 from infrastructure.graph.prompts.scope_preamble import with_scope_preamble
 from infrastructure.graph.state import ExtractedEntities
-
-
-def _known_facts(entities: ExtractedEntities | None) -> str:
-    """The entity summary block -- what intake extracted, or a placeholder."""
-    if entities is None:
-        return "- (intake não extraiu nada estruturado)"
-    pairs = [
-        ("tipo de evento", entities.event_type),
-        ("data", entities.event_date),
-        ("descrição", entities.description),
-        ("valor estimado", entities.estimated_amount),
-        ("veículo", entities.vehicle_info),
-        ("processo SUSEP", entities.susep_process),
-        ("ramo do produto", entities.product_line),
-    ]
-    stated = [f"- {label}: {value}" for label, value in pairs if value is not None]
-    return "\n".join(stated) or "- (nada de concreto no relato)"
 
 
 def build_consistency_prompt(entities: ExtractedEntities | None) -> str:
@@ -73,6 +57,6 @@ naming the specific problem.
 for a minor note.
 
 What intake extracted from the claim:
-{_known_facts(entities)}
+{known_facts_block(entities)}
 """
     return with_scope_preamble(body)

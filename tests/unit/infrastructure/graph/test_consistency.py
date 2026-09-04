@@ -20,6 +20,7 @@ from infrastructure.config.settings import LlmSettings
 from infrastructure.graph.context import GraphContext, RetrievalPort
 from infrastructure.graph.nodes.consistency import _invoke_with_retry, consistency
 from infrastructure.graph.prompts.scope_preamble import SCOPE_PREAMBLE
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import (
     ConsistencyOutput,
     ConsistencySignalItem,
@@ -230,7 +231,9 @@ def test_prompt_carries_the_scope_preamble_and_the_no_verdict_instruction() -> N
     assert SCOPE_PREAMBLE in system_text
     assert "NO verdict" in system_text
     assert "fraud" in system_text.lower()
-    assert messages[1].content == "bati o carro no portao ontem"
+    assert messages[1].content == wrap_untrusted(
+        "claim_narrative", "bati o carro no portao ontem"
+    )
 
 
 # --- retry ------------------------------------------------------------
