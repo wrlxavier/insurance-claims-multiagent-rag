@@ -50,6 +50,7 @@ from application.use_cases.llm_retry_defaults import (
 from domain.verdict import Verdict
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.prompts.recommendation import build_recommendation_prompt
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import RecommendationOutput
 from infrastructure.graph.state import (
     AuditEvent,
@@ -287,7 +288,7 @@ def _draft_justification(
         SystemMessage(
             build_recommendation_prompt(entities, compatibility, flags, citations)
         ),
-        HumanMessage(raw_claim_text),
+        HumanMessage(wrap_untrusted("claim_narrative", raw_claim_text)),
     ]
     try:
         result = _invoke_with_retry(structured, messages)

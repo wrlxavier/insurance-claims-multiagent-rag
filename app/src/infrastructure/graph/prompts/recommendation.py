@@ -11,11 +11,17 @@ consistency signals, and asked to render them into one scannable paragraph.
 The model is called only on the path where a compatibility assessment exists.
 The claimant-gaps and retrieval-miss paths use a deterministic template in the
 node and never reach this builder. Per the [M4-01b] convention no prompt text
-lives in the node function; ``_known_facts`` / ``_clause_block`` mirror the
-helpers in ``prompts/compatibility.py``.
+lives in the node function; ``known_facts_block`` / ``clause_block`` are the
+shared helpers in ``prompts/prompt_fragments.py`` ([M5-08]), also used by
+``prompts/compatibility.py``.
 """
 
+from infrastructure.graph.prompts.prompt_fragments import (
+    clause_block,
+    known_facts_block,
+)
 from infrastructure.graph.prompts.scope_preamble import with_scope_preamble
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.state import (
     Citation,
     CompatibilityAssessment,
@@ -23,35 +29,13 @@ from infrastructure.graph.state import (
     ExtractedEntities,
 )
 
-_MAX_EXCERPT_CHARS = 700
 
-
-def _known_facts(entities: ExtractedEntities | None) -> str:
-    """The entity summary block -- what intake extracted, or a placeholder."""
-    if entities is None:
-        return "- (intake não extraiu nada estruturado)"
-    pairs = [
-        ("tipo de evento", entities.event_type),
-        ("data", entities.event_date),
-        ("descrição", entities.description),
-        ("valor estimado", entities.estimated_amount),
-        ("veículo", entities.vehicle_info),
-        ("processo SUSEP", entities.susep_process),
-        ("ramo do produto", entities.product_line),
-    ]
-    stated = [f"- {label}: {value}" for label, value in pairs if value is not None]
-    return "\n".join(stated) or "- (nada de concreto no relato)"
-
-
-def _clause_block(citations: list[Citation]) -> str:
-    """The numbered clause list the justification may reference, and only this."""
-    if not citations:
-        return "(nenhuma cláusula sustenta a avaliação)"
-    lines = []
-    for citation in citations:
-        excerpt = citation.excerpt.strip()[:_MAX_EXCERPT_CHARS]
-        lines.append(f"[{citation.clause_id}] ({citation.clause_type.value}) {excerpt}")
-    return "\n".join(lines)
+def _reasoning_block(reasoning: str) -> str:
+    """The compatibility reasoning, wrapped as untrusted content, or a placeholder."""
+    stripped = reasoning.strip()
+    if not stripped:
+        return "(sem raciocínio registrado)"
+    return wrap_untrusted("compatibility_reasoning", stripped)
 
 
 def _flags_block(flags: list[ConsistencySignal]) -> str:
@@ -94,13 +78,13 @@ product's conditions, nothing more.
 
 The compatibility verdict: {compatibility.verdict.value}
 The compatibility reasoning:
-{compatibility.reasoning.strip() or "(sem raciocínio registrado)"}
+{_reasoning_block(compatibility.reasoning)}
 
 What intake extracted from the claim:
-{_known_facts(entities)}
+{known_facts_block(entities)}
 
 Clauses the assessment rests on (the only ids you may cite):
-{_clause_block(citations)}
+{clause_block(citations, empty_message="(nenhuma cláusula sustenta a avaliação)")}
 
 Consistency attention points:
 {_flags_block(flags)}

@@ -19,8 +19,10 @@ from infrastructure.config.enums import LlmProvider
 from infrastructure.config.settings import LlmSettings
 from infrastructure.evaluation.synthetic_claims_schema import MissingFactType
 from infrastructure.graph.context import GraphContext, RetrievalPort
+from infrastructure.graph.errors import SchemaValidationError
 from infrastructure.graph.nodes.intake import _invoke_with_retry, intake
 from infrastructure.graph.prompts.scope_preamble import SCOPE_PREAMBLE
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import IntakeOutput, MissingInfoTag
 from infrastructure.graph.state import ExtractedEntities
 from infrastructure.rag.retrieved_clause import RetrievedClause
@@ -211,7 +213,9 @@ def test_intake_prompt_carries_the_scope_preamble_and_every_product_line() -> No
     assert SCOPE_PREAMBLE in system_text
     for code in ("CASCO", "RCF-A", "ASSIST", "GAR.EST", "CARTA VERDE"):
         assert code in system_text
-    assert messages[1].content == "bati o carro no portao"
+    assert messages[1].content == wrap_untrusted(
+        "claim_narrative", "bati o carro no portao"
+    )
 
 
 @pytest.mark.unit
@@ -237,6 +241,23 @@ def test_intake_reraises_after_exhausting_retries() -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         _invoke_with_retry(RunnableLambda(always_fail), [], sleep=lambda _s: None)
+
+
+@pytest.mark.unit
+def test_intake_rejects_a_response_that_fails_schema_validation() -> None:
+    """[M5-08] A malformed structured output is a rejection, not a coercion.
+
+    ``parsed is None`` (LangChain's signal that the response did not validate
+    against ``IntakeOutput``) must raise ``SchemaValidationError`` rather than
+    fall through into an attribute access on ``None``.
+    """
+    model = cast(Any, FakeChatModel(cast(IntakeOutput, None)))
+
+    with pytest.raises(SchemaValidationError):
+        intake(
+            cast(Any, {"claim_id": "c1", "raw_claim_text": "bati o carro"}),
+            Runtime(context=_context(model)),
+        )
 
 
 @pytest.mark.unit
@@ -302,7 +323,9 @@ def test_intake_prompt_names_questions_already_asked_on_re_entry() -> None:
     messages = cast(list[BaseMessage], model.received[0])
     system_text = str(messages[0].content)
     assert "Quando foi?" in system_text
-    assert messages[1].content == "bati o carro no portao"
+    assert messages[1].content == wrap_untrusted(
+        "claim_narrative", "bati o carro no portao"
+    )
 
 
 @pytest.mark.unit

@@ -292,6 +292,7 @@ def test_every_node_appears_as_a_span() -> None:
         "retrieval",
         "compatibility",
         "consistency",
+        "injection_scan",
         "recommendation",
         "human_review",
     } <= names

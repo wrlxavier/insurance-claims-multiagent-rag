@@ -157,6 +157,32 @@ service runs identically with none of this. Reading a trace, and a worked
 example of diagnosing a wrong verdict, are in
 [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
+### Prompt-injection classifier (optional)
+
+Every prompt in this system carries text this project does not control: a
+retrieved clause excerpt or a claimant's own narrative
+([`docs/PROMPT_INJECTION.md`](docs/PROMPT_INJECTION.md)). Delimiters, schema
+rejection and metadata-only document trust are the actual guard and are
+always on. The M5-08 issue's Appendix additionally spikes a runtime
+classifier as an optional, advisory-only defense-in-depth layer — off by
+default:
+
+```bash
+uv sync --group embed                          # transformers + torch
+PROMPT_INJECTION_CLASSIFIER_ENABLED=true make serve   # and/or `make worker`
+```
+
+It never blocks a node or changes a verdict — a flagged span only adds one
+entry to the audit trail. **On this project's own Portuguese corpus it is
+not recommended**: the pinned model
+(`protectai/deberta-v3-base-prompt-injection-v2`) is trained only on English
+text and flags 70% of real, non-adversarial policy clauses in the measured
+benchmark. That is a property of this model on this domain, not of the
+approach — the code is kept as a working, tested reference for the pattern
+on a domain closer to the model's training language. Method, the real
+numbers and the reasoning behind the `false` default are in
+[`docs/PROMPT_INJECTION_CLASSIFIER.md`](docs/PROMPT_INJECTION_CLASSIFIER.md).
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):

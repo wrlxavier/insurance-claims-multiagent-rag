@@ -30,6 +30,7 @@ from infrastructure.graph.prompts.clarification import (
     CLARIFICATION_FALLBACK_TEMPLATES,
     build_clarification_prompt,
 )
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import ClarificationOutput
 from infrastructure.graph.state import (
     AuditEvent,
@@ -56,7 +57,7 @@ def clarification(
         SystemMessage(
             build_clarification_prompt(entities, missing_information, prior_questions)
         ),
-        HumanMessage(state["raw_claim_text"]),
+        HumanMessage(wrap_untrusted("claim_narrative", state["raw_claim_text"])),
     ]
 
     raw_message: object = None

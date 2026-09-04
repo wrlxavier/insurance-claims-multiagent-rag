@@ -139,6 +139,61 @@ NO_TRACING: TracePort = _NoTracing()
 
 
 @dataclass(frozen=True)
+class ClassificationResult:
+    """One span's score from the optional prompt-injection classifier.
+
+    ``label`` is whatever the classifier's own taxonomy calls its top
+    prediction (e.g. ``"SAFE"`` / ``"INJECTION"``) -- recorded for the audit
+    trail, never branched on. ``flagged`` is the only field a caller acts on:
+    ``score`` compared against the configured threshold.
+    """
+
+    flagged: bool
+    score: float
+    label: str
+
+
+class InjectionClassifierPort(Protocol):
+    """The optional runtime prompt-injection classifier -- [M5-08 Appendix].
+
+    Advisory only. A node calls ``classify`` on one untrusted span (a claim
+    narrative, or a retrieved clause excerpt) and records what it returns as
+    an ``AuditEvent`` when flagged. Nothing in the graph branches on the
+    result, withholds a verdict, or blocks a node because of it -- the M5-08
+    issue's DoD already treats untrusted text as data through delimiters,
+    schema rejection and metadata-only trust (``docs/ARCHITECTURE.md``'s
+    ``[M5-08]`` section); this is a defense-in-depth *signal* for a human
+    reviewer, not a second decision-maker. The Appendix that motivates it is
+    explicit that an external guardrail is non-blocking.
+
+    An implementation **must not raise**: a run is not allowed to fail
+    because its guardrail did, the same contract ``TracePort`` states above.
+    [infrastructure.guardrails.local_prompt_injection_classifier.LocalPromptInjectionClassifier]
+    is the implementation; the port lives here for the same reason
+    ``RetrievalPort``/``AuditTrailSink``/``TracePort`` do.
+    """
+
+    def classify(self, text: str, *, source: str) -> ClassificationResult:
+        """Score ``text`` (read from ``source``) for injected-instruction risk."""
+        ...
+
+
+class _NoClassifier:
+    """The do-nothing ``InjectionClassifierPort``: the guardrail switched off."""
+
+    def classify(self, text: str, *, source: str) -> ClassificationResult:
+        """Always report unflagged -- no model is consulted."""
+        return ClassificationResult(flagged=False, score=0.0, label="disabled")
+
+
+# A null object, mirroring ``NO_TRACING``: the guardrail is off by default
+# (``PROMPT_INJECTION_CLASSIFIER_ENABLED=false``), so every test, eval script
+# and unconfigured deployment builds a ``GraphContext`` exactly as before and
+# ``injection_scan`` takes the same path either way -- no ``if enabled`` noise.
+NO_CLASSIFIER: InjectionClassifierPort = _NoClassifier()
+
+
+@dataclass(frozen=True)
 class GraphContext:
     """Run-scoped dependencies for the agent graph -- [M4-01b].
 
@@ -171,3 +226,7 @@ class GraphContext:
     # unconfigured deployment builds a ``GraphContext`` exactly as before and the
     # nodes take the same path either way.
     tracer: TracePort = NO_TRACING
+    # [M5-08 Appendix]. The optional runtime prompt-injection classifier -- see
+    # ``InjectionClassifierPort``. Defaults to the no-op, off unless
+    # ``PROMPT_INJECTION_CLASSIFIER_ENABLED=true``.
+    classifier: InjectionClassifierPort = NO_CLASSIFIER

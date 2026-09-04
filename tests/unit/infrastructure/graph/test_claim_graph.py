@@ -193,9 +193,13 @@ def test_route_exhausts_at_the_cap() -> None:
 
 
 @pytest.mark.unit
-def test_route_after_retrieval_fans_out_to_both_nodes_when_context_suffices() -> None:
+def test_route_after_retrieval_fans_out_when_context_suffices() -> None:
     state = {"claim_id": "c", "raw_claim_text": "x", "context_sufficient": True}
-    assert route_after_retrieval(cast(Any, state)) == ["compatibility", "consistency"]
+    assert route_after_retrieval(cast(Any, state)) == [
+        "compatibility",
+        "consistency",
+        "injection_scan",
+    ]
 
 
 @pytest.mark.unit
@@ -217,6 +221,7 @@ def test_graph_has_the_expected_nodes_and_entry() -> None:
         "retrieval",
         "compatibility",
         "consistency",
+        "injection_scan",
         "recommendation",
         "human_review",
     } <= set(graph.nodes)
@@ -233,9 +238,11 @@ def test_every_terminal_path_converges_on_the_recommendation_node() -> None:
     edges = {(e.source, e.target) for e in graph.edges}
     assert ("retrieval", "compatibility") in edges
     assert ("retrieval", "consistency") in edges
+    assert ("retrieval", "injection_scan") in edges
     assert ("retrieval", "recommendation") in edges
     assert ("compatibility", "recommendation") in edges
     assert ("consistency", "recommendation") in edges
+    assert ("injection_scan", "recommendation") in edges
     assert ("clarification_exhausted", "recommendation") in edges
     assert ("recommendation", "human_review") in edges
     assert ("human_review", END) in edges
@@ -255,12 +262,17 @@ def test_complete_claim_passes_straight_through() -> None:
     assert not out.get("clarification_questions")
     assert out.get("clarification_rounds", 0) == 0
     # intake -> retrieval -> then the parallel superstep: compatibility (one
-    # event) and consistency (two, one per leg). Order within the superstep
-    # follows the route list, but assert on counts to stay robust.
+    # event) and consistency (two, one per leg). injection_scan also runs in
+    # this superstep ([M5-08 Appendix]) but the default GraphContext leaves
+    # its classifier as NO_CLASSIFIER, so it flags nothing and contributes no
+    # audit_trail entries -- a no-op run is invisible here by design. Order
+    # within the superstep follows the route list, but assert on counts to
+    # stay robust.
     node_runs = [e.node for e in out["audit_trail"]]
     assert node_runs[:2] == ["intake", "retrieval"]
     assert node_runs.count("compatibility") == 1
     assert node_runs.count("consistency") == 2
+    assert node_runs.count("injection_scan") == 0
     # the recommendation node runs once, after both assessment branches, and
     # the human checkpoint closes the run
     assert node_runs.count("recommendation") == 1

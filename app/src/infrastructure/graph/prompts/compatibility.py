@@ -16,38 +16,12 @@ Two rules the prompt carries that the DoD names explicitly:
   removes it, the assertions must say so and cite both.
 """
 
+from infrastructure.graph.prompts.prompt_fragments import (
+    clause_block,
+    known_facts_block,
+)
 from infrastructure.graph.prompts.scope_preamble import with_scope_preamble
 from infrastructure.graph.state import Citation, ExtractedEntities
-
-_MAX_EXCERPT_CHARS = 700
-
-
-def _known_facts(entities: ExtractedEntities | None) -> str:
-    """The entity summary block -- what intake extracted, or a placeholder."""
-    if entities is None:
-        return "- (intake não extraiu nada estruturado)"
-    pairs = [
-        ("tipo de evento", entities.event_type),
-        ("data", entities.event_date),
-        ("descrição", entities.description),
-        ("valor estimado", entities.estimated_amount),
-        ("veículo", entities.vehicle_info),
-        ("processo SUSEP", entities.susep_process),
-        ("ramo do produto", entities.product_line),
-    ]
-    stated = [f"- {label}: {value}" for label, value in pairs if value is not None]
-    return "\n".join(stated) or "- (nada de concreto no relato)"
-
-
-def _clause_block(citations: list[Citation]) -> str:
-    """The numbered clause list the assertions must cite from."""
-    if not citations:
-        return "(nenhuma cláusula recuperada)"
-    lines = []
-    for citation in citations:
-        excerpt = citation.excerpt.strip()[:_MAX_EXCERPT_CHARS]
-        lines.append(f"[{citation.clause_id}] ({citation.clause_type.value}) {excerpt}")
-    return "\n".join(lines)
 
 
 def build_compatibility_prompt(
@@ -79,9 +53,9 @@ an explicit assertion and cite both clause ids. Do not stop at the coverage side
 - confidence is how firmly the retrieved clauses settle the question, 0 to 1.
 
 What intake extracted from the claim:
-{_known_facts(entities)}
+{known_facts_block(entities)}
 
 Retrieved clauses:
-{_clause_block(citations)}
+{clause_block(citations, empty_message="(nenhuma cláusula recuperada)")}
 """
     return with_scope_preamble(body)
