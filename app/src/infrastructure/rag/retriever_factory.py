@@ -41,6 +41,7 @@ from infrastructure.rag.exclusion_co_retrieval import ClauseGraph
 from infrastructure.rag.graph_retrieval_adapter import (
     GraphRetrievalAdapter,
     IndexedClause,
+    SpanRecorder,
     build_clause_index,
 )
 from infrastructure.rag.hybrid_retriever import HybridRetriever
@@ -95,9 +96,19 @@ def retriever_components_from_corpora(
 
 
 def build_graph_retriever(
-    session: Session, components: RetrieverComponents
+    session: Session,
+    components: RetrieverComponents,
+    *,
+    tracer: SpanRecorder | None = None,
 ) -> GraphRetrievalAdapter:
-    """Compose the per-run retrieval adapter over a live Postgres session."""
+    """Compose the per-run retrieval adapter over a live Postgres session.
+
+    ``tracer`` ([M5-07]) is the graph's ``TracePort``, passed through so the
+    adapter can record its ``retrieval.rerank`` span. ``SpanRecorder`` is the
+    same shape re-declared in ``infrastructure.rag`` -- this layer does not
+    import ``infrastructure.graph``. ``None`` (every caller but the composition
+    root) leaves the adapter untraced.
+    """
     dense = DenseRetriever(session, components.embedder)
     hybrid = HybridRetriever(components.lexical, dense)
     return GraphRetrievalAdapter(
@@ -105,6 +116,7 @@ def build_graph_retriever(
         components.reranker,
         components.clause_index,
         co_retrieval=components.clause_graph,
+        tracer=tracer,
     )
 
 

@@ -137,8 +137,14 @@ and its enforcement test are untouched. The correlation id is
 `GraphContext.correlation_id`, set by `LangGraphClaimAssessmentOrchestrator` from
 the ambient request/worker id; the orchestrator also puts it in the graph
 `config` metadata, which LangGraph copies onto every node's child
-`RunnableConfig` so LLM calls carry it (M5-07's tracing reads that). See
-`docs/API.md` "Structured logging & correlation IDs".
+`RunnableConfig` so LLM calls carry it. See `docs/API.md` "Structured logging &
+correlation IDs".
+
+[M5-07] adds spans beside those log lines, and adds them **without touching this
+wrapper or any node** — the Langfuse callback handler goes on the run's config in
+the orchestrator, where it sees the nodes *and* the LLM calls inside them. See
+"Tracing is one callback handler on the run" below and
+`docs/OBSERVABILITY.md`.
 
 ---
 
@@ -935,3 +941,79 @@ state machine), `test_submit_claim.py` (persist-then-enqueue),
 → burst worker → completion, transient retry, dead-letter). `test_layer_boundaries.py`
 adds `rq` / `redis` to the forbidden roots. CI's `integration` job gains a
 `redis` service.
+
+## Tracing is one callback handler on the run, plus two hand-written spans — [M5-07]
+
+**Decision.** Trace the graph into a self-hosted Langfuse by installing its
+LangChain `CallbackHandler` on the graph's run config in
+`LangGraphClaimAssessmentOrchestrator._invoke`, and add exactly two spans by
+hand for the work no LLM call passes through. `docs/OBSERVABILITY.md` is the
+reader's guide; this section is the why.
+
+**Why the orchestrator and not `build.py`.** [M5-06] already wraps every node in
+`build._instrumented` for its log lines, so wrapping them again for spans is the
+obvious move — and it is the wrong one. LangGraph nodes are runnables, so a
+handler on the *run* already sees every node, and it sees something a node
+wrapper never can: the `chain.invoke(messages)` calls **inside** the nodes,
+with their prompts, completions and token usage. `_invoke` is also the only
+place a whole run passes through, which makes it the only sensible flush point —
+it covers the worker, the synchronous `resume` the API serves, and the eval
+scripts at once. So `build.py`, all eight node modules and the [M4-01b]
+`(state, runtime) -> dict` convention are untouched by this issue.
+
+The handler must go on the run rather than on the model objects, because the
+nodes deliberately pass no `config` to their own `chain.invoke` and rely on
+LangChain's ambient child config; a handler bound to a model would be bypassed.
+
+**Why two spans are still hand-written.** Callbacks see runnables. Retrieval is
+deterministic Python — no LLM call — so to a callback handler the node is a
+black box, and its candidate list, their scores and the [M3-07] gate's reasoning
+are locals that mostly never reach state. Three gate fields (`threshold`,
+`missing_category`, `closest_clause_ids`) are computed on every single run and
+recorded *nowhere*: state keeps the boolean, the audit event keeps the trigger
+name. Since those are the first thing you want when a verdict is wrong, the
+retrieval node opens a span for them, and `GraphRetrievalAdapter` nests a second
+one showing each candidate's hybrid rank against its cross-encoder rank.
+
+**Why the graph layer owns a `TracePort`.** Same reason it owns `RetrievalPort`
+and `AuditTrailSink`: a node depends on a capability, never on an adapter, and
+`infrastructure.observability.tracing.LangfuseTracer` satisfies it structurally.
+`infrastructure.rag` restates the same shape as `SpanRecorder` rather than
+importing it, so the `graph -> rag` dependency direction is not reversed for a
+span. The port deals in plain mappings and is a context manager, so the span's
+latency is measured rather than reported, and a test fake is a handful of lines.
+
+**A null object, not `| None`.** `GraphContext.tracer` defaults to `NO_TRACING`
+rather than to `None` the way `audit_sink` does. The sink is consulted once, at
+the checkpoint, where a branch is cheap and readable; a tracer is called from
+node bodies, and the null object keeps those bodies free of `if tracer is not
+None` noise for a call whose entire point is that it changes nothing. It also
+means an untraced deployment runs the identical code path, not a second one.
+
+**Optional means two things.** At the application layer,
+`ObservabilitySettings.tracing_active` is the `TRACING_ENABLED` flag **and** both
+keys; inactive, no Langfuse client is constructed at all. At the infrastructure
+layer the four langfuse services sit behind a Compose `profiles: ["tracing"]`,
+so plain `docker compose up -d` remains postgres + redis. And tracing never
+raises into a run: every SDK call is guarded, so a broken tracer degrades to no
+tracing, exactly as the compatibility node degrades rather than raising.
+
+**Deviations on record.** (a) `GET /ready` deliberately does *not* check
+Langfuse — readiness means "can serve an assessment", and an optional dependency
+must not be able to take the service out of rotation. (b) Cost is registered as
+list prices for the *pinned provider route*, not measured; re-pinning
+`LLM_*_PROVIDER_ORDER` makes them stale, and [M5-10] owns the measured number.
+(c) The langfuse services share this stack's Postgres (own database) and Redis
+(db index 1 against the queue's db 0) instead of running their own — a
+development-stack choice, stated rather than hidden. (d) The `langchain`
+meta-package became a direct dependency: Langfuse's handler does
+`import langchain` purely to branch on `langchain.__version__` and refuses to
+import without it, though every symbol it uses comes from `langchain_core`.
+
+**Enforcement.** `tests/unit/infrastructure/observability/test_tracing.py` runs
+the **real compiled graph** against a real Langfuse client whose span exporter
+writes to memory, and asserts a span per node, the retrieval span's candidates
+and scores, the correlation id on the trace, and that a deliberately broken
+tracer still runs the body it wraps — no server, no credentials, so it holds in
+CI. `tests/unit/infrastructure/graph/test_retrieval.py` covers the retrieval
+span's payload against a recording fake port.

@@ -12,7 +12,7 @@ dependencies = [
     "pypdf>=6.14.2",
     "pytesseract>=0.3.13",
     "pillow>=12.3.0",
-    "langchain-core>=1.5.5",
+    "langchain-core>=1.6.0",
     "langchain-openai>=1.5.1",
     "langgraph>=1.2",
     # [M4-09] the Postgres checkpointer -- a separate distribution from
@@ -36,6 +36,21 @@ dependencies = [
     # readiness checks import the client.
     "rq>=2.0",
     "redis>=5.0",
+    # [M5-07] tracing. The v4 SDK is OpenTelemetry-based and its LangChain
+    # callback handler imports `langchain_core` (falling back to the `langchain`
+    # meta-package only if that fails), so it works on this stack -- the v2 SDK's
+    # handler does not, it hard-imports `langchain.schema.*`, removed in
+    # langchain 1.x. Ships `py.typed`, so `mypy --strict` needs no override. A
+    # plain dependency, not an opt-in group like `embed`: it is pure Python and
+    # small, and tracing is switched off by configuration, not by absence.
+    "langfuse>=4.15,<5",
+    # [M5-07] the `langchain` meta-package is a dependency of the Langfuse
+    # callback handler and nothing else here imports it: the handler does
+    # `import langchain` purely to branch on `langchain.__version__`, then
+    # imports every symbol it actually uses from `langchain_core`. It refuses to
+    # import without it. Thin -- langchain-core, langgraph and pydantic, all
+    # already direct dependencies -- but it does raise the langchain-core floor.
+    "langchain>=1.4,<2",
 ]
 
 [dependency-groups]

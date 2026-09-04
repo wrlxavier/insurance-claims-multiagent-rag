@@ -20,6 +20,12 @@ Design notes:
   ``_CapturingAuditSink`` so the ``human_review`` node's trail comes back in the
   ``OrchestratorResult`` and ``SubmitHumanDecision`` writes it in the same
   transaction as the settled record (``docs/ARCHITECTURE.md``, the [M5-04] fold).
+- **Tracing hangs off this one method** ([M5-07]). ``_invoke`` is the only place
+  the whole graph run passes through, so installing the Langfuse callback
+  handler on ``config["callbacks"]`` here is what makes every node and every LLM
+  call appear in a trace -- ``build.py`` and the nodes are untouched. It also
+  makes the flush point obvious: one per invocation, covering the worker, the
+  synchronous ``resume`` the API serves, and the eval scripts alike.
 - **The contract checks belong to the use case.** ``start`` not pausing / ``resume``
   not finishing is surfaced by the use case as ``OrchestratorContractError``
   (per the port docstring); this adapter just reports ``awaiting_review`` as it
@@ -49,6 +55,7 @@ from infrastructure.observability.correlation import (
     generate_correlation_id,
     get_correlation_id,
 )
+from infrastructure.observability.tracing import NO_TRACING, RunTracer
 
 _GraphFactory = Callable[
     [], StateGraph[ClaimState, GraphContext, ClaimState, ClaimState]
@@ -92,18 +99,22 @@ class LangGraphClaimAssessmentOrchestrator:
         session_factory: sessionmaker[Session],
         database_url: str | None = None,
         graph_builder: _GraphFactory = build_claim_graph,
+        tracer: RunTracer = NO_TRACING,
     ) -> None:
         """Wire the adapter to its per-run dependencies.
 
         ``context_factory`` builds a ``GraphContext`` on a fresh session (models
         and retriever components are singletons the composition root closes over);
         ``database_url`` is passed to ``open_claim_checkpointer`` -- ``None`` uses
-        the service database the rest of the app reads.
+        the service database the rest of the app reads. ``tracer`` defaults to the
+        no-op ([M5-07]), so a test or an eval script constructs an untraced
+        orchestrator by saying nothing.
         """
         self._context_factory = context_factory
         self._session_factory = session_factory
         self._database_url = database_url
         self._graph_builder = graph_builder
+        self._tracer = tracer
 
     def start(self, *, assessment_id: str, claim: Claim) -> OrchestratorResult:
         """Assess ``claim`` from scratch, up to the human checkpoint."""
@@ -148,13 +159,22 @@ class LangGraphClaimAssessmentOrchestrator:
             },
             # LangGraph copies `metadata` onto every node's child RunnableConfig,
             # so the bare `chain.invoke(messages)` LLM calls in the nodes carry
-            # the correlation id without a per-node change ([M5-06]; M5-07's
-            # tracer reads it).
+            # the correlation id without a per-node change ([M5-06]), and the
+            # [M5-07] callback handler below reads it off the same place.
             "metadata": {"correlation_id": correlation_id},
+            # [M5-07]. Empty when tracing is off, which is exactly what LangGraph
+            # does with no callbacks at all. The nodes pass no `config` to their
+            # own `chain.invoke(messages)`, relying on LangChain's ambient child
+            # config -- which is why the handler has to be attached here, on the
+            # run, and not to the model objects.
+            "callbacks": self._tracer.callbacks(),
         }
         sink = _CapturingAuditSink()
         with (
             bind_correlation_id(correlation_id),
+            self._tracer.assessment_run(
+                assessment_id=assessment_id, correlation_id=correlation_id
+            ),
             self._session_factory() as session,
             open_claim_checkpointer(self._database_url) as checkpointer,
         ):
@@ -163,6 +183,7 @@ class LangGraphClaimAssessmentOrchestrator:
                 self._context_factory(session),
                 audit_sink=sink,
                 correlation_id=correlation_id,
+                tracer=self._tracer,
             )
             final_state = compiled.invoke(graph_input, config=config, context=context)
         return cast("dict[str, Any]", final_state), sink
