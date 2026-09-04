@@ -25,8 +25,9 @@ Code:
   every fixture.
 
 **Scope.** The `icephi` runtime-classifier spike named in the M5-08 issue
-Appendix is **not** part of this measurement or this guard — it is deferred
-to a later, separate, environment-toggled change.
+Appendix is **not** part of this measurement or this guard — it is a
+separate, optional, environment-toggled layer, implemented and measured in
+`docs/PROMPT_INJECTION_CLASSIFIER.md`.
 
 ---
 

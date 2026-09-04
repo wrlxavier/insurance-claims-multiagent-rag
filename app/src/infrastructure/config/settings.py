@@ -293,6 +293,31 @@ class LlmSettings(BaseSettings):
     embedding_model: str = Field(alias="EMBEDDING_MODEL")
     reranker_model: str = Field(alias="RERANKER_MODEL")
 
+    # [M5-08 Appendix] the optional runtime prompt-injection classifier -- the
+    # off switch, separate from the model choice, mirrors
+    # ObservabilitySettings.tracing_enabled: opt-in (default False, unlike
+    # tracing's default-on) because this is an advisory defense-in-depth
+    # layer, not the containment this project actually relies on ([M5-08]).
+    # See infrastructure.graph.context.InjectionClassifierPort.
+    prompt_injection_classifier_enabled: bool = Field(
+        alias="PROMPT_INJECTION_CLASSIFIER_ENABLED", default=False
+    )
+    # Pinned to an exact Hub revision in code
+    # (infrastructure.guardrails.classifier_config); this key is the
+    # human-facing name, cross-checked against that pin by a test -- same
+    # pattern as EMBEDDING_MODEL / RERANKER_MODEL above.
+    prompt_injection_classifier_model: str = Field(
+        alias="PROMPT_INJECTION_CLASSIFIER_MODEL",
+        default="protectai/deberta-v3-base-prompt-injection-v2",
+    )
+    # The classifier's own "INJECTION" score at or above which a span is
+    # flagged. A deployment knob, unlike the model/revision pin above: it
+    # trades false positives against detection rate without changing which
+    # model produced the score. See docs/PROMPT_INJECTION_CLASSIFIER.md.
+    prompt_injection_classifier_threshold: float = Field(
+        alias="PROMPT_INJECTION_CLASSIFIER_THRESHOLD", default=0.5
+    )
+
 
 class ParsingSettings(BaseSettings):
     """Settings used by the text-extraction pipeline."""

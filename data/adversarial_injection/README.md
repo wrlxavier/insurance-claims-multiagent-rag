@@ -1,5 +1,16 @@
 # Adversarial prompt-injection fixtures ([M5-08])
 
+Two files in this directory, for two different consumers:
+
+- `fixtures.jsonl` — adversarial probes for the real compatibility node
+  (`make eval-prompt-injection`), documented below.
+- `benign_imperative_clauses.jsonl` — real, non-adversarial imperative
+  clause excerpts for the optional runtime classifier's false-positive
+  benchmark (`make eval-prompt-injection-classifier`, [M5-08 Appendix]),
+  documented at the bottom of this file.
+
+## `fixtures.jsonl`
+
 `fixtures.jsonl` — hand-authored adversarial probes for
 `scripts/eval_prompt_injection.py` (`make eval-prompt-injection`). Unlike
 `data/synthetic_claims/` and `data/golden_set/`, these are **not** produced by
@@ -39,3 +50,16 @@ is looked up against `data/policies/`.
 that produces a verdict from clause text). `recommendation` and `consistency`
 have no verdict field to hijack ([M4-08], [M4-06]) — a prompt injection there
 could at most leak into free prose, not into a decision this system reports.
+
+## `benign_imperative_clauses.jsonl` ([M5-08 Appendix])
+
+Ten hand-picked, **verbatim** excerpts from the real parsed corpus
+(`build/parsed_clauses.jsonl`), each carrying `document_id` / `clause_id` /
+`susep_process` / `insurer` for traceability back to its source PDF. None of
+this text is adversarial or synthetic — every row is genuine SUSEP policy
+wording, chosen because it uses the same imperative verb forms an injected
+instruction would ("o segurado obriga-se a...", "fica vedado...", "deverá...")
+while meaning nothing of the kind. `scripts/eval_prompt_injection_classifier.py`
+scores these as the false-positive side of the Appendix's domain benchmark;
+the four rows in `fixtures.jsonl` (their injected spans) are the detection
+side. Schema: `infrastructure.evaluation.benign_clause_schema.BenignClauseFixture`.

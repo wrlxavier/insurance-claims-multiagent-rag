@@ -15,16 +15,18 @@ the caller (a test today, the composition root later) owns ``.compile()``, so
 ``build_claim_graph().compile(checkpointer=pg_saver)`` without a second entry
 point here.
 
-Topology after [M4-09]::
+Topology after [M5-08 Appendix]::
 
     START -> intake -> route_after_intake
         "proceed"       -> retrieval -> route_after_retrieval
-                               sufficient   -> {compatibility, consistency}
+                               sufficient   -> {compatibility, consistency,
+                                                 injection_scan}
                                insufficient -> recommendation
         "clarification" -> clarification -> intake   (loop)
         "exhausted"     -> clarification_exhausted -> recommendation
 
-    {compatibility, consistency} -> recommendation -> human_review -> END
+    {compatibility, consistency, injection_scan}
+        -> recommendation -> human_review -> END
 
 ``human_review`` is the one node with an edge to ``END``.
 
@@ -48,14 +50,26 @@ this router plus the cap -- the graph never relies on LangGraph's
 ``recursion_limit`` / ``GraphRecursionError``.
 
 ``route_after_retrieval`` acts on the [M3-07] gate flag the retrieval node
-recorded. A sufficient context fans out -- one superstep, both the compatibility
-([M4-05]) and consistency ([M4-06]) nodes -- and the two converge on the
-recommendation node. This is LangGraph's *fixed parallel branches* primitive (a
-conditional edge to two known nodes, then a fan-in), **not** ``Send``, which is
-for dynamic map-reduce over a variable number of items. The nodes write disjoint
-state channels (``compatibility`` vs ``consistency``); ``audit_trail``, the one
-channel both write in the superstep, carries a reducer
-(``state.append_audit_events``).
+recorded. A sufficient context fans out -- one superstep, the compatibility
+([M4-05]) and consistency ([M4-06]) nodes plus the optional injection-scan
+node ([M5-08 Appendix]) -- and all three converge on the recommendation node.
+This is LangGraph's *fixed parallel branches* primitive (a conditional edge to
+three known nodes, then a fan-in), **not** ``Send``, which is for dynamic
+map-reduce over a variable number of items. ``compatibility`` and
+``consistency`` write disjoint state channels; ``injection_scan`` writes only
+``audit_trail``, the one channel all three can write in the same superstep,
+which carries a reducer (``state.append_audit_events``) for exactly this
+reason.
+
+``injection_scan`` is a fixed member of this fan-out regardless of whether
+the optional classifier is configured -- see
+``infrastructure.graph.context.InjectionClassifierPort``/``NO_CLASSIFIER``
+and ``infrastructure.graph.nodes.injection_scan``. Keeping the graph's
+topology static and reading the toggle only at the composition root (never
+here) is deliberate: ``build_claim_graph()`` stays deterministic, and every
+existing test/eval script that builds a bare ``GraphContext`` exercises the
+same three-branch fan-out it always did, just with a classifier that is a
+guaranteed no-op.
 
 The recommendation node ([M4-08]) is the single terminal consolidation point:
 every terminal path routes through it (both assessment branches, the
@@ -89,6 +103,7 @@ from infrastructure.graph.nodes.clarification_exhausted import clarification_exh
 from infrastructure.graph.nodes.compatibility import compatibility
 from infrastructure.graph.nodes.consistency import consistency
 from infrastructure.graph.nodes.human_review import human_review
+from infrastructure.graph.nodes.injection_scan import injection_scan
 from infrastructure.graph.nodes.intake import intake
 from infrastructure.graph.nodes.recommendation import recommendation
 from infrastructure.graph.nodes.retrieval import retrieval
@@ -174,16 +189,18 @@ def route_after_retrieval(state: ClaimState) -> list[str]:
 
     ``context_sufficient is False`` -> ``["recommendation"]`` (the node produces
     an ``insufficient_information`` recommendation directly, with no assessment
-    branches); anything else (the gate said the context settles the question,
-    or -- defensively -- no flag was written) -> ``["compatibility",
-    "consistency"]``, the fixed parallel fan-out to the two assessment nodes
-    ([M4-05]/[M4-06]) in one superstep. Returning a list of node names is
-    LangGraph's fan-out primitive; both branches then converge on the
-    recommendation node ([M4-08]).
+    branches -- the optional injection scan is skipped on this path too, since
+    there is no retrieved-clause set for it to score); anything else (the gate
+    said the context settles the question, or -- defensively -- no flag was
+    written) -> ``["compatibility", "consistency", "injection_scan"]``, the
+    fixed parallel fan-out to the two assessment nodes ([M4-05]/[M4-06]) plus
+    the optional, advisory-only injection scan ([M5-08 Appendix]) in one
+    superstep. Returning a list of node names is LangGraph's fan-out primitive;
+    all three branches then converge on the recommendation node ([M4-08]).
     """
     if state.get("context_sufficient") is False:
         return ["recommendation"]
-    return ["compatibility", "consistency"]
+    return ["compatibility", "consistency", "injection_scan"]
 
 
 def build_claim_graph() -> _ClaimGraph:
@@ -199,6 +216,7 @@ def build_claim_graph() -> _ClaimGraph:
     builder.add_node("retrieval", _instrumented(retrieval))
     builder.add_node("compatibility", _instrumented(compatibility))
     builder.add_node("consistency", _instrumented(consistency))
+    builder.add_node("injection_scan", _instrumented(injection_scan))
     builder.add_node("recommendation", _instrumented(recommendation))
     builder.add_node("human_review", _instrumented(human_review))
 
@@ -217,13 +235,15 @@ def build_claim_graph() -> _ClaimGraph:
     builder.add_conditional_edges(
         "retrieval",
         route_after_retrieval,
-        ["compatibility", "consistency", "recommendation"],
+        ["compatibility", "consistency", "injection_scan", "recommendation"],
     )
     # Fan-in on the recommendation node ([M4-08]): it runs once after both
-    # assessment branches complete on the sufficient-context path, and once
-    # directly on the insufficient-context / clarification-exhausted paths.
+    # assessment branches (plus the optional injection scan, [M5-08 Appendix])
+    # complete on the sufficient-context path, and once directly on the
+    # insufficient-context / clarification-exhausted paths.
     builder.add_edge("compatibility", "recommendation")
     builder.add_edge("consistency", "recommendation")
+    builder.add_edge("injection_scan", "recommendation")
     # The human checkpoint ([M4-09]) is the last thing before END, so no path
     # reaches a final state without a person having seen the recommendation.
     builder.add_edge("recommendation", "human_review")

@@ -33,7 +33,11 @@ from infrastructure.database import (
     sqlalchemy_unit_of_work_factory,
 )
 from infrastructure.graph.checkpointer import open_claim_checkpointer
-from infrastructure.graph.context import GraphContext
+from infrastructure.graph.context import (
+    NO_CLASSIFIER,
+    GraphContext,
+    InjectionClassifierPort,
+)
 from infrastructure.graph.orchestrator import LangGraphClaimAssessmentOrchestrator
 from infrastructure.observability.tracing import RunTracer, build_tracer
 from infrastructure.rag.retriever_factory import (
@@ -101,6 +105,7 @@ def build_core_components(
         allow_fallbacks=llm.llm_reasoning_allow_fallbacks,
     )
     retriever_components = load_retriever_components()
+    classifier = _load_classifier(llm)
 
     def context_factory(session: Session) -> GraphContext:
         return GraphContext(
@@ -112,6 +117,7 @@ def build_core_components(
             llm_settings=llm,
             audit_sink=None,
             tracer=tracer,
+            classifier=classifier,
         )
 
     orchestrator = LangGraphClaimAssessmentOrchestrator(
@@ -127,4 +133,26 @@ def build_core_components(
         orchestrator=orchestrator,
         uow_factory=sqlalchemy_unit_of_work_factory(session_factory),
         tracer=tracer,
+    )
+
+
+def _load_classifier(llm: LlmSettings) -> InjectionClassifierPort:
+    """The optional prompt-injection classifier -- [M5-08 Appendix].
+
+    ``NO_CLASSIFIER`` (the no-op) unless
+    ``PROMPT_INJECTION_CLASSIFIER_ENABLED=true``; deferred import so the
+    optional ``embed`` group is only required where the classifier is
+    actually turned on, mirroring ``infrastructure.rag.retriever_factory``'s
+    ``_load_reranker``/``_load_query_embedder``.
+    """
+    if not llm.prompt_injection_classifier_enabled:
+        return NO_CLASSIFIER
+
+    from infrastructure.guardrails.local_prompt_injection_classifier import (
+        LocalPromptInjectionClassifier,
+    )
+
+    return LocalPromptInjectionClassifier(
+        model_id=llm.prompt_injection_classifier_model,
+        threshold=llm.prompt_injection_classifier_threshold,
     )

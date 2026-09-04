@@ -184,6 +184,9 @@ module = [
     # Optional `embed` dependency group -- not installed in the default env that
     # `make typecheck` / CI run against.
     "sentence_transformers.*",
+    # transformers ships no py.typed marker either -- the optional runtime
+    # prompt-injection classifier's only import from it ([M5-08 Appendix]).
+    "transformers.*",
     # The Rust `tokenizers` package ships py.typed only in some releases; the
     # `embed` group's transformers pin holds it at 0.20.x. scripts/*.py duck-type
     # it via a local Protocol regardless.

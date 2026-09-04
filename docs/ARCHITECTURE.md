@@ -1085,10 +1085,9 @@ authoritative, and a clean/injected claim-narrative pair for a
 system-override and a role-change attempt. Results and method:
 `docs/PROMPT_INJECTION.md`.
 
-**Deferred.** The M5-08 issue's Appendix — an exploratory spike evaluating a
-runtime prompt-injection classifier (`icephi`) as an optional, env-toggled
-defense-in-depth layer — is explicitly out of this issue's scope and not
-implemented here.
+**The M5-08 issue's Appendix** — an exploratory spike evaluating a runtime
+prompt-injection classifier (`icephi`) as an optional, env-toggled
+defense-in-depth layer — is implemented separately; see the next section.
 
 **Enforcement.**
 `tests/unit/infrastructure/graph/prompts/test_untrusted_content.py` (fast,
@@ -1103,3 +1102,58 @@ a failed parse); `tests/unit/infrastructure/graph/test_compatibility.py`
 intent explicitly: a response that insists on a foreign document's clause id
 is never trusted); `tests/eval/test_prompt_injection.py` (eval-marked, real
 model, skips without `LLM_PROVIDER`).
+
+---
+
+## An optional runtime classifier is a defense-in-depth signal, never a gate — [M5-08 Appendix]
+
+**The design.** `icephi`, the runtime classifier the M5-08 issue's Appendix
+names, is not a real library (checked); this is built with a real,
+well-known open one instead — `protectai/deberta-v3-base-prompt-injection-v2`,
+run locally via `transformers`
+(`infrastructure.guardrails.local_prompt_injection_classifier.LocalPromptInjectionClassifier`).
+It sits behind `infrastructure.graph.context.InjectionClassifierPort`, a
+`Protocol` with a null-object default (`NO_CLASSIFIER`) — the exact recipe
+`TracePort`/`NO_TRACING` ([M5-07]) already established: every test, eval
+script and unconfigured deployment builds a `GraphContext` exactly as
+before, and the graph's topology never reads the toggle.
+
+The classifier is exercised by a new, fixed node — `injection_scan` — added
+to the existing parallel fan-out alongside `compatibility`/`consistency`
+([M4-07]'s topology, extended: `infrastructure.graph.build`). It runs on
+every claim; when the classifier is `NO_CLASSIFIER` (the default,
+`PROMPT_INJECTION_CLASSIFIER_ENABLED=false`), every `classify()` call is a
+no-op. When enabled, it scores the claim narrative and every retrieved
+clause excerpt and, for each flagged span, appends one `AuditEvent`
+(`node="injection_scan"`, `confidence=<score>`) — nothing else.
+**`injection_scan` returns only `audit_trail` or `{}`; no verdict, citation,
+or routing decision is ever conditioned on its output.** That is what makes
+"advisory, never blocking" a structural fact about the code, matching the
+Appendix's own framing ("non-blocking evaluation... optional defense-in-depth
+layer"), not a policy someone could quietly violate later.
+
+**The empirical check.** `make eval-prompt-injection-classifier`
+(`scripts/eval_prompt_injection_classifier.py`) measures exactly what the
+Appendix asks for: false-positive rate on real, non-adversarial imperative
+SUSEP clause language, and detection rate + latency on the existing M5-08
+adversarial fixtures. Results and the recommendation this drives:
+`docs/PROMPT_INJECTION_CLASSIFIER.md`. In short: this particular classifier,
+trained only on English text, flags 70% of real Portuguese policy clauses —
+the false-positive risk the issue named by name is real — so
+`PROMPT_INJECTION_CLASSIFIER_ENABLED` ships `false` by default. That result
+is a fact about this model on this domain, not about the technique — the
+wiring stays real, tested, and available both for a deployment that wants
+the signal anyway and as a worked reference for applying the same pattern
+(port, null object, one advisory-only node, measure before trusting) to a
+domain closer to the model's training distribution.
+
+**Enforcement.** `tests/unit/infrastructure/graph/test_injection_scan.py`
+(a fake classifier; the node returns only `audit_trail` or `{}`, and the
+default `GraphContext.classifier` is `NO_CLASSIFIER`);
+`tests/unit/infrastructure/guardrails/` (the pinned model contract and the
+classifier's own wiring, faked at the `transformers` import boundary — no
+network, mirrors `test_cross_encoder_reranker.py`);
+`tests/unit/infrastructure/graph/test_claim_graph.py` (the three-branch
+fan-out, the compiled graph's structure);
+`tests/eval/test_prompt_injection_classifier.py` (eval-marked, real model,
+skips without `transformers` installed).
