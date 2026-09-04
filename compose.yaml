@@ -2,9 +2,12 @@
 #
 # [M0-08] brought up the database. [M5-05] adds `redis` -- the asynchronous
 # assessment queue (`make worker`) needs it, and so does `make test-integration`.
-# [M5-09] still adds the `api` / `worker` / `langfuse` services (once there is a
-# Dockerfile to run them from). Every block reads its configuration from the same
-# `${...}` variables those services will, so they are appended, not rewritten.
+# [M5-07] adds the self-hosted Langfuse stack behind the `tracing` profile, so
+# `docker compose up -d` is still just postgres + redis and
+# `docker compose --profile tracing up -d` is the traced stack. [M5-09] still
+# adds the `api` / `worker` services (once there is a Dockerfile to run them
+# from). Every block reads its configuration from the same `${...}` variables
+# those services will, so they are appended, not rewritten.
 services:
   postgres:
     # Postgres major and pgvector version are both explicit: the floating
@@ -48,5 +51,152 @@ services:
       timeout: 3s
       retries: 12
 
+  # ---------------------------------------------------------------------------
+  # Tracing -- [M5-07]. `profiles: ["tracing"]` on every service below, so a
+  # plain `docker compose up -d` never starts them: tracing is opt-in at the
+  # infrastructure layer the same way `TRACING_ENABLED` makes it opt-in at the
+  # application layer.
+  #
+  #   docker compose --profile tracing up -d
+  #
+  # Langfuse v4 needs Postgres, ClickHouse, S3-compatible blob storage and Redis.
+  # It shares this stack's postgres (its own database) and redis (its own db
+  # index) rather than duplicating them; ClickHouse and MinIO have no local
+  # counterpart, so they are added, unpublished -- nothing outside the compose
+  # network talks to them.
+  #
+  # Note the variable names: the langfuse containers read `DATABASE_URL`, `SALT`
+  # and `ENCRYPTION_KEY`, and `DATABASE_URL` already means the *application*
+  # database in this project's .env. Every value below is therefore passed
+  # explicitly, and our own knobs stay under the `LANGFUSE_` prefix.
+  # ---------------------------------------------------------------------------
+  clickhouse:
+    # Langfuse's trace store. Pinned to the minor Langfuse tests against, for the
+    # same reason postgres and redis are pinned above.
+    image: clickhouse/clickhouse-server:25.12
+    profiles: ["tracing"]
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    # Langfuse uploads raw ingestion events to blob storage before the worker
+    # folds them into ClickHouse. The bucket is created by the entrypoint rather
+    # than by a separate init container, as upstream's own compose does.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    profiles: ["tracing"]
+    restart: unless-stopped
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" /data'
+    environment:
+      MINIO_ROOT_USER: ${LANGFUSE_MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_ROOT_PASSWORD:-miniosecret}
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  langfuse-worker: &langfuse-service
+    image: docker.langfuse.com/langfuse/langfuse-worker:4.28.1
+    profiles: ["tracing"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment: &langfuse-env
+      # Its own database on this stack's postgres -- created by
+      # docker/postgres/initdb/02-create-langfuse-database.sql on a fresh volume.
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_DB_NAME:-langfuse}
+      # db index 1: the assessment queue owns db 0, so RQ's keyspace and
+      # Langfuse's BullMQ queues never share a `FLUSHDB`.
+      REDIS_CONNECTION_STRING: redis://redis:6379/1
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_ROOT_PASSWORD:-miniosecret}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_ROOT_PASSWORD:-miniosecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3000}
+      SALT: ${LANGFUSE_SALT:?set LANGFUSE_SALT in .env -- openssl rand -hex 32}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set LANGFUSE_ENCRYPTION_KEY in .env -- openssl rand -hex 32}
+      # This is a local development stack; it phones nobody home.
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      # `$$(hostname)`, not localhost: both langfuse servers bind the container's
+      # own network address rather than loopback, so a probe at 127.0.0.1 (or at
+      # `localhost`, which resolves to ::1 here) is refused by a healthy service.
+      # The `$$` is compose escaping -- the shell inside the container expands it.
+      test:
+        ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://$$(hostname):3030/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  langfuse-web:
+    <<: *langfuse-service
+    image: docker.langfuse.com/langfuse/langfuse:4.28.1
+    ports:
+      - ${LANGFUSE_PORT:-3000}:3000
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?set LANGFUSE_NEXTAUTH_SECRET in .env -- openssl rand -hex 32}
+      # Headless bootstrap: the project is created on first boot with exactly the
+      # keys the application is already configured with, so `up -d` yields a
+      # working tracer with no click-through in the UI.
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-insurance-claims}
+      LANGFUSE_INIT_ORG_NAME: Insurance Claims
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-claims-assessment}
+      LANGFUSE_INIT_PROJECT_NAME: Claims Assessment
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?set LANGFUSE_PUBLIC_KEY in .env}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?set LANGFUSE_SECRET_KEY in .env}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: Local Analyst
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://$$(hostname):3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
 volumes:
   postgres_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:

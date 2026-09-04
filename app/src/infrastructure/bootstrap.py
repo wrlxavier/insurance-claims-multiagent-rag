@@ -22,8 +22,10 @@ from infrastructure.config.llm_client_factory import build_chat_model
 from infrastructure.config.settings import (
     DatabaseSettings,
     LlmSettings,
+    ObservabilitySettings,
     get_database_settings,
     get_llm_settings,
+    get_observability_settings,
 )
 from infrastructure.database import (
     create_engine_from_settings,
@@ -33,6 +35,7 @@ from infrastructure.database import (
 from infrastructure.graph.checkpointer import open_claim_checkpointer
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.orchestrator import LangGraphClaimAssessmentOrchestrator
+from infrastructure.observability.tracing import RunTracer, build_tracer
 from infrastructure.rag.retriever_factory import (
     build_graph_retriever,
     load_retriever_components,
@@ -47,16 +50,19 @@ class CoreComponents:
     session_factory: sessionmaker[Session]
     orchestrator: LangGraphClaimAssessmentOrchestrator
     uow_factory: UnitOfWorkFactory
+    tracer: RunTracer
 
     def dispose(self) -> None:
-        """Release the connection pool -- call on shutdown."""
+        """Release the connection pool and stop the tracer -- call on shutdown."""
         self.engine.dispose()
+        self.tracer.shutdown()
 
 
 def build_core_components(
     *,
     database_settings: DatabaseSettings | None = None,
     llm_settings: LlmSettings | None = None,
+    observability_settings: ObservabilitySettings | None = None,
     probe_checkpointer: bool = True,
 ) -> CoreComponents:
     """Build the DB engine, the chat models, the retriever and the orchestrator.
@@ -64,9 +70,16 @@ def build_core_components(
     ``probe_checkpointer`` opens the LangGraph Postgres checkpointer once so a
     missing schema fails fast with an actionable "run ``make setup-checkpointer``"
     message rather than on the first job.
+
+    The tracer ([M5-07]) is process-wide like the models: one Langfuse client per
+    API or worker process, or the no-op when tracing is not configured. It is
+    built here rather than per run because the SDK batches and exports on a
+    background thread -- one per assessment would be a thread per assessment.
     """
     db = database_settings or get_database_settings()
     llm = llm_settings or get_llm_settings()
+    observability = observability_settings or get_observability_settings()
+    tracer = build_tracer(observability=observability, llm=llm)
 
     engine = create_engine_from_settings(db)
     session_factory = create_session_factory(engine=engine)
@@ -93,15 +106,19 @@ def build_core_components(
         return GraphContext(
             fast_model=fast_model,
             reasoning_model=reasoning_model,
-            retriever=build_graph_retriever(session, retriever_components),
+            retriever=build_graph_retriever(
+                session, retriever_components, tracer=tracer
+            ),
             llm_settings=llm,
             audit_sink=None,
+            tracer=tracer,
         )
 
     orchestrator = LangGraphClaimAssessmentOrchestrator(
         context_factory=context_factory,
         session_factory=session_factory,
         database_url=db.sqlalchemy_database_url,
+        tracer=tracer,
     )
 
     return CoreComponents(
@@ -109,4 +126,5 @@ def build_core_components(
         session_factory=session_factory,
         orchestrator=orchestrator,
         uow_factory=sqlalchemy_unit_of_work_factory(session_factory),
+        tracer=tracer,
     )

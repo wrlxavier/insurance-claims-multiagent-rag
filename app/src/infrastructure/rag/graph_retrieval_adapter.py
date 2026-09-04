@@ -22,11 +22,21 @@ Flow, per ``retrieve`` call:
 
 Needs a live [infrastructure.rag.hybrid_retriever.HybridRetriever] (Postgres +
 the ``embed`` group's models); a unit test drives it with fakes.
+
+[M5-07] records steps 1-4 as a ``retrieval.rerank`` span. The retrieval node's
+own span shows the ranking the assessment nodes then reason over; this one shows
+how it was arrived at -- each candidate's hybrid rank beside its cross-encoder
+rank and score, plus anything co-retrieval injected. ``RERANK_CANDIDATE_DEPTH``
+is 10, the same as the node's ``k``, so the reranker re-orders rather than
+prunes: the question this span answers is not "what was dropped" but "did the
+hybrid legs surface the right clause at all, and where did the cross-encoder
+move it" -- two different bugs with two different fixes.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -129,6 +139,43 @@ def build_clause_index(chunks: Sequence[_ChunkRow]) -> dict[str, IndexedClause]:
     return index
 
 
+class SpanRecorder(Protocol):
+    """A ``span`` context manager -- structurally the graph's ``TracePort``.
+
+    Re-declared rather than imported for the same reason ``_FilterableBase``
+    above is: ``infrastructure.rag`` does not depend on
+    ``infrastructure.graph``, and this module is not going to be the first to
+    reverse that.
+    """
+
+    def span(
+        self,
+        name: str,
+        *,
+        input: Mapping[str, object],
+        metadata: Mapping[str, object] | None = None,
+    ) -> AbstractContextManager[MutableMapping[str, object]]:
+        """Open a span; fill the yielded mapping to set its output."""
+        ...
+
+
+class _NoSpans:
+    """The no-op recorder this adapter uses unless the composition root traces."""
+
+    def span(
+        self,
+        name: str,
+        *,
+        input: Mapping[str, object],
+        metadata: Mapping[str, object] | None = None,
+    ) -> AbstractContextManager[MutableMapping[str, object]]:
+        """Yield a throwaway mapping and record nothing."""
+        return nullcontext({})
+
+
+_NO_SPANS: SpanRecorder = _NoSpans()
+
+
 class _FixedRanking:
     """A one-shot base that hands ``ExclusionCoRetrievalRetriever`` a set ranking."""
 
@@ -157,12 +204,14 @@ class GraphRetrievalAdapter:
         candidate_depth: int = RERANK_CANDIDATE_DEPTH,
         co_retrieval: ClauseGraph | None = None,
         reserved_exclusion_slots: int = RESERVED_EXCLUSION_SLOTS,
+        tracer: SpanRecorder | None = None,
     ) -> None:
         """Compose the hybrid retriever, the reranker and the clause index.
 
         ``co_retrieval`` set turns on [M3-06] exclusion co-retrieval over the
         reranked ranking. A candidate missing from ``clause_index`` is scored as
-        the empty string (it sinks) and hydrated as a bare id.
+        the empty string (it sinks) and hydrated as a bare id. ``tracer``
+        defaults to the no-op ([M5-07]).
         """
         self._hybrid = hybrid
         self._reranker = reranker
@@ -170,6 +219,7 @@ class GraphRetrievalAdapter:
         self._candidate_depth = candidate_depth
         self._co_retrieval = co_retrieval
         self._reserved_exclusion_slots = reserved_exclusion_slots
+        self._tracer = tracer if tracer is not None else _NO_SPANS
 
     def retrieve(
         self,
@@ -181,35 +231,66 @@ class GraphRetrievalAdapter:
         """Up to ``k`` clauses (more only when co-retrieval injects), best first."""
         if k <= 0:
             return []
-        candidates = self._hybrid.retrieve(
-            question, k=self._candidate_depth, metadata_filter=metadata_filter
-        )
-        if not candidates:
-            return []
+        with self._tracer.span(
+            "retrieval.rerank",
+            input={"k": k, "candidate_depth": self._candidate_depth},
+        ) as traced:
+            candidates = self._hybrid.retrieve(
+                question, k=self._candidate_depth, metadata_filter=metadata_filter
+            )
+            traced["n_hybrid_candidates"] = len(candidates)
+            if not candidates:
+                return []
 
-        passages = [
-            self._clause_index[cid].embed_text if cid in self._clause_index else ""
-            for cid in candidates
-        ]
-        scores = self._reranker.rerank(question, passages)
-        order = sorted(range(len(candidates)), key=lambda i: scores[i], reverse=True)
-        ranked = [(candidates[i], float(scores[i])) for i in order]
-        top = ranked[:k]
+            passages = [
+                self._clause_index[cid].embed_text if cid in self._clause_index else ""
+                for cid in candidates
+            ]
+            scores = self._reranker.rerank(question, passages)
+            order = sorted(
+                range(len(candidates)), key=lambda i: scores[i], reverse=True
+            )
+            ranked = [(candidates[i], float(scores[i])) for i in order]
+            top = ranked[:k]
 
-        score_by_id = dict(ranked)
-        final_ids = [cid for cid, _ in top]
-        if self._co_retrieval is not None:
-            final_ids = _ExclusionCoRetrieval(
-                _FixedRanking(final_ids),
-                self._co_retrieval,
-                reserved_slots=self._reserved_exclusion_slots,
-            ).retrieve(question, k=k, metadata_filter=metadata_filter)
+            score_by_id = dict(ranked)
+            final_ids = [cid for cid, _ in top]
+            if self._co_retrieval is not None:
+                final_ids = _ExclusionCoRetrieval(
+                    _FixedRanking(final_ids),
+                    self._co_retrieval,
+                    reserved_slots=self._reserved_exclusion_slots,
+                ).retrieve(question, k=k, metadata_filter=metadata_filter)
 
-        return [
-            self._hydrate(cid, score_by_id.get(cid, _INJECTED_CLAUSE_SCORE))
-            for cid in final_ids
-            if cid in self._clause_index
-        ]
+            # Both ranks per candidate: where the hybrid legs put it, and where
+            # the cross-encoder moved it to. A large gap on the clause that
+            # mattered is the whole diagnosis.
+            hybrid_rank = {cid: rank for rank, cid in enumerate(candidates, start=1)}
+            traced.update(
+                {
+                    "candidates": [
+                        {
+                            "clause_id": clause_id,
+                            "hybrid_rank": hybrid_rank[clause_id],
+                            "rerank_rank": rank,
+                            "rerank_score": score,
+                        }
+                        for rank, (clause_id, score) in enumerate(ranked, start=1)
+                    ],
+                    "kept": final_ids,
+                    "co_retrieval_injected": [
+                        clause_id
+                        for clause_id in final_ids
+                        if clause_id not in score_by_id
+                    ],
+                }
+            )
+
+            return [
+                self._hydrate(cid, score_by_id.get(cid, _INJECTED_CLAUSE_SCORE))
+                for cid in final_ids
+                if cid in self._clause_index
+            ]
 
     def _hydrate(self, clause_id: str, score: float) -> RetrievedClause:
         """Build a [RetrievedClause] from the clause index (caller guards presence)."""

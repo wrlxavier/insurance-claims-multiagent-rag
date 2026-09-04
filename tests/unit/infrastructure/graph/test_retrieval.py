@@ -6,6 +6,8 @@ against the golden set is a separate ``eval``-marked measurement
 (``scripts/eval_retrieval_node.py`` / ``tests/eval``).
 """
 
+from collections.abc import Iterator, Mapping, MutableMapping
+from contextlib import contextmanager
 from typing import Any, cast
 
 import pytest
@@ -16,7 +18,12 @@ from langgraph.runtime import Runtime
 from domain.clause_classification import ClauseType
 from infrastructure.config.enums import LlmProvider
 from infrastructure.config.settings import LlmSettings
-from infrastructure.graph.context import GraphContext, RetrievalPort
+from infrastructure.graph.context import (
+    NO_TRACING,
+    GraphContext,
+    RetrievalPort,
+    TracePort,
+)
 from infrastructure.graph.nodes.retrieval import (
     RETRIEVAL_K,
     _build_filter,
@@ -75,13 +82,35 @@ def _llm_settings() -> LlmSettings:
     )
 
 
-def _context(retriever: RetrievalPort) -> GraphContext:
+class _RecordingTracer:
+    """A ``TracePort`` that keeps each span's name, input and finished output."""
+
+    def __init__(self) -> None:
+        self.spans: list[tuple[str, dict[str, object], dict[str, object]]] = []
+
+    @contextmanager
+    def span(
+        self,
+        name: str,
+        *,
+        input: Mapping[str, object],
+        metadata: Mapping[str, object] | None = None,
+    ) -> Iterator[MutableMapping[str, object]]:
+        output: dict[str, object] = {}
+        yield output
+        self.spans.append((name, dict(input), output))
+
+
+def _context(
+    retriever: RetrievalPort, *, tracer: TracePort = NO_TRACING
+) -> GraphContext:
     unused = cast(BaseChatModel, object())
     return GraphContext(
         fast_model=unused,
         reasoning_model=unused,
         retriever=retriever,
         llm_settings=_llm_settings(),
+        tracer=tracer,
     )
 
 
@@ -90,13 +119,14 @@ def _run(
     *,
     entities: ExtractedEntities | None,
     raw_claim_text: str = "bati o carro no portao ontem",
+    tracer: TracePort = NO_TRACING,
 ) -> dict[str, object]:
     state: dict[str, object] = {"claim_id": "c1", "raw_claim_text": raw_claim_text}
     if entities is not None:
         state["entities"] = entities
     return retrieval(
         cast(ClaimState, state),
-        Runtime(context=_context(cast(RetrievalPort, retriever))),
+        Runtime(context=_context(cast(RetrievalPort, retriever), tracer=tracer)),
     )
 
 
@@ -261,3 +291,78 @@ def test_retrieval_runs_as_a_node_in_a_compiled_state_graph() -> None:
     )
     assert [c.clause_id for c in out["citations"]] == ["doc-1:1.1"]
     assert out["context_sufficient"] is True
+
+
+# --- tracing ([M5-07]) ----------------------------------------------
+
+
+@pytest.mark.unit
+def test_retrieval_records_a_span_with_its_candidates_and_scores() -> None:
+    """The [M5-07] DoD's retrieval span: what was retrieved, ranked and scored.
+
+    Retrieval makes no LLM call, so the trace's callback handler sees the node
+    as a black box; this span is the only place the candidate list appears.
+    """
+    retriever = _RecordingRetriever([_hit("doc-1:1.1", 0.91), _hit("doc-1:2.4", 0.72)])
+    tracer = _RecordingTracer()
+
+    _run(
+        retriever,
+        entities=ExtractedEntities(event_type="colisão", product_line="CASCO"),
+        tracer=tracer,
+    )
+
+    assert [name for name, _, _ in tracer.spans] == ["retrieval"]
+    _, recorded_input, output = tracer.spans[0]
+    assert recorded_input["query"] == "colisão"
+    assert recorded_input["k"] == RETRIEVAL_K
+    assert recorded_input["filter"] == {"susep_process": None, "product_line": "CASCO"}
+    assert output["n_returned"] == 2
+    assert output["candidates"] == [
+        {
+            "rank": 1,
+            "clause_id": "doc-1:1.1",
+            "document_id": "doc-1",
+            "susep_process": "15414.900000/2013-00",
+            "clause_type": "coverage",
+            "score": 0.91,
+        },
+        {
+            "rank": 2,
+            "clause_id": "doc-1:2.4",
+            "document_id": "doc-1",
+            "susep_process": "15414.900000/2013-00",
+            "clause_type": "coverage",
+            "score": 0.72,
+        },
+    ]
+
+
+@pytest.mark.unit
+def test_the_retrieval_span_records_why_the_gate_abstained() -> None:
+    """The gate's reasoning fields, which reach no other record.
+
+    The node's audit event keeps only ``sufficient`` and the trigger name, and
+    state keeps only the flag -- so without the span, the reason a run abstained
+    is not recoverable after the fact.
+    """
+    retriever = _RecordingRetriever([_hit("doc-1:9.9", 0.01)])
+    tracer = _RecordingTracer()
+
+    _run(retriever, entities=ExtractedEntities(event_type="colisão"), tracer=tracer)
+
+    gate = cast(dict[str, Any], tracer.spans[0][2]["gate"])
+    assert gate["sufficient"] is False
+    assert gate["trigger"]
+    assert gate["threshold"] > 0
+    assert gate["explanation"]
+
+
+@pytest.mark.unit
+def test_retrieval_runs_untraced_by_default() -> None:
+    """``NO_TRACING`` is the default, so nothing above has to opt out of tracing."""
+    retriever = _RecordingRetriever([_hit("doc-1:1.1", 0.91)])
+
+    result = _run(retriever, entities=ExtractedEntities(event_type="colisão"))
+
+    assert result["context_sufficient"] is True

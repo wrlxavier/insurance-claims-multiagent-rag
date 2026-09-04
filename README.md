@@ -136,6 +136,27 @@ the retry/back-off policy and the dead-letter path are in
 [`docs/ASYNC_PROCESSING.md`](docs/ASYNC_PROCESSING.md). The `api` / `worker`
 Compose services (and their Dockerfile) are [M5-09].
 
+### Tracing (optional)
+
+A run is a tree of nodes, LLM calls and one retrieval step; when a verdict is
+wrong, the question is which of them was. [M5-07] traces that into a
+self-hosted Langfuse, which rides along in the Compose stack behind a profile:
+
+```bash
+# .env: set the three secrets first -- openssl rand -hex 32 each
+#   LANGFUSE_NEXTAUTH_SECRET, LANGFUSE_SALT, LANGFUSE_ENCRYPTION_KEY
+docker compose --profile tracing up -d    # + langfuse-web, langfuse-worker, clickhouse, minio
+open http://localhost:3000                # sign in with LANGFUSE_INIT_USER_*
+```
+
+The project is seeded on first boot with the `LANGFUSE_PUBLIC_KEY` /
+`LANGFUSE_SECRET_KEY` already in your `.env`, so there is no key-copying step.
+Tracing is off unless both keys are set and `TRACING_ENABLED` is not `false`,
+and plain `docker compose up -d` still starts only postgres + redis — the
+service runs identically with none of this. Reading a trace, and a worked
+example of diagnosing a wrong verdict, are in
+[`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
+
 ### Pre-commit hooks
 
 1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):

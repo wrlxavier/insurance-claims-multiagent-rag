@@ -38,6 +38,10 @@ FORBIDDEN_ROOTS = frozenset(
         # adapter stays in infrastructure.
         "rq",
         "redis",
+        # [M5-07]: tracing. `TracePort` is a port on the graph layer; the
+        # Langfuse client and its OpenTelemetry exporter stay in infrastructure.
+        "langfuse",
+        "opentelemetry",
         "fitz",
         "pyarrow",
         "pytesseract",

@@ -40,9 +40,29 @@ class ObservabilitySettings(BaseSettings):
     langfuse_secret_key: SecretStr = Field(
         alias="LANGFUSE_SECRET_KEY", default=SecretStr("")
     )
-    langfuse_host: str = Field(
-        alias="LANGFUSE_HOST", default="https://api.langfuse.com"
-    )
+    # [M5-07] the self-hosted Langfuse from the compose `tracing` profile, not
+    # Langfuse Cloud: this project ships the server it traces to, so the default
+    # is the one `docker compose --profile tracing up -d` brings up.
+    langfuse_host: str = Field(alias="LANGFUSE_HOST", default="http://localhost:3000")
+    # [M5-07] the off switch. Separate from the keys so tracing can be disabled
+    # without deleting credentials -- which is what makes "the service runs
+    # without it" testable rather than merely claimed.
+    tracing_enabled: bool = Field(alias="TRACING_ENABLED", default=True)
+
+    @property
+    def tracing_active(self) -> bool:
+        """Whether tracing should actually run: switched on *and* credentialed.
+
+        [M5-07]'s "optional via configuration" line, in one place. Keys without
+        the flag, or the flag without keys, both mean no tracing -- the tracer
+        degrades to a no-op rather than failing to start, so an unconfigured
+        clone runs the whole flow with tracing simply absent.
+        """
+        return (
+            self.tracing_enabled
+            and bool(self.langfuse_public_key)
+            and bool(self.langfuse_secret_key.get_secret_value())
+        )
 
     @property
     def is_development(self) -> bool:
@@ -222,6 +242,28 @@ class LlmSettings(BaseSettings):
     )
     llm_vision_output_cost_per_1m_tokens_usd: float = Field(
         alias="LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD", default=2.50
+    )
+
+    # [M5-07] registers these two pairs with Langfuse as model definitions, so
+    # the trace UI can price a generation for a model served under a name
+    # Langfuse has never seen. **Priced for the pinned OpenRouter route, not for
+    # the model in general** -- the same model costs 3x more on some routes than
+    # others, so re-pin `LLM_*_PROVIDER_ORDER` above and these go stale. Read
+    # from OpenRouter's endpoints API on 2026-09-04: the fast model on
+    # `baidu/fp8` and the reasoning model on `streamlake`, the defaults pinned
+    # above. List prices, not a measurement -- [M5-10] owns the measured cost
+    # per assessment.
+    llm_fast_input_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_FAST_INPUT_COST_PER_1M_TOKENS_USD", default=0.14
+    )
+    llm_fast_output_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_FAST_OUTPUT_COST_PER_1M_TOKENS_USD", default=0.28
+    )
+    llm_reasoning_input_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_REASONING_INPUT_COST_PER_1M_TOKENS_USD", default=1.1154
+    )
+    llm_reasoning_output_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_REASONING_OUTPUT_COST_PER_1M_TOKENS_USD", default=3.3462
     )
 
     # Pinned per M1-08b: baidu/fp8 is the required OpenRouter route for

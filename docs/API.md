@@ -186,10 +186,15 @@ response as `X-Correlation-ID`. The middleware emits one access line per request
 The id propagates into the assessment run: the orchestrator binds it for the
 graph invocation and puts it in the graph `config` metadata, so every node run
 logs a correlation-tagged `node.start` / `node.completed` line
-(`infrastructure.graph.node`) and every LLM call carries it (M5-07's tracing
-reads that metadata). On the async path the id rides the RQ job across Redis and
-the worker re-binds it, so a worker's node logs trace back to the `POST` that
-queued the claim.
+(`infrastructure.graph.node`) and every LLM call carries it. On the async path
+the id rides the RQ job across Redis and the worker re-binds it, so a worker's
+node logs trace back to the `POST` that queued the claim.
+
+Since [M5-07] the same id also tags the run's **trace**, and each run logs a
+`trace.started` line carrying `trace_id` and a ready-made `trace_url` — so a log
+line leads to the trace, and a correlation id from a log line finds it in
+Langfuse's search. See [`docs/OBSERVABILITY.md`](OBSERVABILITY.md) for the span
+tree, how to read one, and how to turn tracing off.
 
 ## Errors
 
