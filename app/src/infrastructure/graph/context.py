@@ -98,3 +98,9 @@ class GraphContext:
     # the same way a deterministic node leaves `AuditEvent.model` unset. The
     # composition root supplies the Postgres-backed sink.
     audit_sink: AuditTrailSink | None = None
+    # [M5-06]. The correlation id for this run -- tied to the originating HTTP
+    # request (or minted by the worker). `infrastructure.graph.build`'s node
+    # wrapper stamps it on every node log line; the orchestrator also puts it in
+    # the graph `config` metadata so LLM calls inherit it. Defaulted so a test
+    # or eval `GraphContext(...)` needs nothing.
+    correlation_id: str = ""

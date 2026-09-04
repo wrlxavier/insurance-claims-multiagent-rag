@@ -26,11 +26,13 @@ from application.use_cases.list_assessments import ListAssessments
 from application.use_cases.submit_claim import SubmitClaim
 from application.use_cases.submit_human_decision import SubmitHumanDecision
 from domain.policy_clause import PolicyClause
+from infrastructure.observability.readiness import CheckResult
 from presentation.app import create_app
 from presentation.dependencies import (
     get_get_assessment,
     get_get_audit_trail,
     get_list_assessments,
+    get_readiness_probe,
     get_submit_claim,
     get_submit_human_decision,
 )
@@ -45,6 +47,20 @@ from tests.unit.application.fakes import (
     SequentialIds,
     make_uow_factory,
 )
+
+
+class FakeReadinessProbe:
+    """A ``ReadinessProbe`` stand-in whose check results the test dictates."""
+
+    def __init__(self) -> None:
+        self.results: list[CheckResult] = [
+            CheckResult("postgres", ok=True),
+            CheckResult("redis", ok=True),
+            CheckResult("vector_index", ok=True, detail="12 embedded chunks"),
+        ]
+
+    def check(self) -> list[CheckResult]:
+        return list(self.results)
 
 
 @dataclass
@@ -62,6 +78,7 @@ class Harness:
     orchestrator: FakeClaimAssessmentOrchestrator = field(
         default_factory=FakeClaimAssessmentOrchestrator
     )
+    readiness: FakeReadinessProbe = field(default_factory=FakeReadinessProbe)
 
 
 @pytest.fixture
@@ -108,6 +125,7 @@ def harness() -> Iterator[Harness]:
         jobs=_jobs(),
         audit=InMemoryAuditTrailReader(audit_store),
     )
+    app.dependency_overrides[get_readiness_probe] = lambda: h.readiness
 
     yield h
     app.dependency_overrides.clear()

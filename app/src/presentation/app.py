@@ -33,9 +33,12 @@ from infrastructure.config.settings import (
     get_observability_settings,
     get_queue_settings,
 )
+from infrastructure.observability.logging import configure_logging
+from infrastructure.observability.readiness import ReadinessProbe
 from infrastructure.queue import build_assessment_queue
 from presentation.dependencies import AppComponents
 from presentation.errors import register_exception_handlers
+from presentation.middleware import RequestContextMiddleware
 from presentation.routes import assessments, health
 
 logger = logging.getLogger(__name__)
@@ -46,7 +49,7 @@ _LifespanFactory = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 @asynccontextmanager
 async def _default_lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Build the production composition root and tear it down on shutdown."""
-    logging.basicConfig(level=get_observability_settings().log_level)
+    configure_logging(get_observability_settings())
 
     core = build_core_components()
     queue = build_assessment_queue(get_queue_settings())
@@ -58,6 +61,10 @@ async def _default_lifespan(app: FastAPI) -> AsyncIterator[None]:
         uow_factory=core.uow_factory,
         session_factory=core.session_factory,
         new_id=lambda: str(uuid4()),
+        readiness=ReadinessProbe(
+            session_factory=core.session_factory,
+            redis_ping=queue.ping,
+        ),
     )
     logger.info("assessment API composition root ready")
     try:
@@ -73,6 +80,7 @@ def create_app(*, lifespan: _LifespanFactory | None = None) -> FastAPI:
         version="1",
         lifespan=lifespan or _default_lifespan,
     )
+    app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router)
     app.include_router(assessments.router)
     register_exception_handlers(app)

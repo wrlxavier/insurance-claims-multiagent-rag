@@ -44,6 +44,11 @@ from infrastructure.graph.build import build_claim_graph
 from infrastructure.graph.checkpointer import open_claim_checkpointer
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.state import AuditRecord, ClaimState
+from infrastructure.observability.correlation import (
+    bind_correlation_id,
+    generate_correlation_id,
+    get_correlation_id,
+)
 
 _GraphFactory = Callable[
     [], StateGraph[ClaimState, GraphContext, ClaimState, ClaimState]
@@ -135,14 +140,30 @@ class LangGraphClaimAssessmentOrchestrator:
         graph_input: ClaimState | Command[Any],
     ) -> tuple[dict[str, Any], _CapturingAuditSink]:
         """Compile the graph, invoke it once for this run, return its final state."""
-        config: Any = {"configurable": {"thread_id": assessment_id}}
+        correlation_id = get_correlation_id() or generate_correlation_id()
+        config: Any = {
+            "configurable": {
+                "thread_id": assessment_id,
+                "correlation_id": correlation_id,
+            },
+            # LangGraph copies `metadata` onto every node's child RunnableConfig,
+            # so the bare `chain.invoke(messages)` LLM calls in the nodes carry
+            # the correlation id without a per-node change ([M5-06]; M5-07's
+            # tracer reads it).
+            "metadata": {"correlation_id": correlation_id},
+        }
         sink = _CapturingAuditSink()
         with (
+            bind_correlation_id(correlation_id),
             self._session_factory() as session,
             open_claim_checkpointer(self._database_url) as checkpointer,
         ):
             compiled = self._graph_builder().compile(checkpointer=checkpointer)
-            context = replace(self._context_factory(session), audit_sink=sink)
+            context = replace(
+                self._context_factory(session),
+                audit_sink=sink,
+                correlation_id=correlation_id,
+            )
             final_state = compiled.invoke(graph_input, config=config, context=context)
         return cast("dict[str, Any]", final_state), sink
 

@@ -35,6 +35,7 @@ from infrastructure.database import (
 )
 from infrastructure.graph.checkpointer import open_claim_checkpointer
 from infrastructure.graph.orchestrator import LangGraphClaimAssessmentOrchestrator
+from infrastructure.observability.readiness import ReadinessProbe
 from infrastructure.queue.rq_queue import QUEUE_NAME, RqAssessmentQueue
 from infrastructure.queue.worker import stop_retry_on_permanent
 from presentation.app import create_app
@@ -80,6 +81,9 @@ def _lifespan(
             uow_factory=sqlalchemy_unit_of_work_factory(session_factory),
             session_factory=session_factory,
             new_id=lambda: next(ids),
+            readiness=ReadinessProbe(
+                session_factory=session_factory, redis_ping=queue.ping
+            ),
         )
         yield
 

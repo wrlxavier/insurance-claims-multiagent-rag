@@ -11,6 +11,7 @@ GET    /v1/assessments/{id}                 lifecycle + recommendation -> 200
 POST   /v1/assessments/{id}/decision        approve / edit / reject  -> 200
 GET    /v1/assessments/{id}/audit           durable audit trail      -> 200
 GET    /health                              liveness                 -> 200
+GET    /ready                               dependency readiness     -> 200 / 503
 ```
 
 Since [M5-05] the graph runs on a background worker, not in the request. `POST`
@@ -29,7 +30,13 @@ Code:
 - `app/src/presentation/{schemas,mappers}.py` — Pydantic models, pure
   dataclass↔schema conversions.
 - `app/src/presentation/errors.py` — the single error→HTTP edge.
-- `app/src/presentation/routes/{assessments,health}.py` — the routers.
+- `app/src/presentation/routes/{assessments,health}.py` — the routers (`health.py`
+  serves both `/health` and the [M5-06] `/ready`).
+- `app/src/presentation/middleware.py` — the [M5-06] request-context middleware
+  (correlation id + one structured access line).
+- `app/src/infrastructure/observability/` — [M5-06] JSON logging
+  (`logging.py`), the correlation-id context var (`correlation.py`) and the
+  `/ready` dependency probe (`readiness.py`).
 - `app/src/infrastructure/graph/orchestrator.py` — `LangGraphClaimAssessmentOrchestrator`
   and its `_CapturingAuditSink`.
 - `app/src/infrastructure/graph/state_mapper.py` — the `state.py` ↔ domain mapper.
@@ -145,6 +152,45 @@ resumed.
 Empty (`"entries": []`) until a decision is submitted — the durable trail is
 written once, at the human checkpoint.
 
+### `GET /health` and `GET /ready` — [M5-06]
+
+`GET /health` is liveness: `200 {"status": "ok"}`, no dependency touched, so a
+load balancer can tell the process is up even while a dependency is down.
+
+`GET /ready` is readiness — it probes Postgres, Redis and the vector index (the
+`chunk` table must be migrated **and** carry embedded rows):
+
+```json
+{ "status": "ready",
+  "checks": { "postgres": { "status": "ok" },
+              "redis": { "status": "ok" },
+              "vector_index": { "status": "ok", "detail": "4540 embedded chunks" } } }
+```
+
+`200` when every check passes, `503` with `"status": "degraded"` and the failing
+check carrying `{"status": "error", "detail": "<why>"}` otherwise — a caller
+reads the body to see which dependency is down, not just the status.
+
+## Structured logging & correlation IDs — [M5-06]
+
+The service logs one JSON object per line to stdout — `timestamp` (ISO-8601
+UTC), `level`, `logger`, `message`, `correlation_id`, plus any event fields. Set
+`LOG_FORMAT=text` for readable lines on a local `make serve`; `LOG_LEVEL`
+controls verbosity.
+
+Every request carries a **correlation id**: taken from `X-Correlation-ID` (or
+`X-Request-ID`) when the caller sends one, minted otherwise, and echoed on the
+response as `X-Correlation-ID`. The middleware emits one access line per request
+(`{"message": "request", "path", "method", "status", "duration_ms", "correlation_id"}`).
+
+The id propagates into the assessment run: the orchestrator binds it for the
+graph invocation and puts it in the graph `config` metadata, so every node run
+logs a correlation-tagged `node.start` / `node.completed` line
+(`infrastructure.graph.node`) and every LLM call carries it (M5-07's tracing
+reads that metadata). On the async path the id rides the RQ job across Redis and
+the worker re-binds it, so a worker's node logs trace back to the `POST` that
+queued the claim.
+
 ## Errors
 
 Uniform envelope; `code` is stable, branch on it:
@@ -213,8 +259,9 @@ Redis round-trip — submission → worker → completion, transient retry, dead
   retry-with-backoff on transient provider faults, dead-letter, and the
   `pending` / `running` / `failed` lifecycle behind the non-blocking 202.
   See [`ASYNC_PROCESSING.md`](ASYNC_PROCESSING.md).
-- **[M5-06]** — `GET /ready` with per-check detail, JSON logs to stdout, and
-  correlation-id propagation from the request into every node and LLM call.
+- **[M5-06] done** — `GET /ready` with per-check detail, JSON logs to stdout, and
+  correlation-id propagation from the request into every node and LLM call. See
+  "Structured logging & correlation IDs" above.
 - **[M5-09]** — the Compose `api` / `worker` services, the Dockerfile, the CI
   image build, and the proxy-header / trusted-host middleware from
   `ObservabilitySettings`.

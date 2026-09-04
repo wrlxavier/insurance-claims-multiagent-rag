@@ -36,6 +36,7 @@ from infrastructure.database import (
     SqlAlchemyAuditTrailReader,
     SqlAlchemyClauseRepository,
 )
+from infrastructure.observability.readiness import ReadinessProbe
 
 
 @dataclass
@@ -48,6 +49,7 @@ class AppComponents:
     uow_factory: UnitOfWorkFactory
     session_factory: sessionmaker[Session]
     new_id: Callable[[], str]
+    readiness: ReadinessProbe
 
 
 def _components(request: Request) -> AppComponents:
@@ -84,6 +86,11 @@ def get_uow_factory(request: Request) -> UnitOfWorkFactory:
 def get_new_id(request: Request) -> Callable[[], str]:
     """Mints the claim / assessment identifiers."""
     return _components(request).new_id
+
+
+def get_readiness_probe(request: Request) -> ReadinessProbe:
+    """The dependency probe ``GET /ready`` reports on -- [M5-06]."""
+    return _components(request).readiness
 
 
 _Session = Annotated[Session, Depends(get_read_session)]

@@ -28,6 +28,12 @@ Topology after [M4-09]::
 
 ``human_review`` is the one node with an edge to ``END``.
 
+Every node is registered through ``_instrumented`` ([M5-06]): a wrapper that
+brackets each run with a correlation-id-tagged ``node.start`` / ``node.completed``
+log line (and ``node.failed`` on a real exception). It is applied here, not in
+the node files, so the ``(state, runtime) -> dict`` convention and its
+enforcement test stay untouched.
+
 **Compiling this graph without a checkpointer is a mistake, not an option.**
 ``human_review`` calls ``interrupt()``, and LangGraph does not complain when
 there is nowhere to persist the pause -- ``.invoke()`` simply returns early with
@@ -68,9 +74,14 @@ audit trail somewhere a compliance reader can query. See
 ``docs/HUMAN_CHECKPOINT.md``.
 """
 
-from typing import Literal
+import logging
+import time
+from collections.abc import Callable
+from typing import Literal, cast
 
+from langgraph.errors import GraphBubbleUp
 from langgraph.graph import END, START, StateGraph
+from langgraph.runtime import Runtime
 
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.nodes.clarification import clarification
@@ -90,6 +101,56 @@ from infrastructure.graph.state import ClaimState
 MAX_CLARIFICATION_ROUNDS = 2
 
 _ClaimGraph = StateGraph[ClaimState, GraphContext, ClaimState, ClaimState]
+
+_Node = Callable[[ClaimState, Runtime[GraphContext]], dict[str, object]]
+
+# One log line at the start and end of every node run, tagged with the run's
+# correlation id ([M5-06]). Emitting it here -- once, around every node -- rather
+# than in each node file keeps the `(state, runtime) -> dict` node convention
+# untouched and gives per-node timing for free (a head start on [M5-10]).
+_node_logger = logging.getLogger("infrastructure.graph.node")
+
+
+def _instrumented[NodeT: _Node](node: NodeT) -> NodeT:
+    """Wrap a node so every run brackets itself with a correlation-tagged log line."""
+
+    def wrapper(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, object]:
+        correlation_id = runtime.context.correlation_id or "-"
+        _node_logger.info(
+            "node.start",
+            extra={"node": node.__name__, "correlation_id": correlation_id},
+        )
+        started = time.perf_counter()
+        try:
+            result = node(state, runtime)
+        except GraphBubbleUp:
+            # `interrupt()` in `human_review` and other LangGraph control flow --
+            # not a failure, let it bubble silently.
+            raise
+        except Exception:
+            _node_logger.exception(
+                "node.failed",
+                extra={
+                    "node": node.__name__,
+                    "correlation_id": correlation_id,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+            )
+            raise
+        _node_logger.info(
+            "node.completed",
+            extra={
+                "node": node.__name__,
+                "correlation_id": correlation_id,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            },
+        )
+        return result
+
+    wrapper.__name__ = node.__name__
+    wrapper.__qualname__ = getattr(node, "__qualname__", node.__name__)
+    wrapper.__doc__ = node.__doc__
+    return cast("NodeT", wrapper)
 
 
 def route_after_intake(
@@ -132,14 +193,14 @@ def build_claim_graph() -> _ClaimGraph:
     to every invocation -- see the module docstring.
     """
     builder: _ClaimGraph = StateGraph(ClaimState, context_schema=GraphContext)
-    builder.add_node("intake", intake)
-    builder.add_node("clarification", clarification)
-    builder.add_node("clarification_exhausted", clarification_exhausted)
-    builder.add_node("retrieval", retrieval)
-    builder.add_node("compatibility", compatibility)
-    builder.add_node("consistency", consistency)
-    builder.add_node("recommendation", recommendation)
-    builder.add_node("human_review", human_review)
+    builder.add_node("intake", _instrumented(intake))
+    builder.add_node("clarification", _instrumented(clarification))
+    builder.add_node("clarification_exhausted", _instrumented(clarification_exhausted))
+    builder.add_node("retrieval", _instrumented(retrieval))
+    builder.add_node("compatibility", _instrumented(compatibility))
+    builder.add_node("consistency", _instrumented(consistency))
+    builder.add_node("recommendation", _instrumented(recommendation))
+    builder.add_node("human_review", _instrumented(human_review))
 
     builder.add_edge(START, "intake")
     builder.add_conditional_edges(

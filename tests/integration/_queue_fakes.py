@@ -29,6 +29,10 @@ from infrastructure.database import (
 )
 from infrastructure.graph.orchestrator import LangGraphClaimAssessmentOrchestrator
 from infrastructure.llm_errors import is_transient_llm_error
+from infrastructure.observability.correlation import (
+    bind_correlation_id,
+    generate_correlation_id,
+)
 from tests.integration._checkpoint_fakes import build_fake_context
 
 _MAX_ATTEMPTS = 3
@@ -62,20 +66,23 @@ def _fake_orchestrator(
     )
 
 
-def _run(orchestrator: object, assessment_id: str) -> None:
+def _run(
+    orchestrator: object, assessment_id: str, correlation_id: str | None = None
+) -> None:
     session_factory = _session_factory()
-    RunAssessment(
-        clock=SystemClock(),
-        orchestrator=orchestrator,  # type: ignore[arg-type]
-        uow_factory=sqlalchemy_unit_of_work_factory(session_factory),
-        is_transient=is_transient_llm_error,
-        max_attempts=_MAX_ATTEMPTS,
-    )(assessment_id)
+    with bind_correlation_id(correlation_id or generate_correlation_id()):
+        RunAssessment(
+            clock=SystemClock(),
+            orchestrator=orchestrator,  # type: ignore[arg-type]
+            uow_factory=sqlalchemy_unit_of_work_factory(session_factory),
+            is_transient=is_transient_llm_error,
+            max_attempts=_MAX_ATTEMPTS,
+        )(assessment_id)
 
 
-def run_assessment_job(assessment_id: str) -> None:
+def run_assessment_job(assessment_id: str, correlation_id: str | None = None) -> None:
     """Happy-path job: run the fake graph to the human checkpoint."""
-    _run(_fake_orchestrator(_session_factory()), assessment_id)
+    _run(_fake_orchestrator(_session_factory()), assessment_id, correlation_id)
 
 
 class _WrappingOrchestrator:
@@ -110,14 +117,23 @@ class _PermanentlyFailingOrchestrator(_WrappingOrchestrator):
         raise ValueError("the claim narrative could not be parsed")
 
 
-def run_flaky_assessment_job(assessment_id: str) -> None:
+def run_flaky_assessment_job(
+    assessment_id: str, correlation_id: str | None = None
+) -> None:
     """Fails transiently once, then succeeds -- exercises retry-with-backoff."""
-    _run(_FlakyOrchestrator(_fake_orchestrator(_session_factory())), assessment_id)
+    _run(
+        _FlakyOrchestrator(_fake_orchestrator(_session_factory())),
+        assessment_id,
+        correlation_id,
+    )
 
 
-def run_failing_assessment_job(assessment_id: str) -> None:
+def run_failing_assessment_job(
+    assessment_id: str, correlation_id: str | None = None
+) -> None:
     """Fails with a real error every time -- exercises the dead-letter path."""
     _run(
         _PermanentlyFailingOrchestrator(_fake_orchestrator(_session_factory())),
         assessment_id,
+        correlation_id,
     )
