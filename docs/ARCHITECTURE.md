@@ -127,6 +127,19 @@ first two parameters are not `(state, runtime)`.
 `tests/architecture/test_scope_vocabulary.py` already scans the same tree for
 verdict-vocabulary drift.
 
+**Instrumentation — [M5-06].** `build.py` registers every node through a
+`_instrumented(node)` wrapper: each run brackets itself with a correlation-tagged
+`node.start` / `node.completed` log line on the `infrastructure.graph.node`
+logger (`node.failed` on a real exception; LangGraph control-flow exceptions such
+as `human_review`'s `interrupt()` bubble silently), plus a `duration_ms`. It sits
+in `build.py`, not the node files, so the `(state, runtime) -> dict` convention
+and its enforcement test are untouched. The correlation id is
+`GraphContext.correlation_id`, set by `LangGraphClaimAssessmentOrchestrator` from
+the ambient request/worker id; the orchestrator also puts it in the graph
+`config` metadata, which LangGraph copies onto every node's child
+`RunnableConfig` so LLM calls carry it (M5-07's tracing reads that). See
+`docs/API.md` "Structured logging & correlation IDs".
+
 ---
 
 ## The clarification loop is self-capping in the router, not in the framework — [M4-03]
@@ -859,10 +872,13 @@ LangGraph checkpointer) with a fake model and stub retriever: submit → 202 →
 runs the presentation unit tests.
 
 **Downstream.** [M5-05] replaces the synchronous 202 with a Redis queue and adds
-run-status states (below). [M5-06] adds `/ready`, JSON logging and correlation-id
-propagation. [M5-09] adds the Compose `api` / `worker` services, the Dockerfile
-and the CI image build, and wires the proxy-header / trusted-host middleware from
-`ObservabilitySettings`.
+run-status states (below). [M5-06] **done** — `/ready` with per-check detail, one
+JSON log line per event to stdout, and a correlation id accepted or minted per
+request and propagated into every graph node log line and LLM call (via
+`presentation/middleware.py`, `infrastructure/observability/`, and the `build.py`
+node wrapper); see `docs/API.md`. [M5-09] adds the Compose `api` / `worker`
+services, the Dockerfile and the CI image build, and wires the proxy-header /
+trusted-host middleware from `ObservabilitySettings`.
 
 ---
 

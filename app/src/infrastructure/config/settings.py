@@ -1,7 +1,7 @@
 """This module contains the application settings loaded from environment variables."""
 
 from functools import lru_cache
-from typing import Self
+from typing import Literal, Self
 from urllib.parse import quote_plus
 
 from pydantic import Field, SecretStr, model_validator
@@ -25,6 +25,11 @@ class ObservabilitySettings(BaseSettings):
 
     app_env: str = Field(alias="APP_ENV", default="development")
     log_level: str = Field(alias="LOG_LEVEL", default="INFO")
+
+    # [M5-06] `json` (one JSON object per line, to stdout -- the DoD shape) or
+    # `text` (a human-readable line for a local `make serve`). Default `json`:
+    # the deployed service is the common case, a developer opts out.
+    log_format: Literal["json", "text"] = Field(alias="LOG_FORMAT", default="json")
     proxy_headers_enabled: bool = Field(alias="PROXY_HEADERS_ENABLED", default=True)
     forwarded_allow_ips: str = Field(
         alias="FORWARDED_ALLOW_IPS",

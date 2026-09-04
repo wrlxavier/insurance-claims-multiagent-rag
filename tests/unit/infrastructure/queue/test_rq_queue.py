@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from rq import Retry
 
+from infrastructure.observability.correlation import bind_correlation_id
 from infrastructure.queue.rq_queue import RqAssessmentQueue
 
 
@@ -38,7 +39,7 @@ def test_enqueue_passes_id_job_id_timeout_and_retry() -> None:
 
     (call,) = fake.calls
     assert call["f"] == "pkg.mod.run"
-    assert call["args"] == ("assess-42",)
+    assert call["args"][0] == "assess-42"
     assert call["kwargs"]["job_id"] == "assess-42"
     assert call["kwargs"]["job_timeout"] == 1800
     retry = call["kwargs"]["retry"]
@@ -54,3 +55,26 @@ def test_no_retry_object_when_only_one_attempt_is_allowed() -> None:
     queue.enqueue("assess-1")
 
     assert fake.calls[0]["kwargs"]["retry"] is None
+
+
+@pytest.mark.unit
+def test_enqueue_carries_the_bound_correlation_id() -> None:
+    queue, fake = _queue()
+
+    with bind_correlation_id("corr-123"):
+        queue.enqueue("assess-42")
+
+    (call,) = fake.calls
+    assert call["args"] == ("assess-42", "corr-123")
+    assert call["kwargs"]["meta"] == {"correlation_id": "corr-123"}
+
+
+@pytest.mark.unit
+def test_enqueue_mints_a_correlation_id_when_none_is_bound() -> None:
+    queue, fake = _queue()
+
+    queue.enqueue("assess-42")
+
+    (call,) = fake.calls
+    minted = call["args"][1]
+    assert minted and call["kwargs"]["meta"] == {"correlation_id": minted}

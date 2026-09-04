@@ -21,6 +21,10 @@ from infrastructure.bootstrap import build_core_components
 from infrastructure.clock import SystemClock
 from infrastructure.config.settings import get_queue_settings
 from infrastructure.llm_errors import is_transient_llm_error
+from infrastructure.observability.correlation import (
+    bind_correlation_id,
+    generate_correlation_id,
+)
 
 _lock = threading.Lock()
 _runner: RunAssessment | None = None
@@ -48,6 +52,13 @@ def _runner_singleton() -> RunAssessment:
     return _runner
 
 
-def run_assessment_job(assessment_id: str) -> None:
-    """RQ entry point: process one queued assessment run to the human checkpoint."""
-    _runner_singleton()(assessment_id)
+def run_assessment_job(assessment_id: str, correlation_id: str | None = None) -> None:
+    """RQ entry point: process one queued assessment run to the human checkpoint.
+
+    ``correlation_id`` is the id the enqueue side ([M5-06]) carried across Redis;
+    binding it here means the graph run and its node log lines trace back to the
+    originating request. Defaulted so an older queued job (no second arg) still
+    runs, with a fresh id.
+    """
+    with bind_correlation_id(correlation_id or generate_correlation_id()):
+        _runner_singleton()(assessment_id)

@@ -18,6 +18,10 @@ import redis
 from rq import Queue, Retry
 
 from infrastructure.config.settings import QueueSettings
+from infrastructure.observability.correlation import (
+    generate_correlation_id,
+    get_correlation_id,
+)
 
 QUEUE_NAME = "assessments"
 DEFAULT_JOB_PATH = "infrastructure.queue.tasks.run_assessment_job"
@@ -43,20 +47,33 @@ class RqAssessmentQueue:
         self._job_timeout = job_timeout
 
     def enqueue(self, assessment_id: str) -> None:
-        """Queue ``assessment_id`` for a worker, with retry + timeout attached."""
+        """Queue ``assessment_id`` for a worker, with retry + timeout attached.
+
+        The caller's correlation id ([M5-06]) rides across Redis as the job's
+        second argument and on its ``meta``, so the worker's graph run -- and
+        every node log line it produces -- ties back to the request that
+        submitted the claim.
+        """
         retry: Retry | None = None
         if self._max_attempts > 1:
             retry = Retry(
                 max=self._max_attempts - 1,
                 interval=self._retry_intervals or 0,
             )
+        correlation_id = get_correlation_id() or generate_correlation_id()
         self._queue.enqueue(
             self._job_path,
             assessment_id,
+            correlation_id,
             job_id=assessment_id,
             job_timeout=self._job_timeout,
             retry=retry,
+            meta={"correlation_id": correlation_id},
         )
+
+    def ping(self) -> None:
+        """Round-trip the Redis connection -- the readiness probe's redis check."""
+        self._queue.connection.ping()
 
 
 def build_assessment_queue(

@@ -32,6 +32,7 @@ from infrastructure.config.settings import (
     get_observability_settings,
     get_queue_settings,
 )
+from infrastructure.observability.logging import configure_logging
 from infrastructure.queue.rq_queue import QUEUE_NAME
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ def stop_retry_on_permanent(
 
 def run_worker() -> None:
     """Start the worker pool and block until it is stopped."""
-    logging.basicConfig(level=get_observability_settings().log_level)
+    configure_logging(get_observability_settings())
     settings = get_queue_settings()
     connection = redis.Redis.from_url(settings.redis_url)
 

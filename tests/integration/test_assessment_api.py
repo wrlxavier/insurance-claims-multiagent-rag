@@ -37,6 +37,7 @@ from infrastructure.database import (
 from infrastructure.database.chunk_repository import upsert_chunks
 from infrastructure.graph.checkpointer import open_claim_checkpointer
 from infrastructure.graph.orchestrator import LangGraphClaimAssessmentOrchestrator
+from infrastructure.observability.readiness import ReadinessProbe
 from infrastructure.rag.chunk_schema import SCHEMA_VERSION, ChunkRecord
 from presentation.app import create_app
 from presentation.dependencies import AppComponents
@@ -117,6 +118,9 @@ def _test_lifespan(database_url: str, session_factory: sessionmaker[Session]) ->
             uow_factory=uow_factory,
             session_factory=session_factory,
             new_id=lambda: next(ids),
+            readiness=ReadinessProbe(
+                session_factory=session_factory, redis_ping=lambda: None
+            ),
         )
         yield
 
