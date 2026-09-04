@@ -34,6 +34,10 @@ FORBIDDEN_ROOTS = frozenset(
         "pydantic",
         "langgraph",
         "langchain",
+        # [M5-05]: the async queue. `AssessmentQueue` is a port; the RQ/Redis
+        # adapter stays in infrastructure.
+        "rq",
+        "redis",
         "fitz",
         "pyarrow",
         "pytesseract",

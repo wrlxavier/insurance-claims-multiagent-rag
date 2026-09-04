@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check serve migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check serve worker migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  test-eval         - Run the eval-marked pytest suite (requires build/parsed_clauses.jsonl; run fetch-corpus-artifacts or parse first)"
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
 	@echo "  serve             - M5-04: run the assessment API locally (uvicorn presentation.app:app on :8000; needs make migrate + setup-checkpointer + build-index and LLM_* in .env)"
+	@echo "  worker            - M5-05: run the assessment worker pool draining the Redis queue (ASSESSMENT_WORKER_CONCURRENCY workers; needs the same setup as serve + a running Redis)"
 	@echo "  migrate           - Apply Alembic migrations to the configured database"
 	@echo "  migrate-down      - Roll back the latest Alembic migration"
 	@echo "  setup-checkpointer - M4-09: run the LangGraph Postgres checkpointer's own migrations (its tables live outside Alembic); idempotent, acts on the same DATABASE_URL as make migrate"
@@ -98,6 +99,9 @@ check: lint format-check typecheck test
 
 serve:
 	PYTHONPATH=app/src uv run --group embed uvicorn presentation.app:app --reload --port 8000
+
+worker:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.run_assessment_worker
 
 migrate:
 	PYTHONPATH=app/src uv run alembic upgrade head

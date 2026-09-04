@@ -43,6 +43,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from application.assessment_job import JobStatus
 from application.assessment_record import AssessmentStatus
 from domain.chunk import ChunkRule
 from domain.clause_classification import ClauseType, TypeSource
@@ -278,6 +279,60 @@ class AssessmentRow(Base):
         Index("ix_assessment_claim_id", "claim_id"),
         Index("ix_assessment_status", "status"),
         Index("ix_assessment_created_at", "created_at"),
+    )
+
+
+class AssessmentJobRow(Base):
+    """One queued assessment run's lifecycle -- [M5-05].
+
+    The persistence representation of [application.assessment_job.AssessmentJob]:
+    the run state a caller polls (``pending`` -> ``running`` -> ``succeeded`` /
+    ``failed``) plus what a worker needs to rebuild the domain ``Claim`` after a
+    redelivery or a retry (``raw_text``, ``policy_ref``, and ``submitted_at`` --
+    stamped once at submission so a retry keeps the same loss-date baseline).
+
+    ``failure`` is ``JSONB`` (``kind`` / ``error_type`` / ``message`` /
+    ``failed_at``): a frozen value object read whole with the job, never queried
+    by field -- the same call as ``AuditEventRow.payload``. ``status`` is
+    ``TEXT`` + a named CHECK from ``JobStatus`` (chunk/assessment precedent -- no
+    native PG enums here). No FK to ``assessment``: the job row is created before
+    any assessment exists, and outlives a failed run that never produces one.
+    """
+
+    __tablename__ = "assessment_job"
+
+    assessment_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    claim_id: Mapped[str] = mapped_column(Text, nullable=False)
+
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # The SUSEP process the claim is filed against, canonical form -- or NULL when
+    # the submission carried none (intake extracts it from the narrative instead).
+    policy_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    failure: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            _in_clause("status", (member.value for member in JobStatus)),
+            name="status_valid",
+        ),
+        # `status` -- the worker scans for `pending`; `claim_id` -- what a human
+        # searches by (every run of one claim). `created_at` is not indexed:
+        # unlike `assessment`, jobs are not listed newest-first through the API.
+        Index("ix_assessment_job_status", "status"),
+        Index("ix_assessment_job_claim_id", "claim_id"),
     )
 
 

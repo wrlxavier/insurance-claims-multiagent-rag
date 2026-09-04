@@ -30,6 +30,12 @@ dependencies = [
     # server bits (uvloop, httptools, websockets, watchfiles for `--reload`).
     "fastapi>=0.128.0",
     "uvicorn[standard]>=0.34.0",
+    # [M5-05] the asynchronous-processing queue. `rq` is the sync Redis-backed
+    # worker queue (native Retry-with-backoff + FailedJobRegistry dead-letter);
+    # it pulls `redis` but we pin it directly since the queue adapter and the
+    # readiness checks import the client.
+    "rq>=2.0",
+    "redis>=5.0",
 ]
 
 [dependency-groups]

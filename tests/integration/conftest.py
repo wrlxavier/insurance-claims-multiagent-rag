@@ -3,6 +3,7 @@ from os import getenv
 from pathlib import Path
 
 import pytest
+import redis
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, MetaData
@@ -37,6 +38,28 @@ def postgres_database_url() -> str:
     if not database_url:
         pytest.skip("Set TEST_DATABASE_URL to run PostgreSQL integration tests.")
     return database_url
+
+
+@pytest.fixture(scope="session")
+def redis_url() -> str:
+    url = getenv("TEST_REDIS_URL")
+    if not url:
+        pytest.skip("Set TEST_REDIS_URL to run the assessment-queue integration tests.")
+    try:
+        redis.Redis.from_url(url).ping()
+    except redis.RedisError as exc:  # pragma: no cover - environment guard
+        pytest.skip(f"Redis at TEST_REDIS_URL is not reachable: {exc}")
+    return url
+
+
+@pytest.fixture
+def redis_connection(redis_url: str) -> Iterator[redis.Redis]:
+    """A flushed Redis connection -- each test starts with an empty queue."""
+    connection = redis.Redis.from_url(redis_url)
+    connection.flushdb()
+    yield connection
+    connection.flushdb()
+    connection.close()
 
 
 @pytest.fixture(scope="session")

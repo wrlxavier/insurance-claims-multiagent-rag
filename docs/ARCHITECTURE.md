@@ -859,7 +859,63 @@ LangGraph checkpointer) with a fake model and stub retriever: submit → 202 →
 runs the presentation unit tests.
 
 **Downstream.** [M5-05] replaces the synchronous 202 with a Redis queue and adds
-run-status states. [M5-06] adds `/ready`, JSON logging and correlation-id
-propagation. [M5-09] adds the Compose `api` service, the Dockerfile and the CI
-image build, and wires the proxy-header / trusted-host middleware from
+run-status states (below). [M5-06] adds `/ready`, JSON logging and correlation-id
+propagation. [M5-09] adds the Compose `api` / `worker` services, the Dockerfile
+and the CI image build, and wires the proxy-header / trusted-host middleware from
 `ObservabilitySettings`.
+
+---
+
+## Asynchronous assessment: an RQ/Redis queue behind a non-blocking 202 — [M5-05]
+
+**Decision.** `POST /v1/assessments` no longer runs the graph. `SubmitClaim`
+persists an `application.assessment_job.AssessmentJob` (`PENDING`) and enqueues
+it on an RQ queue; `RunAssessment` (a new use case) runs on
+`ASSESSMENT_WORKER_CONCURRENCY` workers (`make worker` / `scripts/run_assessment_worker.py`),
+drives the claim to the human checkpoint through the orchestrator port, and — on
+success — writes the `AssessmentRecord` and flips the job to `SUCCEEDED` in one
+transaction. New ports: `AssessmentQueue`, `AssessmentJobRepository` (added to
+`UnitOfWork`). New infra: `infrastructure/queue/` (the RQ adapter, the job
+function, the worker pool), `infrastructure/llm_errors.py` (the transient
+classifier), `infrastructure/bootstrap.py` (the heavy singletons, now shared by
+the API `lifespan` and the worker). `GET /v1/assessments/{id}` returns an
+`AssessmentReadModel` spanning the lifecycle. Full walkthrough:
+`docs/ASYNC_PROCESSING.md`.
+
+**Why RQ, and why a separate aggregate.** RQ is the sync Redis-backed queue the
+"reuse the queue pattern professionally" framing points at — native
+`Retry(interval=[…])` for backoff, `FailedJobRegistry` for the dead-letter, and
+`WorkerPool` for concurrency, with no second broker. The codebase is sync
+throughout (SQLAlchemy/psycopg3, `compiled.invoke`, sentence-transformers), so a
+sync worker is the honest shape. `AssessmentJob` is deliberately **not** part of
+`AssessmentRecord`: the record's invariants (non-empty verdict/prose, the
+≥1-citation projection) can't represent a claim that has not been assessed yet,
+and weakening them to bolt on a `PENDING` state would undo M5-01/02. Two
+aggregates, two tables; the read path composes them.
+
+**Why retry stays at the job boundary.** The transient/real split
+(`is_transient_llm_error` + RQ `Retry` + the `stop_retry_on_permanent` handler)
+lives entirely in the queue layer. The six per-node `_invoke_with_retry` helpers
+are untouched — they cover a mid-run blip (seconds); a sustained 429 now bubbles
+past them to the job, which backs off for minutes, which is what
+`docs/END_TO_END_EVALUATION.md` measured a rate limit needs. Keeping M4 node code
+out of scope also keeps the M4 eval baselines reproducible.
+
+**Deviations on record.** (a) `GET /v1/assessments` (list) stays record-only —
+queued/failed jobs are not in the collection; the per-id `GET` is "status
+tracking per assessment id". (b) `SubmitClaim` commits the job before enqueueing
+it, so a crash in that window leaves a `PENDING` job that is never picked up — a
+reconciler is left to operations. (c) The checkpointer connection is still
+per-call, not pooled (`docs/DATABASE.md` "the M5 shape"). (d) `compose.yaml`
+gains `redis`; the `api` / `worker` services and the Dockerfile are [M5-09].
+
+**Enforcement.** `tests/unit/application/use_cases/test_run_assessment.py` (the
+state machine), `test_submit_claim.py` (persist-then-enqueue),
+`tests/unit/infrastructure/test_llm_errors.py` (the classifier truth table),
+`tests/unit/infrastructure/queue/**` (the adapter and the retry gate),
+`tests/unit/infrastructure/database/test_assessment_job_mapper.py`.
+`tests/integration/test_assessment_job_repository.py` (real Postgres) and
+`tests/integration/test_assessment_queue.py` (real Postgres + real Redis: submit
+→ burst worker → completion, transient retry, dead-letter). `test_layer_boundaries.py`
+adds `rq` / `redis` to the forbidden roots. CI's `integration` job gains a
+`redis` service.

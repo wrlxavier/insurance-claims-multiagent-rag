@@ -1,7 +1,7 @@
 """Schema-level guarantees for the ORM models.
 
 ``chunk`` -- [M3-02]; ``audit_event`` -- [M4-09]; ``assessment`` /
-``human_decision`` -- [M5-03].
+``human_decision`` -- [M5-03]; ``assessment_job`` -- [M5-05].
 """
 
 import re
@@ -10,12 +10,14 @@ import pytest
 from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import CheckConstraint, DateTime, Table
 
+from application.assessment_job import JobStatus
 from application.assessment_record import AssessmentStatus
 from domain.chunk import ChunkRule
 from domain.clause_classification import ClauseType, TypeSource
 from domain.human_decision import DecisionOutcome
 from domain.verdict import Verdict
 from infrastructure.database.models import (
+    AssessmentJobRow,
     AssessmentRow,
     AuditEventRow,
     ChunkRow,
@@ -30,6 +32,7 @@ _CHUNK_TABLE = ChunkRow.metadata.tables["chunk"]
 _AUDIT_TABLE = AuditEventRow.metadata.tables["audit_event"]
 _ASSESSMENT_TABLE = AssessmentRow.metadata.tables["assessment"]
 _DECISION_TABLE = HumanDecisionRow.metadata.tables["human_decision"]
+_JOB_TABLE = AssessmentJobRow.metadata.tables["assessment_job"]
 
 _EXPECTED_INDEXES = {
     "ix_chunk_clause_type",
@@ -301,3 +304,44 @@ def test_human_decision_decided_at_is_timezone_aware() -> None:
     column_type = _DECISION_TABLE.c.decided_at.type
     assert isinstance(column_type, DateTime)
     assert column_type.timezone is True
+
+
+# --------------------------------------------------------------------------- #
+# assessment_job -- [M5-05]
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.unit
+def test_assessment_job_table_name_and_primary_key() -> None:
+    assert AssessmentJobRow.__tablename__ == "assessment_job"
+    assert [c.name for c in _JOB_TABLE.primary_key.columns] == ["assessment_id"]
+
+
+@pytest.mark.unit
+def test_assessment_job_status_check_matches_the_job_status_enum() -> None:
+    assert _check_constraint_values("ck_assessment_job_status_valid", _JOB_TABLE) == {
+        member.value for member in JobStatus
+    }
+
+
+@pytest.mark.unit
+def test_assessment_job_has_no_foreign_key_to_assessment() -> None:
+    # The job row exists before any assessment does, and a failed run keeps its
+    # job row without ever producing one.
+    assert list(_JOB_TABLE.foreign_keys) == []
+
+
+@pytest.mark.unit
+def test_assessment_job_timestamps_are_timezone_aware() -> None:
+    for name in ("submitted_at", "created_at", "updated_at"):
+        column_type = _JOB_TABLE.c[name].type
+        assert isinstance(column_type, DateTime)
+        assert column_type.timezone is True
+
+
+@pytest.mark.unit
+def test_assessment_job_indexes_status_and_claim_id() -> None:
+    assert {str(index.name) for index in _JOB_TABLE.indexes} == {
+        "ix_assessment_job_status",
+        "ix_assessment_job_claim_id",
+    }

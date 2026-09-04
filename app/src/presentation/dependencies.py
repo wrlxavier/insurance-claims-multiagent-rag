@@ -21,6 +21,7 @@ from typing import Annotated, cast
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 
+from application.ports.assessment_queue import AssessmentQueue
 from application.ports.claim_assessment_orchestrator import ClaimAssessmentOrchestrator
 from application.ports.clock import Clock
 from application.ports.unit_of_work import UnitOfWorkFactory
@@ -30,6 +31,7 @@ from application.use_cases.list_assessments import ListAssessments
 from application.use_cases.submit_claim import SubmitClaim
 from application.use_cases.submit_human_decision import SubmitHumanDecision
 from infrastructure.database import (
+    SqlAlchemyAssessmentJobRepository,
     SqlAlchemyAssessmentRepository,
     SqlAlchemyAuditTrailReader,
     SqlAlchemyClauseRepository,
@@ -41,6 +43,7 @@ class AppComponents:
     """The process-wide singletons the composition root builds once."""
 
     clock: Clock
+    queue: AssessmentQueue
     orchestrator: ClaimAssessmentOrchestrator
     uow_factory: UnitOfWorkFactory
     session_factory: sessionmaker[Session]
@@ -64,8 +67,13 @@ def get_clock(request: Request) -> Clock:
 
 
 def get_orchestrator(request: Request) -> ClaimAssessmentOrchestrator:
-    """The LangGraph-backed assessment orchestrator."""
+    """The LangGraph-backed assessment orchestrator (resume path)."""
     return _components(request).orchestrator
+
+
+def get_queue(request: Request) -> AssessmentQueue:
+    """The Redis-backed queue ``SubmitClaim`` hands a new job to."""
+    return _components(request).queue
 
 
 def get_uow_factory(request: Request) -> UnitOfWorkFactory:
@@ -81,20 +89,21 @@ def get_new_id(request: Request) -> Callable[[], str]:
 _Session = Annotated[Session, Depends(get_read_session)]
 _Clock = Annotated[Clock, Depends(get_clock)]
 _Orchestrator = Annotated[ClaimAssessmentOrchestrator, Depends(get_orchestrator)]
+_Queue = Annotated[AssessmentQueue, Depends(get_queue)]
 _UowFactory = Annotated[UnitOfWorkFactory, Depends(get_uow_factory)]
 _NewId = Annotated[Callable[[], str], Depends(get_new_id)]
 
 
 def get_submit_claim(
     clock: _Clock,
-    orchestrator: _Orchestrator,
+    queue: _Queue,
     uow_factory: _UowFactory,
     new_id: _NewId,
 ) -> SubmitClaim:
     """Wire ``SubmitClaim`` for one request."""
     return SubmitClaim(
         clock=clock,
-        orchestrator=orchestrator,
+        queue=queue,
         uow_factory=uow_factory,
         new_id=new_id,
     )
@@ -102,7 +111,10 @@ def get_submit_claim(
 
 def get_get_assessment(session: _Session) -> GetAssessment:
     """Wire ``GetAssessment`` for one request."""
-    return GetAssessment(assessments=SqlAlchemyAssessmentRepository(session))
+    return GetAssessment(
+        assessments=SqlAlchemyAssessmentRepository(session),
+        jobs=SqlAlchemyAssessmentJobRepository(session),
+    )
 
 
 def get_list_assessments(session: _Session) -> ListAssessments:
@@ -130,5 +142,6 @@ def get_get_audit_trail(session: _Session) -> GetAuditTrail:
     """Wire ``GetAuditTrail`` for one request."""
     return GetAuditTrail(
         assessments=SqlAlchemyAssessmentRepository(session),
+        jobs=SqlAlchemyAssessmentJobRepository(session),
         audit=SqlAlchemyAuditTrailReader(session),
     )

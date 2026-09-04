@@ -5,13 +5,19 @@ envelope, citations as structured objects. The graph stays entirely behind
 `ClaimAssessmentOrchestrator` — no route, schema or mapper imports LangGraph.
 
 ```
-POST   /v1/assessments                     submit a claim            -> 202 + id
-GET    /v1/assessments                      list, newest first       -> 200
-GET    /v1/assessments/{id}                 state + recommendation   -> 200
+POST   /v1/assessments                     submit a claim (queued)  -> 202 + id
+GET    /v1/assessments                      list completed, newest   -> 200
+GET    /v1/assessments/{id}                 lifecycle + recommendation -> 200
 POST   /v1/assessments/{id}/decision        approve / edit / reject  -> 200
 GET    /v1/assessments/{id}/audit           durable audit trail      -> 200
 GET    /health                              liveness                 -> 200
 ```
+
+Since [M5-05] the graph runs on a background worker, not in the request. `POST`
+persists a job and returns; `GET /v1/assessments/{id}` reports a lifecycle
+`status` — `pending` → `running` → `awaiting_review` (or `failed`) — and fills in
+the recommendation once it reaches `awaiting_review`. See
+[`ASYNC_PROCESSING.md`](ASYNC_PROCESSING.md).
 
 Code:
 
@@ -61,17 +67,28 @@ is missing. The checkpointer schema is probed at startup too.
 ```
 
 `202 Accepted`, `Location: /v1/assessments/<id>`, body `{"assessment_id": "<id>",
-"status": "awaiting_review"}`. The graph runs synchronously to the human
-checkpoint before the response returns (see *Findings*). `policy_ref` is
-prepended to the narrative as `[Apólice registrada: processo SUSEP …]` so intake
-extracts it and retrieval pre-filters on it.
+"status": "pending"}`. The claim is queued; a worker runs the graph. Poll
+`GET /v1/assessments/{id}`. `policy_ref` is stored on the job and prepended to the
+narrative as `[Apólice registrada: processo SUSEP …]` so intake extracts it and
+retrieval pre-filters on it.
 
-### `GET /v1/assessments/{id}` and `GET /v1/assessments`
+### `GET /v1/assessments/{id}`
 
-The full servable aggregate:
+The lifecycle view. While the run is queued or failed there is no
+recommendation yet — the verdict/prose/citation fields are `null` / `[]` and
+`error` carries the failure cause:
+
+```json
+{ "assessment_id": "...", "claim_id": "...", "status": "pending",
+  "error": null, "verdict": null, "citations": [], "is_grounded": false,
+  "created_at": "2026-09-04T12:00:00Z", "decision": null }
+```
+
+Once `status` reaches `awaiting_review` (or `decided`) it is the full aggregate:
 
 ```json
 { "assessment_id": "...", "claim_id": "...", "status": "awaiting_review",
+  "error": null,
   "verdict": "compatible", "reasoning": "...", "recommended_action": "...",
   "confidence": 0.72, "is_grounded": true,
   "citations": [ { "clause_id": "...", "document_id": "...",
@@ -85,8 +102,14 @@ The full servable aggregate:
   "decision": null }
 ```
 
-The collection endpoint takes `claim_id`, `status`, `limit` (>0, default 50) and
-`offset` (>=0), newest first.
+`status` is one of `pending`, `running`, `awaiting_review`, `decided`, `failed`.
+
+### `GET /v1/assessments`
+
+The collection endpoint lists **completed** assessments (`awaiting_review` /
+`decided`) — queued and failed jobs are not here. Takes `claim_id`, `status`
+(`awaiting_review` / `decided`), `limit` (>0, default 50) and `offset` (>=0),
+newest first.
 
 ### `POST /v1/assessments/{id}/decision`
 
@@ -140,29 +163,34 @@ Uniform envelope; `code` is stable, branch on it:
 | `invalid_susep_process` / `invalid_value_object` / `verdict_not_permitted` | 422 | a malformed `policy_ref` or `edited` payload |
 | `invalid_request` | 422 | an `edit` without a payload, a non-`edit` carrying one, bad paging |
 | `request_validation_error` | 422 | the body failed schema validation (`details.errors`) |
-| `orchestrator_contract_error` | 502 | `start` did not pause / `resume` did not finish |
+| `orchestrator_contract_error` | 502 | `resume` did not finish (a bad `start` is a `failed` job, not an error here) |
 | `internal_error` | 500 | anything unexpected — logged, no traceback in the body |
 
 ## Results
 
-`tests/integration/test_assessment_api.py` runs the whole flow against real
-Postgres (the assessment/decision/audit tables and the LangGraph checkpointer)
-with a canned-output model and a one-clause stub retriever: `POST` → 202 + id →
-`GET` shows `awaiting_review` + a `compatible` recommendation + a structured
-citation → `GET …/audit` is empty → `POST …/decision {approve}` → 200 `decided`
-→ `GET` shows the system verdict unchanged beside the decision → `GET …/audit`
-shows the trail ending in `human_review` / `human_decision:approve` with the
-decision in `payload`. A second decision returns 409. The `reject` and `edit`
-paths, the unknown-clause 422, the unknown-id 404, and the transactional fold
-(a `SELECT count(*) FROM audit_event` proving the trail committed with the
-`DECIDED` record) are covered too.
+`tests/integration/test_assessment_api.py` runs the decision flow against real
+Postgres (the assessment/decision/audit/job tables and the LangGraph
+checkpointer) with a canned-output model and a one-clause stub retriever. It
+stubs the [M5-05] queue with an *inline* one that runs `RunAssessment`
+synchronously on enqueue, so `POST` → `GET awaiting_review` + a `compatible`
+recommendation + a structured citation → `GET …/audit` is empty → `POST
+…/decision {approve}` → 200 `decided` → `GET` shows the system verdict unchanged
+beside the decision → `GET …/audit` ends in `human_review` /
+`human_decision:approve` with the decision in `payload`. A second decision
+returns 409. The `reject` and `edit` paths, the unknown-clause 422, the
+unknown-id 404, and the transactional fold (a `SELECT count(*) FROM audit_event`
+proving the trail committed with the `DECIDED` record) are covered too. The real
+Redis round-trip — submission → worker → completion, transient retry, dead-letter
+— is `tests/integration/test_assessment_queue.py` (see
+[`ASYNC_PROCESSING.md`](ASYNC_PROCESSING.md)).
 
 ## Findings
 
-1. **`POST` is synchronous behind its 202.** The handler blocks for the whole
-   graph run (minutes, many LLM calls). This is the interim: [M5-05] owns the
-   Redis queue and the `PENDING/RUNNING/FAILED` run states that make it truly
-   non-blocking. The 202 + `Location` contract does not change.
+1. **`POST` is non-blocking as of [M5-05].** It persists an `AssessmentJob` in
+   `pending` and enqueues it; a worker (`make worker`) runs the graph. `GET
+   /v1/assessments/{id}` reports `pending` → `running` → `awaiting_review` (or
+   `failed`, with the cause in `error`). Details, the retry/back-off policy and
+   the dead-letter path: [`ASYNC_PROCESSING.md`](ASYNC_PROCESSING.md).
 2. **The audit trail is empty before a decision.** By [M4-09] design the durable
    trail is written once, in `human_review`, after the analyst decides. `GET
    …/audit` on an `AWAITING_REVIEW` assessment is `200 {"entries": []}`, not a
@@ -181,12 +209,14 @@ paths, the unknown-clause 422, the unknown-id 404, and the transactional fold
 
 ## What this leaves for later
 
-- **[M5-05]** — Redis-backed queue, bounded concurrency, retry/back-off,
-  dead-letter, and the `PENDING/RUNNING/FAILED` run states behind a non-blocking
-  202.
+- **[M5-05] done** — Redis/RQ queue, `ASSESSMENT_WORKER_CONCURRENCY`,
+  retry-with-backoff on transient provider faults, dead-letter, and the
+  `pending` / `running` / `failed` lifecycle behind the non-blocking 202.
+  See [`ASYNC_PROCESSING.md`](ASYNC_PROCESSING.md).
 - **[M5-06]** — `GET /ready` with per-check detail, JSON logs to stdout, and
   correlation-id propagation from the request into every node and LLM call.
-- **[M5-09]** — the Compose `api` service, the Dockerfile, the CI image build,
-  and the proxy-header / trusted-host middleware from `ObservabilitySettings`.
+- **[M5-09]** — the Compose `api` / `worker` services, the Dockerfile, the CI
+  image build, and the proxy-header / trusted-host middleware from
+  `ObservabilitySettings`.
 - A pooled checkpointer connection (`docs/DATABASE.md` "the M5 shape") — the
   adapter opens one per `start` / `resume` today.

@@ -32,6 +32,10 @@ repos:
           - alembic>=1.19.1
           - pgvector>=0.5.0
           - tokenizers>=0.20
+          # [M5-05]: infrastructure/queue/* and infrastructure/llm_errors.py.
+          - rq>=2.0
+          - redis>=5.0
+          - openai>=3.0
   - repo: https://github.com/kynan/nbstripout
     rev: 0.9.1
     hooks:

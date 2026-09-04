@@ -4,6 +4,13 @@ SQLAlchemy models, repositories, session management, and the pgvector
 integration.
 """
 
+from infrastructure.database.assessment_job_mapper import (
+    job_to_row,
+    row_to_job,
+)
+from infrastructure.database.assessment_job_repository import (
+    SqlAlchemyAssessmentJobRepository,
+)
 from infrastructure.database.assessment_mapper import (
     record_to_rows,
     rows_to_record,
@@ -27,6 +34,7 @@ from infrastructure.database.chunk_repository import (
 from infrastructure.database.clause_repository import SqlAlchemyClauseRepository
 from infrastructure.database.graph_audit_sink import SqlAlchemyAuditTrailSink
 from infrastructure.database.models import (
+    AssessmentJobRow,
     AssessmentRow,
     AuditEventRow,
     ChunkRow,
@@ -44,11 +52,13 @@ from infrastructure.database.unit_of_work import (
 )
 
 __all__ = [
+    "AssessmentJobRow",
     "AssessmentRow",
     "AuditEventRow",
     "Base",
     "ChunkRow",
     "HumanDecisionRow",
+    "SqlAlchemyAssessmentJobRepository",
     "SqlAlchemyAssessmentRepository",
     "SqlAlchemyAuditTrailReader",
     "SqlAlchemyAuditTrailSink",
@@ -63,7 +73,9 @@ __all__ = [
     "create_session_factory",
     "fetch_chunks_missing_embedding",
     "is_database_reachable",
+    "job_to_row",
     "record_to_rows",
+    "row_to_job",
     "rows_to_record",
     "sqlalchemy_unit_of_work_factory",
     "upsert_chunks",

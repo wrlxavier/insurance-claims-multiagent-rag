@@ -1,12 +1,17 @@
 """The assessment API over the full stack -- [M5-04].
 
-Real Postgres (the assessment / decision / audit tables and the LangGraph
+Real Postgres (the assessment / decision / audit / job tables and the LangGraph
 Postgres checkpointer), the real use cases, the real orchestrator adapter and
 its capturing sink -- only the LLM and the retriever are faked
 (``tests/integration/_checkpoint_fakes.build_fake_context``: a canned-output
-model and a one-clause stub retriever). Proves the DoD end to end: submit ->
-202 + id, read state/recommendation/citations, submit a decision and observe the
-resumed run, read the audit trail.
+model and a one-clause stub retriever). Proves the M5-04 DoD: submit -> 202 + id,
+read state/recommendation/citations, submit a decision and observe the resumed
+run, read the audit trail.
+
+The [M5-05] queue is stubbed with an *inline* queue that runs ``RunAssessment``
+synchronously on ``enqueue`` -- these tests are about the decision / resume /
+audit-fold path, not the queue. ``tests/integration/test_assessment_queue.py``
+exercises the real Redis round-trip.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session, sessionmaker
 
+from application.use_cases.run_assessment import RunAssessment
 from infrastructure.clock import SystemClock
 from infrastructure.database import (
     create_engine_from_database_url,
@@ -75,19 +81,40 @@ def _seed_stub_clause(session: Session) -> None:
     session.commit()
 
 
+class _InlineQueue:
+    """Runs the assessment synchronously on ``enqueue`` (no worker, no Redis)."""
+
+    def __init__(self, run: RunAssessment) -> None:
+        self._run = run
+
+    def enqueue(self, assessment_id: str) -> None:
+        self._run(assessment_id)
+
+
 def _test_lifespan(database_url: str, session_factory: sessionmaker[Session]) -> object:
     ids = (f"it-{n}" for n in itertools.count(1))
+    orchestrator = LangGraphClaimAssessmentOrchestrator(
+        context_factory=lambda _session: build_fake_context(),
+        session_factory=session_factory,
+        database_url=database_url,
+    )
+    uow_factory = sqlalchemy_unit_of_work_factory(session_factory)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.components = AppComponents(
             clock=SystemClock(),
-            orchestrator=LangGraphClaimAssessmentOrchestrator(
-                context_factory=lambda _session: build_fake_context(),
-                session_factory=session_factory,
-                database_url=database_url,
+            queue=_InlineQueue(
+                RunAssessment(
+                    clock=SystemClock(),
+                    orchestrator=orchestrator,
+                    uow_factory=uow_factory,
+                    is_transient=lambda _exc: False,
+                    max_attempts=1,
+                )
             ),
-            uow_factory=sqlalchemy_unit_of_work_factory(session_factory),
+            orchestrator=orchestrator,
+            uow_factory=uow_factory,
             session_factory=session_factory,
             new_id=lambda: next(ids),
         )
