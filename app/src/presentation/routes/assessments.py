@@ -2,13 +2,14 @@
 
 Five routes over the four use cases:
 
-- ``POST /v1/assessments`` -> ``SubmitClaim``. Returns **202** with the id in the
-  body and in ``Location``. The graph runs synchronously in the handler for now
-  (minutes, LLM calls); [M5-05]'s queue makes it truly non-blocking and adds
-  ``PENDING/RUNNING/FAILED`` run states.
-- ``GET /v1/assessments`` -> ``ListAssessments`` (newest first).
-- ``GET /v1/assessments/{id}`` -> ``GetAssessment`` (state, recommendation,
-  structured citations).
+- ``POST /v1/assessments`` -> ``SubmitClaim``. Persists a ``pending`` job,
+  enqueues it, returns **202** with the id in the body and in ``Location``. The
+  graph runs later on a worker ([M5-05]).
+- ``GET /v1/assessments`` -> ``ListAssessments`` (completed assessments, newest
+  first -- queued/failed jobs are not listed here).
+- ``GET /v1/assessments/{id}`` -> ``GetAssessment``. The lifecycle view:
+  ``pending`` / ``running`` / ``failed`` while the run is in flight, then the
+  recommendation and structured citations once ``awaiting_review``.
 - ``POST /v1/assessments/{id}/decision`` -> ``SubmitHumanDecision``. Resumes the
   paused run and returns the settled record (200 -- the resume completes).
 - ``GET /v1/assessments/{id}/audit`` -> ``GetAuditTrail``. Empty until a decision
@@ -24,6 +25,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response
 
+from application.assessment_read_model import AssessmentReadModel
 from application.assessment_record import AssessmentStatus
 from application.use_cases.get_assessment import GetAssessment
 from application.use_cases.get_audit_trail import GetAuditTrail
@@ -71,16 +73,17 @@ def submit_claim(
     response: Response,
     use_case: _SubmitClaim,
 ) -> SubmitClaimResponse:
-    """Accept a claim, run it to the human checkpoint, return 202 + the id."""
-    record = use_case(
+    """Accept a claim, queue it for assessment, return 202 + the id.
+
+    The graph runs later on a worker ([M5-05]); poll ``GET /v1/assessments/{id}``.
+    """
+    job = use_case(
         raw_text=body.raw_text,
         policy_ref=to_policy_ref(body.policy_ref),
         claim_id=body.claim_id,
     )
-    response.headers["Location"] = f"/v1/assessments/{record.assessment_id}"
-    return SubmitClaimResponse(
-        assessment_id=record.assessment_id, status=record.status.value
-    )
+    response.headers["Location"] = f"/v1/assessments/{job.assessment_id}"
+    return SubmitClaimResponse(assessment_id=job.assessment_id, status="pending")
 
 
 @router.get("", response_model=list[AssessmentResponse])
@@ -98,7 +101,10 @@ def list_assessments(
         limit=limit,
         offset=offset,
     )
-    return [assessment_response(record) for record in records]
+    return [
+        assessment_response(AssessmentReadModel.from_record(record))
+        for record in records
+    ]
 
 
 @router.get("/{assessment_id}", response_model=AssessmentResponse)
@@ -106,7 +112,7 @@ def get_assessment(
     assessment_id: str,
     use_case: _GetAssessment,
 ) -> AssessmentResponse:
-    """Return one assessment's state, recommendation and citations."""
+    """Return one assessment's lifecycle state -- and its recommendation once ready."""
     return assessment_response(use_case(assessment_id))
 
 
@@ -123,7 +129,7 @@ def submit_decision(
         notes=body.notes,
         edited=edited_from_request(body),
     )
-    return assessment_response(record)
+    return assessment_response(AssessmentReadModel.from_record(record))
 
 
 @router.get("/{assessment_id}/audit", response_model=AuditTrailResponse)

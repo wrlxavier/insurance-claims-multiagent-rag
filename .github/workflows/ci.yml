@@ -82,8 +82,21 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        # [M5-05]: the assessment queue's integration test does a real Redis
+        # round-trip. Same major as compose.yaml.
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/insurance_claims_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379/0
 
     steps:
       - name: Checkout

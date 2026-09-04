@@ -10,6 +10,7 @@ from datetime import timedelta
 
 import pytest
 
+from application.assessment_job import JobStatus
 from application.assessment_record import AssessmentRecord, AssessmentStatus
 from domain.citation import Citation
 from domain.clause_classification import ClauseType
@@ -22,6 +23,7 @@ from tests.unit.application.fakes import (
     FakeClaimAssessmentOrchestrator,
     make_audit_entry,
     make_citation,
+    make_job,
     make_orchestrator_result,
     make_policy_clause,
     make_record,
@@ -36,7 +38,7 @@ _CANONICAL_SUSEP = "15414.610650/2024-59"
 # --------------------------------------------------------------------------- #
 
 
-def test_submit_claim_returns_202_with_id_and_location(harness: Harness) -> None:
+def test_submit_claim_returns_202_pending_and_enqueues(harness: Harness) -> None:
     response = harness.client.post(
         "/v1/assessments", json={"raw_text": "Bati o carro."}
     )
@@ -44,10 +46,13 @@ def test_submit_claim_returns_202_with_id_and_location(harness: Harness) -> None
     assert response.status_code == 202
     body = response.json()
     assessment_id = body["assessment_id"]
-    assert body["status"] == "awaiting_review"
+    assert body["status"] == "pending"
     assert response.headers["location"] == f"/v1/assessments/{assessment_id}"
-    stored = harness.store[assessment_id]
-    assert stored.status is AssessmentStatus.AWAITING_REVIEW
+    stored = harness.job_store[assessment_id]
+    assert stored.status is JobStatus.PENDING
+    assert harness.queue.enqueued == [assessment_id]
+    # nothing ran -- no record yet
+    assert harness.store == {}
 
 
 def test_submit_claim_empty_narrative_is_422_validation(harness: Harness) -> None:
@@ -66,24 +71,47 @@ def test_submit_claim_bad_policy_ref_is_422(harness: Harness) -> None:
     assert response.json()["error"]["code"] == "invalid_susep_process"
 
 
-def test_submit_claim_threads_policy_ref_into_the_claim(harness: Harness) -> None:
-    harness.client.post(
+def test_submit_claim_stores_policy_ref_on_the_job(harness: Harness) -> None:
+    body = harness.client.post(
         "/v1/assessments", json={"raw_text": "x", "policy_ref": _CANONICAL_SUSEP}
+    ).json()
+
+    job = harness.job_store[body["assessment_id"]]
+    assert job.policy_ref == SusepProcess(_CANONICAL_SUSEP).value
+
+
+def test_get_pending_assessment_reads_as_pending(harness: Harness) -> None:
+    harness.job_store["a1"] = make_job(assessment_id="a1")
+
+    body = harness.client.get("/v1/assessments/a1").json()
+
+    assert body["status"] == "pending"
+    assert body["verdict"] is None
+    assert body["citations"] == []
+    assert body["error"] is None
+
+
+def test_get_failed_assessment_carries_the_cause(harness: Harness) -> None:
+    from datetime import UTC, datetime
+
+    from application.assessment_job import JobFailure
+
+    harness.job_store["a1"] = make_job(
+        assessment_id="a1",
+        status=JobStatus.FAILED,
+        attempts=3,
+        failure=JobFailure(
+            kind="permanent",
+            error_type="ValueError",
+            message="the claim narrative could not be parsed",
+            failed_at=datetime(2026, 9, 4, tzinfo=UTC),
+        ),
     )
 
-    _, claim = harness.orchestrator.started[0]
-    assert claim.policy_ref == SusepProcess(_CANONICAL_SUSEP)
+    body = harness.client.get("/v1/assessments/a1").json()
 
-
-def test_submit_claim_orchestrator_not_pausing_is_502(harness: Harness) -> None:
-    harness.orchestrator = FakeClaimAssessmentOrchestrator(
-        start_result=make_orchestrator_result(awaiting_review=False)
-    )
-
-    response = harness.client.post("/v1/assessments", json={"raw_text": "x"})
-
-    assert response.status_code == 502
-    assert response.json()["error"]["code"] == "orchestrator_contract_error"
+    assert body["status"] == "failed"
+    assert body["error"] == "the claim narrative could not be parsed"
 
 
 # --------------------------------------------------------------------------- #
@@ -394,8 +422,11 @@ def test_error_envelope_shape(harness: Harness, path: str) -> None:
 
 
 def test_unexpected_error_is_logged_500_without_traceback(harness: Harness) -> None:
-    boom = RuntimeError("kaboom")
-    harness.orchestrator = FakeClaimAssessmentOrchestrator(raise_on_start=boom)
+    class _BrokenQueue:
+        def enqueue(self, assessment_id: str) -> None:
+            raise RuntimeError("kaboom")
+
+    harness.queue = _BrokenQueue()  # type: ignore[assignment]
 
     response = harness.client.post("/v1/assessments", json={"raw_text": "x"})
 

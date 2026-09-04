@@ -64,3 +64,22 @@ class OrchestratorContractError(ApplicationError):
     that breaks either is an adapter bug, surfaced here rather than silently
     persisted.
     """
+
+
+class AssessmentRunError(ApplicationError):
+    """Base for a background assessment run that did not complete [M5-05].
+
+    ``RunAssessment`` raises one of the two subclasses so the queue layer can
+    tell a retryable failure from a dead-letter one without re-classifying the
+    cause: ``TransientAssessmentError`` -> RQ retries with backoff;
+    ``PermanentAssessmentError`` -> straight to the dead-letter. The original
+    exception is always chained (``raise ... from cause``).
+    """
+
+
+class TransientAssessmentError(AssessmentRunError):
+    """A run failed on a transient provider fault -- a rate limit, a 5xx, a drop."""
+
+
+class PermanentAssessmentError(AssessmentRunError):
+    """A run failed on a real error -- a bad claim, a contract breach, a bug."""

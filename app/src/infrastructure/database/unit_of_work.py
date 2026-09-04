@@ -16,9 +16,13 @@ from types import TracebackType
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from application.ports.assessment_job_repository import AssessmentJobRepository
 from application.ports.assessment_repository import AssessmentRepository
 from application.ports.audit_trail_writer import AuditTrailWriter
 from application.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
+from infrastructure.database.assessment_job_repository import (
+    SqlAlchemyAssessmentJobRepository,
+)
 from infrastructure.database.assessment_repository import SqlAlchemyAssessmentRepository
 from infrastructure.database.audit_trail_writer import SqlAlchemyAuditTrailWriter
 
@@ -30,6 +34,7 @@ class SqlAlchemyUnitOfWork:
     # the `UnitOfWork` protocol (matching `tests/unit/application/fakes.py`).
     assessments: AssessmentRepository
     audit: AuditTrailWriter
+    jobs: AssessmentJobRepository
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         """Bind the unit to a session factory; the session opens on ``__enter__``."""
@@ -43,6 +48,7 @@ class SqlAlchemyUnitOfWork:
         self._committed = False
         self.assessments = SqlAlchemyAssessmentRepository(self._session)
         self.audit = SqlAlchemyAuditTrailWriter(self._session)
+        self.jobs = SqlAlchemyAssessmentJobRepository(self._session)
         return self
 
     def __exit__(

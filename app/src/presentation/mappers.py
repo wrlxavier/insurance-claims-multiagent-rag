@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from application.assessment_record import AssessmentRecord
+from application.assessment_read_model import AssessmentReadModel
 from application.audit_trail_entry import AuditTrailEntry
 from application.consistency_flag import ConsistencyFlag
 from application.edited_assessment_input import EditedAssessmentInput
@@ -80,12 +80,25 @@ def _decision_schema(decision: HumanDecision) -> HumanDecisionSchema:
     )
 
 
-def assessment_response(record: AssessmentRecord) -> AssessmentResponse:
-    """Render an ``AssessmentRecord`` as the API response model."""
+def assessment_response(model: AssessmentReadModel) -> AssessmentResponse:
+    """Render the lifecycle view as the API response model.
+
+    A ``pending`` / ``running`` / ``failed`` model has no ``record`` yet -- the
+    recommendation fields stay at their defaults and ``error`` carries the cause.
+    """
+    record = model.record
+    if record is None:
+        return AssessmentResponse(
+            assessment_id=model.assessment_id,
+            claim_id=model.claim_id,
+            status=model.status,
+            error=model.error,
+            created_at=model.created_at,
+        )
     return AssessmentResponse(
         assessment_id=record.assessment_id,
         claim_id=record.claim_id,
-        status=record.status.value,
+        status=model.status,
         verdict=record.verdict.value,
         reasoning=record.reasoning,
         recommended_action=record.recommended_action,

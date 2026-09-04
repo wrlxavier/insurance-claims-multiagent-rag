@@ -27,9 +27,9 @@ make setup-checkpointer
 `make setup-checkpointer` is the second half of the schema, and it is separate
 for a reason — see "The checkpointer owns its own schema" below.
 
-`compose.yaml` currently holds one service. [M5-09] adds `api`, `redis`
-and `langfuse` to that same file; the Postgres block is written so they are
-appended rather than requiring it to be rewritten.
+`compose.yaml` holds `postgres` and — since [M5-05] — `redis` (the async
+assessment queue). [M5-09] adds `api`, `worker` and `langfuse` to the same file;
+every block is written so they are appended rather than requiring a rewrite.
 
 Roll a migration back with `make migrate-down` (one step). Both targets read
 the same settings loader the application does, so they act on whatever
@@ -293,8 +293,10 @@ before building the API).
 `LangGraphClaimAssessmentOrchestrator.start` / `.resume` each open
 `open_claim_checkpointer` (its own autocommit psycopg connection) and a fresh
 SQLAlchemy session for the run, then close both. Concurrent API requests never
-share either. A pooled connection (`ConnectionPool`) is still the M5 shape; the
-[M5-05] worker model revisits it. On `resume`, the `human_review` node's audit
+share either. A pooled connection (`ConnectionPool`) is still the M5 shape;
+[M5-05] moved the graph run onto a worker but did **not** pool the checkpointer —
+each `RunAssessment` still opens its own, one per job. On `resume`, the
+`human_review` node's audit
 write no longer commits on its own — the orchestrator captures the trail and
 `SubmitHumanDecision` writes it through `UnitOfWork.audit`
 (`append_audit_entries`, same `ON CONFLICT DO NOTHING` insert path) in the same
@@ -371,6 +373,27 @@ existing `chunk` table, reassembling a clause from every row whose
 `display_text` in `chunk_index` order). This is the same reconstruction
 `infrastructure.rag.graph_retrieval_adapter.build_clause_index` does, and the
 id it matches is the one a `Citation` carries.
+
+## The assessment_job table ([M5-05])
+
+`AssessmentJobRow` (`models.py`) is the persistence side of
+`application.assessment_job.AssessmentJob` — the queued-run lifecycle a caller
+polls. Migration `20260904_01`; mapper in
+`infrastructure.database.assessment_job_mapper`.
+
+- Column per field. `status` is `TEXT` + a named `CHECK` against `JobStatus`
+  (`pending` / `running` / `succeeded` / `failed`), tied back to the enum by
+  `test_models.py`. `failure` is `JSONB` (`kind` / `error_type` / `message` /
+  `failed_at`) — a frozen value object, read whole, same reasoning as
+  `assessment.citations`. `raw_text` / `policy_ref` / `submitted_at` are what a
+  worker needs to rebuild the domain `Claim` after a retry or a redelivery;
+  `submitted_at` is stamped once so a retry keeps the same loss-date baseline.
+- Indexed on `status` (the worker scans for `pending`) and `claim_id` (what a
+  human searches by). Not on `created_at` — jobs are not listed newest-first.
+- **No foreign key to `assessment`.** The job row is created before any
+  assessment exists, and a `failed` run keeps its job row without ever producing
+  one. The worker's success path writes the `assessment` row and flips the job to
+  `succeeded` in **one** transaction (`SqlAlchemyUnitOfWork.jobs`).
 
 ## Append-only enforcement ([M5-03])
 

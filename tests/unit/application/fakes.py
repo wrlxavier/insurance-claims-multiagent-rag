@@ -7,10 +7,12 @@ No mock library, no LLM, no database, no graph. Every use-case test in
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 
+from application.assessment_job import AssessmentJob, JobStatus
 from application.assessment_record import AssessmentRecord, AssessmentStatus
 from application.audit_trail_entry import AuditTrailEntry
 from application.consistency_flag import ConsistencyFlag
 from application.orchestrator_result import OrchestratorResult
+from application.ports.assessment_job_repository import AssessmentJobRepository
 from application.ports.assessment_repository import AssessmentRepository
 from application.ports.audit_trail_writer import AuditTrailWriter
 from application.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
@@ -112,6 +114,23 @@ def make_audit_entry(**overrides: object) -> AuditTrailEntry:
     }
     fields.update(overrides)
     return AuditTrailEntry(**fields)  # type: ignore[arg-type]
+
+
+def make_job(**overrides: object) -> AssessmentJob:
+    fields: dict[str, object] = {
+        "assessment_id": "assessment-1",
+        "claim_id": "claim-1",
+        "raw_text": "Bati o carro na traseira de outro veiculo.",
+        "policy_ref": None,
+        "submitted_at": FIXED_NOW,
+        "status": JobStatus.PENDING,
+        "attempts": 0,
+        "created_at": FIXED_NOW,
+        "updated_at": FIXED_NOW,
+        "failure": None,
+    }
+    fields.update(overrides)
+    return AssessmentJob(**fields)  # type: ignore[arg-type]
 
 
 def make_record(**overrides: object) -> AssessmentRecord:
@@ -236,7 +255,38 @@ class InMemoryAssessmentRepository:
         return tuple(rows[offset : offset + limit])
 
 
+class InMemoryAssessmentJobRepository:
+    """A job store over a shared dict (so a UoW can snapshot it)."""
+
+    def __init__(self, store: dict[str, AssessmentJob]) -> None:
+        self._store = store
+
+    def add(self, job: AssessmentJob) -> None:
+        if job.assessment_id in self._store:
+            raise KeyError(f"assessment job {job.assessment_id!r} already exists")
+        self._store[job.assessment_id] = job
+
+    def update(self, job: AssessmentJob) -> None:
+        if job.assessment_id not in self._store:
+            raise KeyError(f"assessment job {job.assessment_id!r} does not exist")
+        self._store[job.assessment_id] = job
+
+    def get(self, assessment_id: str) -> AssessmentJob | None:
+        return self._store.get(assessment_id)
+
+
+class FakeAssessmentQueue:
+    """Records every ``enqueue`` call instead of touching Redis."""
+
+    def __init__(self) -> None:
+        self.enqueued: list[str] = []
+
+    def enqueue(self, assessment_id: str) -> None:
+        self.enqueued.append(assessment_id)
+
+
 AuditStore = dict[str, list[AuditTrailEntry]]
+JobStore = dict[str, AssessmentJob]
 
 
 class InMemoryAuditTrailWriter:
@@ -277,22 +327,27 @@ class InMemoryAuditTrailReader:
 
 
 class InMemoryUnitOfWork:
-    """A transaction with real rollback: it snapshots both stores on entry."""
+    """A transaction with real rollback: it snapshots every store on entry."""
 
     assessments: AssessmentRepository
     audit: AuditTrailWriter
+    jobs: AssessmentJobRepository
 
     def __init__(
         self,
         store: dict[str, AssessmentRecord],
         audit_store: AuditStore | None = None,
+        job_store: JobStore | None = None,
     ) -> None:
         self._store = store
         self._audit_store: AuditStore = {} if audit_store is None else audit_store
+        self._job_store: JobStore = {} if job_store is None else job_store
         self.assessments = InMemoryAssessmentRepository(store)
         self.audit = InMemoryAuditTrailWriter(self._audit_store)
+        self.jobs = InMemoryAssessmentJobRepository(self._job_store)
         self._snapshot: dict[str, AssessmentRecord] | None = None
         self._audit_snapshot: AuditStore | None = None
+        self._job_snapshot: JobStore | None = None
         self.committed = False
 
     def __enter__(self) -> "UnitOfWork":
@@ -300,6 +355,7 @@ class InMemoryUnitOfWork:
         self._audit_snapshot = {
             thread: list(trail) for thread, trail in self._audit_store.items()
         }
+        self._job_snapshot = dict(self._job_store)
         self.committed = False
         return self
 
@@ -308,6 +364,7 @@ class InMemoryUnitOfWork:
             self.rollback()
         self._snapshot = None
         self._audit_snapshot = None
+        self._job_snapshot = None
 
     def commit(self) -> None:
         self.committed = True
@@ -319,16 +376,21 @@ class InMemoryUnitOfWork:
         if self._audit_snapshot is not None:
             self._audit_store.clear()
             self._audit_store.update(self._audit_snapshot)
+        if self._job_snapshot is not None:
+            self._job_store.clear()
+            self._job_store.update(self._job_snapshot)
 
 
 def make_uow_factory(
     store: dict[str, AssessmentRecord],
     audit_store: AuditStore | None = None,
+    job_store: JobStore | None = None,
 ) -> UnitOfWorkFactory:
     shared_audit: AuditStore = {} if audit_store is None else audit_store
+    shared_jobs: JobStore = {} if job_store is None else job_store
 
     def _open() -> InMemoryUnitOfWork:
-        return InMemoryUnitOfWork(store, shared_audit)
+        return InMemoryUnitOfWork(store, shared_audit, shared_jobs)
 
     return _open
 

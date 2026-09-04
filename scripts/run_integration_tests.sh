@@ -30,6 +30,13 @@ if [[ -z "${TEST_DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
+# [M5-05]: the queue integration test needs a real Redis. Same .env fallback as
+# above; the test skips (rather than fails) when it is unset.
+if [[ -z "${TEST_REDIS_URL:-}" && -f .env ]]; then
+  TEST_REDIS_URL="$(grep -m1 -E '^TEST_REDIS_URL=' .env | cut -d= -f2-)"
+fi
+export TEST_REDIS_URL="${TEST_REDIS_URL:-redis://localhost:6379/0}"
+
 # Exported, not just set: the test fixtures read TEST_DATABASE_URL from the
 # environment and skip when it is absent.
 export TEST_DATABASE_URL

@@ -1,10 +1,10 @@
-# Local database for development and integration tests.
+# Local infrastructure for development and integration tests.
 #
-# [M0-08] brings up the database *capability* only. [M5-09] adds the api,
-# redis and langfuse services to this same file -- the service block below is
-# self-contained and reads its configuration from the same `${DATABASE_*}`
-# variables those services will, so they are appended rather than requiring a
-# rewrite.
+# [M0-08] brought up the database. [M5-05] adds `redis` -- the asynchronous
+# assessment queue (`make worker`) needs it, and so does `make test-integration`.
+# [M5-09] still adds the `api` / `worker` / `langfuse` services (once there is a
+# Dockerfile to run them from). Every block reads its configuration from the same
+# `${...}` variables those services will, so they are appended, not rewritten.
 services:
   postgres:
     # Postgres major and pgvector version are both explicit: the floating
@@ -31,6 +31,21 @@ services:
         ]
       interval: 5s
       timeout: 5s
+      retries: 12
+
+  redis:
+    # Pinned major like postgres above. The queue is transient work state, not a
+    # store of record: persistence is disabled so a restart is a clean slate.
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      # `make worker` and pytest connect from the host.
+      - ${REDIS_PORT:-6379}:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 12
 
 volumes:

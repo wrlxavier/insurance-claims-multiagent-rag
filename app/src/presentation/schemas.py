@@ -23,6 +23,10 @@ from pydantic import BaseModel, Field
 
 _VERDICTS = Literal["compatible", "incompatible", "insufficient_information"]
 _DECISIONS = Literal["approve", "edit", "reject"]
+# The lifecycle a caller polls ([M5-05]): `pending` / `running` while the queued
+# run is in flight, `failed` if it dead-lettered, then `awaiting_review` /
+# `decided` once the graph has produced a recommendation.
+_READ_STATUS = Literal["pending", "running", "awaiting_review", "decided", "failed"]
 
 
 class CitationSchema(BaseModel):
@@ -66,21 +70,28 @@ class HumanDecisionSchema(BaseModel):
 
 
 class AssessmentResponse(BaseModel):
-    """One claim's assessment across its whole lifecycle -- the servable aggregate."""
+    """One claim's assessment across its whole lifecycle -- the servable view.
+
+    While the run is still ``pending`` / ``running`` (or has ``failed``), no
+    recommendation exists yet: the verdict/prose/citation fields are ``null`` /
+    empty and ``error`` carries the failure cause. They are populated once
+    ``status`` reaches ``awaiting_review``.
+    """
 
     assessment_id: str
     claim_id: str
-    status: Literal["awaiting_review", "decided"]
-    verdict: _VERDICTS
-    reasoning: str
-    recommended_action: str
-    confidence: float
-    citations: list[CitationSchema]
-    consistency_flags: list[ConsistencyFlagSchema]
-    context_sufficient: bool | None
-    clarification_exhausted: bool
-    missing_information: list[str]
-    is_grounded: bool
+    status: _READ_STATUS
+    error: str | None = None
+    verdict: _VERDICTS | None = None
+    reasoning: str | None = None
+    recommended_action: str | None = None
+    confidence: float | None = None
+    citations: list[CitationSchema] = Field(default_factory=list)
+    consistency_flags: list[ConsistencyFlagSchema] = Field(default_factory=list)
+    context_sufficient: bool | None = None
+    clarification_exhausted: bool = False
+    missing_information: list[str] = Field(default_factory=list)
+    is_grounded: bool = False
     created_at: datetime
     decision: HumanDecisionSchema | None = None
 
@@ -129,10 +140,14 @@ class SubmitClaimRequest(BaseModel):
 
 
 class SubmitClaimResponse(BaseModel):
-    """The 202 body of ``POST /v1/assessments``; the id also rides in ``Location``."""
+    """The 202 body of ``POST /v1/assessments``; the id also rides in ``Location``.
+
+    ``status`` is ``pending`` -- the run is queued. Poll ``GET /v1/assessments/{id}``
+    for ``running`` -> ``awaiting_review`` (or ``failed``).
+    """
 
     assessment_id: str
-    status: Literal["awaiting_review", "decided"]
+    status: _READ_STATUS
 
 
 class CitationInput(BaseModel):

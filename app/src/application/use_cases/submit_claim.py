@@ -1,31 +1,33 @@
-"""Use case: submit a claim for assessment [M5-02].
+"""Use case: submit a claim for assessment [M5-02, M5-05].
 
-Behind ``POST /v1/assessments`` ([M5-04]). It mints the identifiers, builds the
-domain ``Claim`` (whose construction validates the narrative and the
-timestamp), runs it through the orchestrator up to the human checkpoint, and
-persists the result as an ``AssessmentRecord`` in status ``AWAITING_REVIEW``.
+Behind ``POST /v1/assessments``. It mints the identifiers, builds the domain
+``Claim`` (whose construction validates the narrative and the timestamp),
+persists an ``AssessmentJob`` in ``PENDING``, and hands it to the queue -- then
+returns. The graph runs later, on a worker (``RunAssessment``), behind the 202.
 
 Two identifiers, minted separately: a ``claim_id`` (the narrative) and an
 ``assessment_id`` (this run of it). Re-submitting the same claim is a fresh
-``assessment_id`` -- a second run, a second record.
+``assessment_id`` -- a second run, a second job.
 
-The orchestrator runs *before* the transaction opens: the graph is a long call
-and must not hold a database transaction open, and it must pause at the
-checkpoint before there is anything worth persisting. A failure to persist after
-the graph has paused leaves the run recoverable from its checkpoint but without
-a record. Nothing folds that window shut on the ``start`` path -- the graph
-pauses before it writes any audit trail, so there is no second write to share a
-transaction with, and the checkpoint itself is a separate connection. [M5-05]'s
-run-status tracking closes it; the [M5-04] fold is on the ``resume`` path, in
-``SubmitHumanDecision``.
+[M5-05] changed the shape: M5-04's version ran ``orchestrator.start`` inline
+before responding (a multi-minute call held in the request handler). Now the only
+synchronous work is a single-row insert. ``submitted_at`` is stamped here, once,
+and stored on the job so a retry re-runs the graph against the *same* loss-date
+baseline the consistency checks compare against.
+
+The job is committed *before* it is enqueued: a consumer polling
+``GET /v1/assessments/{id}`` must always find the row. The reverse would leave a
+window where the id is queued but unreadable. The residual window -- committed but
+never enqueued, e.g. Redis is down between the commit and the ``enqueue`` call --
+leaves the job ``PENDING`` forever; a reconciler that re-enqueues stale
+``PENDING`` jobs is left to operations (noted in ``docs/ASYNC_PROCESSING.md``).
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from application.assessment_record import AssessmentRecord, AssessmentStatus
-from application.errors import OrchestratorContractError
-from application.ports.claim_assessment_orchestrator import ClaimAssessmentOrchestrator
+from application.assessment_job import AssessmentJob, JobStatus
+from application.ports.assessment_queue import AssessmentQueue
 from application.ports.clock import Clock
 from application.ports.unit_of_work import UnitOfWorkFactory
 from domain.claim import Claim
@@ -34,10 +36,10 @@ from domain.susep_process import SusepProcess
 
 @dataclass(frozen=True)
 class SubmitClaim:
-    """Assess a submitted claim and persist the pending result."""
+    """Accept a submitted claim, persist it as a pending job, and queue it."""
 
     clock: Clock
-    orchestrator: ClaimAssessmentOrchestrator
+    queue: AssessmentQueue
     uow_factory: UnitOfWorkFactory
     new_id: Callable[[], str]
 
@@ -47,43 +49,42 @@ class SubmitClaim:
         raw_text: str,
         policy_ref: SusepProcess | None = None,
         claim_id: str | None = None,
-    ) -> AssessmentRecord:
-        """Run the claim through assessment and store the awaiting-review record.
+    ) -> AssessmentJob:
+        """Store a ``PENDING`` job for the claim and enqueue it for a worker.
 
         Raises:
             ValueError: the narrative is empty or the clock returned a naive
                 datetime (both surface from ``Claim`` construction).
-            OrchestratorContractError: the orchestrator did not pause at the
-                human checkpoint.
         """
         submitted_at = self.clock.now()
         resolved_claim_id = claim_id or self.new_id()
         assessment_id = self.new_id()
 
-        claim = Claim(
+        # Constructed for its validation side effects (empty narrative, naive
+        # timestamp); the worker rebuilds it from the persisted fields.
+        Claim(
             claim_id=resolved_claim_id,
             raw_text=raw_text,
             submitted_at=submitted_at,
             policy_ref=policy_ref,
         )
 
-        result = self.orchestrator.start(assessment_id=assessment_id, claim=claim)
-        if not result.awaiting_review:
-            raise OrchestratorContractError(
-                f"start did not pause at the human checkpoint for "
-                f"assessment {assessment_id!r}"
-            )
-
-        record = AssessmentRecord.from_orchestrator_result(
-            result,
+        job = AssessmentJob(
             assessment_id=assessment_id,
             claim_id=resolved_claim_id,
+            raw_text=raw_text,
+            policy_ref=policy_ref.value if policy_ref is not None else None,
+            submitted_at=submitted_at,
+            status=JobStatus.PENDING,
+            attempts=0,
             created_at=submitted_at,
-            status=AssessmentStatus.AWAITING_REVIEW,
+            updated_at=submitted_at,
         )
 
         with self.uow_factory() as uow:
-            uow.assessments.add(record)
+            uow.jobs.add(job)
             uow.commit()
 
-        return record
+        self.queue.enqueue(assessment_id)
+
+        return job

@@ -52,19 +52,20 @@ Copy the example file and fill in the values for your environment:
 cp .env.example .env
 ```
 
-### Database (Postgres + pgvector)
+### Database (Postgres + pgvector) and Redis
 
 Postgres is required by the retrieval index, the LangGraph checkpointer and
-the audit trail. Bring it up locally, in this order, on a clean clone:
+the audit trail; Redis backs the asynchronous assessment queue ([M5-05]).
+Bring both up locally, in this order, on a clean clone:
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres
+docker compose up -d          # postgres + redis
 make migrate
 make setup-checkpointer
 ```
 
-The `.env.example` defaults match the Compose service, so the sequence works
+The `.env.example` defaults match the Compose services, so the sequence works
 as written without editing anything first. `make migrate` applies the Alembic
 migrations (the first one enables the `vector` extension); `make migrate-down`
 rolls the latest one back. `make setup-checkpointer` is the second half of the
@@ -116,19 +117,24 @@ Score every retrieval configuration on the golden set with
 `make eval-retrieval-matrix` — the committed comparison table and verdict are in
 [`docs/RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md).
 
-### Run the assessment API
+### Run the assessment API and the worker
 
 Once the schema, the checkpointer and the index are in place:
 
 ```bash
-make serve           # uvicorn presentation.app:app on :8000
+make serve           # the API: uvicorn presentation.app:app on :8000
+make worker          # the queue workers (a second shell)
 ```
 
-`POST /v1/assessments` submits a claim, `GET /v1/assessments/{id}` reads its
-state and recommendation, `POST /v1/assessments/{id}/decision` submits the human
-decision and resumes the run, `GET /v1/assessments/{id}/audit` returns the audit
-trail. Endpoint shapes, the error codes and the design notes are in
-[`docs/API.md`](docs/API.md). The Docker Compose stack is [M5-09].
+`POST /v1/assessments` submits a claim (202, `status: "pending"`); a worker runs
+the graph in the background. `GET /v1/assessments/{id}` reads its lifecycle state
+(`pending` → `running` → `awaiting_review`, or `failed`) and, once ready, the
+recommendation. `POST /v1/assessments/{id}/decision` submits the human decision
+and resumes the run; `GET /v1/assessments/{id}/audit` returns the audit trail.
+Endpoint shapes and error codes are in [`docs/API.md`](docs/API.md); the queue,
+the retry/back-off policy and the dead-letter path are in
+[`docs/ASYNC_PROCESSING.md`](docs/ASYNC_PROCESSING.md). The `api` / `worker`
+Compose services (and their Dockerfile) are [M5-09].
 
 ### Pre-commit hooks
 

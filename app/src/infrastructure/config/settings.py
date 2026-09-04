@@ -319,10 +319,58 @@ class EmbeddingSettings(BaseSettings):
     embedding_batch_size: int = Field(alias="EMBEDDING_BATCH_SIZE", default=64)
 
 
-class Settings(DatabaseSettings, LlmSettings):
-    """Application settings loaded from environment variables."""
+class QueueSettings(BaseSettings):
+    """Settings for the [M5-05] asynchronous-processing queue.
+
+    ``assessment_worker_concurrency`` is the DoD's configurable parallelism bound:
+    each RQ worker runs one assessment at a time, so N workers == N concurrent
+    graph runs against the LLM provider. It is the direct analog of
+    ``LLM_CLASSIFICATION_MAX_WORKERS`` -- an operator knob, tuned to the
+    provider's tolerance (and to VRAM: on the 4 GB-VRAM dev box, keep it at 1 --
+    see ``docs/ASYNC_PROCESSING.md``).
+
+    ``assessment_max_retries`` is the total attempt budget (initial try +
+    retries) a job gets on *transient* failures; ``assessment_retry_backoff_seconds``
+    is the wait before each retry (RQ's ``Retry(interval=...)``). Real errors are
+    not retried at all.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
 
     redis_url: str = Field(alias="REDIS_URL", default="redis://localhost:6379/0")
+    test_redis_url: str | None = Field(alias="TEST_REDIS_URL", default=None)
+
+    assessment_worker_concurrency: int = Field(
+        alias="ASSESSMENT_WORKER_CONCURRENCY", default=2, gt=0
+    )
+    assessment_max_retries: int = Field(alias="ASSESSMENT_MAX_RETRIES", default=3, gt=0)
+    assessment_retry_backoff_seconds: list[int] = Field(
+        alias="ASSESSMENT_RETRY_BACKOFF_SECONDS",
+        default_factory=lambda: [30, 120, 300],
+    )
+    assessment_job_timeout_seconds: int = Field(
+        alias="ASSESSMENT_JOB_TIMEOUT_SECONDS", default=1800, gt=0
+    )
+
+    @property
+    def rq_retry_intervals(self) -> list[int]:
+        """The per-retry wait list, padded/truncated to ``assessment_max_retries - 1``.
+
+        RQ needs one interval per retry (attempts beyond the first). A shorter
+        list repeats its last value; a longer one is truncated.
+        """
+        retries = max(self.assessment_max_retries - 1, 0)
+        backoff = self.assessment_retry_backoff_seconds or [30]
+        return [backoff[min(i, len(backoff) - 1)] for i in range(retries)]
+
+
+class Settings(DatabaseSettings, LlmSettings):
+    """Application settings loaded from environment variables."""
 
     # Logging
     log_level: str = Field(alias="LOG_LEVEL", default="INFO")
@@ -355,6 +403,12 @@ def get_llm_settings() -> LlmSettings:
 def get_settings() -> Settings:
     """Get cached application settings."""
     return Settings()
+
+
+@lru_cache
+def get_queue_settings() -> QueueSettings:
+    """Get cached settings for the asynchronous-processing queue."""
+    return QueueSettings()
 
 
 @lru_cache
