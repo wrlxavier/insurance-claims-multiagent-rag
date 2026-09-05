@@ -1,13 +1,17 @@
-# Local infrastructure for development and integration tests.
+# Local infrastructure for development, integration tests, and the full
+# containerised assessment stack.
 #
 # [M0-08] brought up the database. [M5-05] adds `redis` -- the asynchronous
 # assessment queue (`make worker`) needs it, and so does `make test-integration`.
-# [M5-07] adds the self-hosted Langfuse stack behind the `tracing` profile, so
-# `docker compose up -d` is still just postgres + redis and
-# `docker compose --profile tracing up -d` is the traced stack. [M5-09] still
-# adds the `api` / `worker` services (once there is a Dockerfile to run them
-# from). Every block reads its configuration from the same `${...}` variables
-# those services will, so they are appended, not rewritten.
+# [M5-07] adds the self-hosted Langfuse stack behind the `tracing` profile:
+# `docker compose --profile tracing up -d` is the traced stack, a plain `up`
+# never starts it. [M5-09] adds `migrate` / `api` / `worker` -- one shared
+# image (the repo's `Dockerfile`), reused via the `&app-build` /
+# `&app-environment` anchors below -- so a plain `docker compose up -d --build`
+# now starts the full assessment stack (postgres, redis, migrate, api,
+# worker); see README's Quickstart for the step order `api`/`worker` need.
+# Every block reads its configuration from the same `${...}` variables those
+# services also read, so they are appended, not rewritten.
 services:
   postgres:
     # Postgres major and pgvector version are both explicit: the floating
@@ -50,6 +54,91 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+
+  # ---------------------------------------------------------------------------
+  # Assessment service -- [M5-09]. `api` and `worker` share one image (this
+  # repo's Dockerfile) and one environment shape; `migrate` uses the same
+  # image to apply Alembic and the LangGraph checkpointer's own setup once,
+  # before either starts -- `build_core_components()` probes the checkpointer
+  # at API startup and errors on a missing schema, so `depends_on: postgres
+  # (healthy)` alone is not enough ordering. All three load `.env` directly
+  # (`env_file`) and override only the keys that mean something different
+  # from inside the compose network than from the host: `postgres`/`redis`
+  # instead of `localhost`, and the in-network Langfuse hostname (inert
+  # unless the `tracing` profile is also up). See docs/DEPLOYMENT.md.
+  # ---------------------------------------------------------------------------
+  migrate:
+    build: &app-build
+      context: .
+      dockerfile: Dockerfile
+    image: insurance-claims-assessment:local
+    env_file: .env
+    environment: &app-environment
+      DATABASE_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      LANGFUSE_HOST: http://langfuse-web:3000
+    command: ["sh", "-c", "alembic upgrade head && python -m scripts.setup_checkpointer"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: *app-build
+    image: insurance-claims-assessment:local
+    env_file: .env
+    environment: *app-environment
+    ports:
+      - ${API_PORT:-8000}:8000
+    volumes: &app-volumes
+      - hf_cache:/root/.cache/huggingface
+      # `retriever_factory.load_retriever_components()` reads
+      # build/parsed_clauses.jsonl and build/chunks.jsonl directly at startup
+      # (the BM25 lexical leg and the exclusion-clause graph are in-process,
+      # not Postgres -- docs/LEXICAL_RETRIEVAL.md). Bind-mounted, not baked
+      # into the image, so a re-`make build-index` on the host is picked up
+      # by a container restart, no image rebuild. See docs/DEPLOYMENT.md.
+      - ./build:/app/build:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      # Liveness, not `/ready`: `/ready` 503s until the vector index is
+      # populated (`make build-index`), which would otherwise leave a
+      # freshly-started demo stack "unhealthy" forever.
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  worker:
+    build: *app-build
+    image: insurance-claims-assessment:local
+    env_file: .env
+    environment: *app-environment
+    command: ["python", "-m", "scripts.run_assessment_worker"]
+    volumes: *app-volumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      # No HTTP surface -- liveness is "the worker pool process is running".
+      test: ["CMD-SHELL", "pgrep -f scripts.run_assessment_worker || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   # ---------------------------------------------------------------------------
   # Tracing -- [M5-07]. `profiles: ["tracing"]` on every service below, so a
@@ -197,6 +286,9 @@ services:
 
 volumes:
   postgres_data:
+  # Persists the ~1.2GB embedder/reranker model download (docs/EMBEDDINGS.md,
+  # docs/RERANKING.md) across `api`/`worker` restarts.
+  hf_cache:
   langfuse_clickhouse_data:
   langfuse_clickhouse_logs:
   langfuse_minio_data:

@@ -116,3 +116,19 @@ jobs:
 
       - name: Apply migrations and run integration tests
         run: make test-integration
+
+  docker-image:
+    name: Build the Docker image
+    runs-on: ubuntu-latest
+
+    # [M5-09]: proves the image the `api` / `worker` Compose services run from
+    # actually builds -- the DoD's "image built" clause. Not pushed anywhere;
+    # no registry credentials needed. Its own job for the same reason
+    # `integration` is separate from `quality`: a broken image build should
+    # read as a broken image build, not as a lint failure.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t insurance-claims-assessment:ci .

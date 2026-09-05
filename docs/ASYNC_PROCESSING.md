@@ -109,8 +109,9 @@ past them to the job, which backs off for minutes — which is what
   re-enqueues stale `PENDING` jobs is left to operations.
 - **A connection pool for the checkpointer** ("the M5 shape", `docs/DATABASE.md`)
   is still deferred — each `RunAssessment` opens its own.
-- **`api` / `worker` Compose services + the Dockerfile + the CI image** are
-  [M5-09]. M5-05 adds only the `redis` service to `compose.yaml`.
+- **`api` / `worker` Compose services + the Dockerfile + the CI image build**
+  were added in [M5-09] (`docs/DEPLOYMENT.md`); M5-05 added only the `redis`
+  service to `compose.yaml`.
 
 ## Results
 

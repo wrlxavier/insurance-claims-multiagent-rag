@@ -10,6 +10,56 @@ inconsistent with the conditions of a registered insurance product — it
 cannot say whether a real claim is covered or denied. See
 [`docs/SCOPE.md`](docs/SCOPE.md) for the full statement.
 
+## Quickstart
+
+The literal, followable path from a clean clone to a running assessment,
+entirely through Docker Compose — [M5-09]. Design rationale for the stack
+is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+```bash
+cp .env.example .env
+# fill in LLM_PROVIDER / LLM_BASE_URL / LLM_API_KEY / LLM_MODEL_FAST /
+# LLM_MODEL_REASONING -- the rest of .env.example's defaults already match
+# the Compose services below.
+
+docker compose up -d postgres redis   # infra first -- api/worker need data in place before they can start
+make fetch-corpus-artifacts           # skip the LLM-cost parsing stage (~10MB download)
+make build-index                      # chunk -> Postgres -> embeddings against the running stack
+docker compose up -d --build          # migrate, api, worker -- each healthchecked
+```
+
+`api`/`worker` read `build/chunks.jsonl` (the lexical retriever's BM25 index
+and the exclusion-clause graph, `docs/DEPLOYMENT.md`) at startup, which is
+why `make build-index` runs before the full `up`: starting `api`/`worker`
+before it exists just crash-loops them on a clear "file not found" error.
+The second `docker compose up -d --build` runs `migrate` once (schema +
+checkpointer setup) then starts `api` (`curl localhost:${API_PORT:-8000}/health`
+→ `200`) and `worker`. `make build-index`'s embedding step is a real,
+one-time ~41-minute CPU pass the first time it runs — $0 in API cost, since
+the embedder runs locally, but real wall-clock time (`docs/EMBEDDINGS.md`).
+**Skipping that too:** `make fetch-embedding-cache` (or `make
+fetch-demo-artifacts` in place of `fetch-corpus-artifacts` above, for both
+fetches in one step) downloads a pre-computed embedding cache so the same
+`make build-index` re-fills every vector in seconds instead — once the
+maintainer has published that release (see `docs/DEPLOYMENT.md`'s "What
+this issue ships, and what it deliberately doesn't (yet)"); until then it's
+equivalent to the corpus-only fetch above.
+
+```bash
+curl -s -X POST localhost:${API_PORT:-8000}/v1/assessments \
+  -H 'Content-Type: application/json' \
+  -d '{"raw_text": "Bati o carro na traseira de outro veículo ao tentar estacionar."}'
+# -> 202, {"assessment_id": "<id>", "status": "pending"}
+
+curl -s localhost:${API_PORT:-8000}/v1/assessments/<id>
+# -> status moves pending -> running -> awaiting_review, with the
+# recommendation and its citations once ready
+```
+
+Endpoint shapes, the human-decision step and the audit trail are in
+[`docs/API.md`](docs/API.md). `docker compose --profile tracing up -d` adds
+the self-hosted Langfuse stack alongside the above — see "Tracing" below.
+
 ## Fast start: inspect the parsed corpus without running the pipeline
 
 The full M1 parsing pipeline (OCR, LLM clause classification, the vision-LLM
@@ -54,13 +104,17 @@ cp .env.example .env
 
 ### Database (Postgres + pgvector) and Redis
 
-Postgres is required by the retrieval index, the LangGraph checkpointer and
-the audit trail; Redis backs the asynchronous assessment queue ([M5-05]).
-Bring both up locally, in this order, on a clean clone:
+This is the bare-metal dev loop -- infra in containers, `make serve` /
+`make worker` on the host for hot reload. (For the fully containerized stack,
+including `api` / `worker` themselves, see the Quickstart above; don't run
+both at once against the same ports.) Postgres is required by the retrieval
+index, the LangGraph checkpointer and the audit trail; Redis backs the
+asynchronous assessment queue ([M5-05]). Bring both up locally, in this
+order, on a clean clone:
 
 ```bash
 cp .env.example .env
-docker compose up -d          # postgres + redis
+docker compose up -d postgres redis   # infra only -- not migrate/api/worker
 make migrate
 make setup-checkpointer
 ```
@@ -119,7 +173,9 @@ Score every retrieval configuration on the golden set with
 
 ### Run the assessment API and the worker
 
-Once the schema, the checkpointer and the index are in place:
+Once the schema, the checkpointer and the index are in place (bare-metal dev
+loop -- see the note above; skip this if you're already running the
+containerized `api` / `worker` from the Quickstart):
 
 ```bash
 make serve           # the API: uvicorn presentation.app:app on :8000
@@ -133,8 +189,9 @@ recommendation. `POST /v1/assessments/{id}/decision` submits the human decision
 and resumes the run; `GET /v1/assessments/{id}/audit` returns the audit trail.
 Endpoint shapes and error codes are in [`docs/API.md`](docs/API.md); the queue,
 the retry/back-off policy and the dead-letter path are in
-[`docs/ASYNC_PROCESSING.md`](docs/ASYNC_PROCESSING.md). The `api` / `worker`
-Compose services (and their Dockerfile) are [M5-09].
+[`docs/ASYNC_PROCESSING.md`](docs/ASYNC_PROCESSING.md). `api` and `worker` also
+run as Compose services from the same Dockerfile — see the Quickstart above
+and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) [M5-09].
 
 ### Tracing (optional)
 
@@ -149,12 +206,15 @@ docker compose --profile tracing up -d    # + langfuse-web, langfuse-worker, cli
 open http://localhost:3000                # sign in with LANGFUSE_INIT_USER_*
 ```
 
-The project is seeded on first boot with the `LANGFUSE_PUBLIC_KEY` /
-`LANGFUSE_SECRET_KEY` already in your `.env`, so there is no key-copying step.
-Tracing is off unless both keys are set and `TRACING_ENABLED` is not `false`,
-and plain `docker compose up -d` still starts only postgres + redis — the
-service runs identically with none of this. Reading a trace, and a worked
-example of diagnosing a wrong verdict, are in
+This also brings up `migrate` / `api` / `worker` alongside the tracing
+services (they have no profile, so any `up` starts them) — if you're running
+the bare-metal `make serve` / `make worker` instead, stop them first to avoid
+a port clash. The project is seeded on first boot with the
+`LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` already in your `.env`, so
+there is no key-copying step. Tracing is off unless both keys are set and
+`TRACING_ENABLED` is not `false`, and the plain `docker compose up -d` from
+the Quickstart runs identically with none of this. Reading a trace, and a
+worked example of diagnosing a wrong verdict, are in
 [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
 ### Prompt-injection classifier (optional)

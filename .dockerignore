@@ -1,0 +1,41 @@
+# [M5-09]. Keep the build context to what the image actually needs: app
+# source, scripts, migrations, and the two lockfiles. Everything below is
+# either huge, regenerable, or a secret -- see docs/DEPLOYMENT.md.
+
+.venv/
+.git/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Data, corpus and eval artifacts. `data/rag/` is the one exception: a small,
+# committed CSV (`lexical_stemming_exceptions.csv`) the lexical retriever
+# reads at startup -- everything else under `data/` is either parsing-only
+# (raw PDFs, OCR/LLM caches -- see Dockerfile's comment on why Tesseract is
+# absent too) or a self-healing on-disk cache (data/cache/embeddings,
+# data/cache/reranker) that starts empty if missing.
+data/cache/
+data/policies/
+data/golden_set/
+data/synthetic_claims/
+data/adversarial_injection/
+data/parsing/
+data/README.md
+build/
+eval/
+dist/
+notebooks/
+docs/clause_tree_checkpoints/
+
+.ai_context/
+.claude/
+.vscode/
+scratch_probe/
+
+# Secrets -- env_file: .env is injected by compose at container *start*,
+# never baked into the image.
+.env
+.env.*
+!.env.example
