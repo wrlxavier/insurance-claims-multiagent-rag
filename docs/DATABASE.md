@@ -28,7 +28,8 @@ make setup-checkpointer
 for a reason — see "The checkpointer owns its own schema" below.
 
 `compose.yaml` holds `postgres` and — since [M5-05] — `redis` (the async
-assessment queue). [M5-09] adds `api`, `worker` and `langfuse` to the same file;
+assessment queue), `langfuse` (since [M5-07], behind the `tracing` profile),
+and — since [M5-09] — `migrate` / `api` / `worker` (`docs/DEPLOYMENT.md`);
 every block is written so they are appended rather than requiring a rewrite.
 
 Roll a migration back with `make migrate-down` (one step). Both targets read

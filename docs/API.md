@@ -267,8 +267,10 @@ Redis round-trip — submission → worker → completion, transient retry, dead
 - **[M5-06] done** — `GET /ready` with per-check detail, JSON logs to stdout, and
   correlation-id propagation from the request into every node and LLM call. See
   "Structured logging & correlation IDs" above.
-- **[M5-09]** — the Compose `api` / `worker` services, the Dockerfile, the CI
-  image build, and the proxy-header / trusted-host middleware from
-  `ObservabilitySettings`.
+- **[M5-09] done** — the Compose `api` / `worker` services, the Dockerfile,
+  and the CI image build. See [`DEPLOYMENT.md`](DEPLOYMENT.md). The
+  proxy-header / trusted-host middleware from `ObservabilitySettings` stays
+  unwired — it would matter behind a reverse proxy, and this stack publishes
+  `api` directly with none in front.
 - A pooled checkpointer connection (`docs/DATABASE.md` "the M5 shape") — the
   adapter opens one per `start` / `resume` today.

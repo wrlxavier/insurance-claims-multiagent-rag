@@ -882,9 +882,8 @@ run-status states (below). [M5-06] **done** — `/ready` with per-check detail, 
 JSON log line per event to stdout, and a correlation id accepted or minted per
 request and propagated into every graph node log line and LLM call (via
 `presentation/middleware.py`, `infrastructure/observability/`, and the `build.py`
-node wrapper); see `docs/API.md`. [M5-09] adds the Compose `api` / `worker`
-services, the Dockerfile and the CI image build, and wires the proxy-header /
-trusted-host middleware from `ObservabilitySettings`.
+node wrapper); see `docs/API.md`. [M5-09] **done** — the Compose `api` / `worker`
+services and the Dockerfile; see below.
 
 ---
 
@@ -929,7 +928,8 @@ tracking per assessment id". (b) `SubmitClaim` commits the job before enqueueing
 it, so a crash in that window leaves a `PENDING` job that is never picked up — a
 reconciler is left to operations. (c) The checkpointer connection is still
 per-call, not pooled (`docs/DATABASE.md` "the M5 shape"). (d) `compose.yaml`
-gains `redis`; the `api` / `worker` services and the Dockerfile are [M5-09].
+gained `redis` here; the `api` / `worker` services and the Dockerfile
+followed in [M5-09] (`docs/DEPLOYMENT.md`).
 
 **Enforcement.** `tests/unit/application/use_cases/test_run_assessment.py` (the
 state machine), `test_submit_claim.py` (persist-then-enqueue),
@@ -1157,3 +1157,73 @@ network, mirrors `test_cross_encoder_reranker.py`);
 fan-out, the compiled graph's structure);
 `tests/eval/test_prompt_injection_classifier.py` (eval-marked, real model,
 skips without `transformers` installed).
+
+---
+
+## One Compose image for `api` and `worker`, with a one-shot `migrate` service ahead of both — [M5-09]
+
+**Decision.** `compose.yaml` gains `migrate`, `api` and `worker`, all built
+from a new root `Dockerfile`. `api` and `worker` are the same image — they
+share `infrastructure.bootstrap.build_core_components`, so they share the
+same dependency set (including the optional `embed` uv group, needed at
+runtime because both the request path and the queue-worker path load the
+embedder and cross-encoder in-process) — `worker` only overrides `command:`.
+`migrate` runs `alembic upgrade head && python -m scripts.setup_checkpointer`
+once (`restart: "no"`) and `api`/`worker` `depends_on` it completing
+(`condition: service_completed_successfully`), because
+`build_core_components()` probes the checkpointer at API startup and raises
+if its schema is missing — plain `depends_on: postgres (healthy)` is not
+enough ordering. Full rationale, the healthcheck choice (`/health`, not
+`/ready` — Compose has no "healthy but degraded"), and the environment-
+override shape: `docs/DEPLOYMENT.md`.
+
+**Why demo mode extends the existing artifact pattern instead of a new one.**
+The DoD asks that a reviewer not pay `make build-index`'s embedding cost (a
+real ~41-minute CPU pass, `docs/EMBEDDINGS.md`) to try the system.
+`scripts/fetch_corpus_artifacts.py`/`package_corpus_artifacts.py` already
+solve the identical shape of problem one stage earlier (skip the LLM-cost
+parsing stage via a pinned GitHub Release tarball + checksum). The new
+`fetch_embedding_cache.py`/`package_embedding_cache.py` are the same script
+shape, one stage later, bundling `data/cache/embeddings/cache.jsonl` — the
+existing content-addressed cache `CachingEmbedder` already reads before
+loading the model. No new mechanism, no Postgres dump, no vector-index file
+format — the same "download the expensive artifact instead of computing it"
+idea the corpus already established.
+
+**Deviations on record.** (a) The `m3-embedding-cache-v1` release itself is
+not published as part of this change — the fetch/package scripts and Makefile
+targets (`fetch-embedding-cache`, `package-embedding-cache`,
+`fetch-demo-artifacts`) exist and work, but actually paying the ~41-minute
+embedding pass once and running `gh release create` is left as a deliberate
+manual step; until it exists, `make build-index` still works, it just falls
+through to a real cold embed. (b) `PROXY_HEADERS_ENABLED`/
+`FORWARDED_ALLOW_IPS` (`ObservabilitySettings`, already defined since
+[M5-06]) stay unwired — they'd matter behind a reverse proxy, and this
+Compose stack publishes `api` directly with none in front; earlier notes in
+this document and in `docs/API.md`/`docs/ASYNC_PROCESSING.md`/
+`docs/DATABASE.md` anticipating that wiring as part of this issue are
+superseded by this entry. (c) The heavy evaluation suite's on-demand/
+scheduled trigger (`.github/workflows/eval.yml`) is `workflow_dispatch` only
+— no `schedule:` cron, so it never calls the configured LLM key unattended;
+the DoD's "on demand **or** a schedule" is satisfied by the "on demand" half.
+(d) The retrieval stack turned out not to be a pure Postgres client: its
+lexical/BM25 leg and exclusion-clause graph load `build/chunks.jsonl` and
+`build/parsed_clauses.jsonl` off the local filesystem
+(`docs/LEXICAL_RETRIEVAL.md`), and the lexical analyzer needs the committed
+`data/rag/lexical_stemming_exceptions.csv`. Neither was anticipated by the
+original "the graph reads Postgres" framing this entry started with — found
+by actually running `docker compose up -d --build` end-to-end (`api`/
+`worker` crash-looped on both, in turn) rather than by static review. Fixed
+with a read-only bind mount of `./build` (a regenerated artifact — no reason
+to bake a snapshot into the image) and a normal `COPY data/rag` in the
+Dockerfile (committed source, unlike `build/`'s gitignored output). Full
+account: `docs/DEPLOYMENT.md`.
+
+**Enforcement.** `docker build .` and `ci.yml`'s new `docker-image` job (the
+DoD's "image built" clause — `integration` already covered "integration
+tests against Postgres" and "migrations applied", from [M5-05]/[M5-01]-era
+work, before this issue started). `docker compose config` validates every
+YAML anchor resolves. No automated test drives the full containerised stack
+end-to-end (that needs Docker-in-CI plus real LLM credentials); README's
+Quickstart is written to be run and checked by hand against a clean clone,
+which is what this issue's own DoD asks for.
