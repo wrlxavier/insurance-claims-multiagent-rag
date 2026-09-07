@@ -37,7 +37,7 @@ help:
 	@echo "  package-corpus-artifacts - Maintainer-only: build the release tarball fetch-corpus-artifacts downloads"
 	@echo "  fetch-embedding-cache - M5-09: download the pre-computed embedding cache instead of paying the ~41min cold make embed-chunks pass"
 	@echo "  package-embedding-cache - M5-09: maintainer-only: build the release tarball fetch-embedding-cache downloads"
-	@echo "  fetch-demo-artifacts - M5-09: fetch-corpus-artifacts + fetch-embedding-cache in one step -- the demo-mode shortcut, see README's Quickstart"
+	@echo "  fetch-demo-artifacts - M5-09: fetch-corpus-artifacts + fetch-embedding-cache in one step -- the demo-mode shortcut, see docs/GETTING_STARTED.md"
 	@echo "  validate-golden-set - Validate data/golden_set/*.jsonl against the schema and the parsed corpus"
 	@echo "  draft-golden-questions-casco - M2-02: draft candidate golden questions over the 15 CASCO documents into eval/golden_set_draft_casco.csv for review (overwrites that file; use repair- once rows are finalized)"
 	@echo "  repair-golden-questions-casco - M2-02: re-draft/complete the CASCO draft using the author's review verdicts (requires REVIEW=<csv>)"
@@ -185,7 +185,7 @@ package-embedding-cache:
 	PYTHONPATH=app/src uv run python scripts/package_embedding_cache.py
 
 # M5-09: the demo-mode shortcut -- skips both cost-bearing pipeline stages
-# (LLM parsing, then embedding) in one command. See README's Quickstart.
+# (LLM parsing, then embedding) in one command. See docs/GETTING_STARTED.md.
 fetch-demo-artifacts: fetch-corpus-artifacts fetch-embedding-cache
 	@echo "fetch-demo-artifacts: corpus + LLM caches + embedding cache in place. 'make build-index' is now a cache-hit replay, not a cold run."
 

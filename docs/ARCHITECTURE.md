@@ -1224,6 +1224,6 @@ DoD's "image built" clause — `integration` already covered "integration
 tests against Postgres" and "migrations applied", from [M5-05]/[M5-01]-era
 work, before this issue started). `docker compose config` validates every
 YAML anchor resolves. No automated test drives the full containerised stack
-end-to-end (that needs Docker-in-CI plus real LLM credentials); README's
-Quickstart is written to be run and checked by hand against a clean clone,
-which is what this issue's own DoD asks for.
+end-to-end (that needs Docker-in-CI plus real LLM credentials); the Quickstart
+(now `docs/GETTING_STARTED.md`) is written to be run and checked by hand against
+a clean clone, which is what this issue's own DoD asks for.

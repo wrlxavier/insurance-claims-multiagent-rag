@@ -42,5 +42,5 @@ All other current dependencies (`pydantic`, `pydantic-settings`, `pypdf`,
 (MIT/Apache-2.0/BSD family) and impose no obligations beyond attribution
 already satisfied by this repository's own `LICENSE`. The same applies to
 Tesseract OCR itself (Apache-2.0), a system-level (not Python-packaged)
-dependency invoked via `pytesseract` -- see the README for install
-instructions.
+dependency invoked via `pytesseract` -- see `docs/GETTING_STARTED.md` for
+install instructions.

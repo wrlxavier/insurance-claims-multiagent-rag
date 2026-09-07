@@ -284,7 +284,7 @@ metrics. The one source of drift is fp32 rounding in the cross-encoder across
 different GPU / CPU hardware, which could reorder a borderline `(question,
 clause)` pair and move a reranked-configuration metric by **≤ ~1 question
 (≈ 0.9 pt at n = 117)**. The corpus itself reproduces byte-identical via
-`make fetch-corpus-artifacts` (`README.md`); a `make parse` from raw differs
+`make fetch-corpus-artifacts` (`docs/GETTING_STARTED.md`); a `make parse` from raw differs
 only on `build/manifest.json`'s `built_at_utc`. Latency is hardware-specific and
 reported with the machine. Cost is $0.00.
 
