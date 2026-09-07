@@ -34,12 +34,33 @@ FORBIDDEN_ROOTS = frozenset(
         "pydantic",
         "langgraph",
         "langchain",
+        # [M5-05]: the async queue. `AssessmentQueue` is a port; the RQ/Redis
+        # adapter stays in infrastructure.
+        "rq",
+        "redis",
+        # [M5-07]: tracing. `TracePort` is a port on the graph layer; the
+        # Langfuse client and its OpenTelemetry exporter stay in infrastructure.
+        "langfuse",
+        "opentelemetry",
         "fitz",
         "pyarrow",
         "pytesseract",
         "PIL",
     }
 )
+
+# [M5-02] adds a stricter, application-only check. The application layer talks
+# to infrastructure only through the ports it defines, so `infrastructure` is
+# off-limits as an import. `langchain_core` / `langchain_openai` are separate
+# top-level roots that `_top_level_module` does not fold into `langchain`, and
+# LangGraph re-exports `langchain_core` types -- "the orchestrator hides
+# LangGraph entirely" (M5-02 DoD) means barring those too. Scoped here rather
+# than added to FORBIDDEN_ROOTS so the domain check is untouched.
+APPLICATION_FORBIDDEN_ROOTS = FORBIDDEN_ROOTS | {
+    "infrastructure",
+    "langchain_core",
+    "langchain_openai",
+}
 
 
 @pytest.mark.unit
@@ -57,6 +78,15 @@ def test_application_has_no_forbidden_imports() -> None:
     assert not violations, (
         "application layer must depend only on domain, "
         f"found:\n{format_violations(violations)}"
+    )
+
+
+@pytest.mark.unit
+def test_application_imports_no_infrastructure_or_llm_sdk() -> None:
+    violations = find_forbidden_imports(APPLICATION_DIR, APPLICATION_FORBIDDEN_ROOTS)
+    assert not violations, (
+        "application layer must not import infrastructure or an LLM SDK -- "
+        f"depend on a port instead. Found:\n{format_violations(violations)}"
     )
 
 

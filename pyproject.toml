@@ -12,7 +12,7 @@ dependencies = [
     "pypdf>=6.14.2",
     "pytesseract>=0.3.13",
     "pillow>=12.3.0",
-    "langchain-core>=1.5.5",
+    "langchain-core>=1.6.0",
     "langchain-openai>=1.5.1",
     "langgraph>=1.2",
     # [M4-09] the Postgres checkpointer -- a separate distribution from
@@ -26,6 +26,31 @@ dependencies = [
     "tokenizers>=0.20",
     "pgvector>=0.5.0",
     "snowballstemmer>=2.2",
+    # [M5-04] the HTTP surface. uvicorn's `standard` extra pulls the production
+    # server bits (uvloop, httptools, websockets, watchfiles for `--reload`).
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.34.0",
+    # [M5-05] the asynchronous-processing queue. `rq` is the sync Redis-backed
+    # worker queue (native Retry-with-backoff + FailedJobRegistry dead-letter);
+    # it pulls `redis` but we pin it directly since the queue adapter and the
+    # readiness checks import the client.
+    "rq>=2.0",
+    "redis>=5.0",
+    # [M5-07] tracing. The v4 SDK is OpenTelemetry-based and its LangChain
+    # callback handler imports `langchain_core` (falling back to the `langchain`
+    # meta-package only if that fails), so it works on this stack -- the v2 SDK's
+    # handler does not, it hard-imports `langchain.schema.*`, removed in
+    # langchain 1.x. Ships `py.typed`, so `mypy --strict` needs no override. A
+    # plain dependency, not an opt-in group like `embed`: it is pure Python and
+    # small, and tracing is switched off by configuration, not by absence.
+    "langfuse>=4.15,<5",
+    # [M5-07] the `langchain` meta-package is a dependency of the Langfuse
+    # callback handler and nothing else here imports it: the handler does
+    # `import langchain` purely to branch on `langchain.__version__`, then
+    # imports every symbol it actually uses from `langchain_core`. It refuses to
+    # import without it. Thin -- langchain-core, langgraph and pydantic, all
+    # already direct dependencies -- but it does raise the langchain-core floor.
+    "langchain>=1.4,<2",
 ]
 
 [dependency-groups]
@@ -37,6 +62,8 @@ dev = [
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "ruff>=0.16.0",
+    # [M5-04] starlette.testclient (FastAPI's TestClient) needs httpx.
+    "httpx>=0.28.0",
 ]
 
 # Real local embedder (`make embed-chunks`) and cross-encoder reranker
@@ -157,6 +184,9 @@ module = [
     # Optional `embed` dependency group -- not installed in the default env that
     # `make typecheck` / CI run against.
     "sentence_transformers.*",
+    # transformers ships no py.typed marker either -- the optional runtime
+    # prompt-injection classifier's only import from it ([M5-08 Appendix]).
+    "transformers.*",
     # The Rust `tokenizers` package ships py.typed only in some releases; the
     # `embed` group's transformers pin holds it at 0.20.x. scripts/*.py duck-type
     # it via a local Protocol regardless.

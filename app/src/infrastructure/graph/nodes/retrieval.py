@@ -21,6 +21,15 @@ What it does:
 - assembles the [infrastructure.rag.insufficient_context_gate.GateSignals] and
   runs [evaluate_gate] to set ``context_sufficient``. The router
   ``route_after_retrieval`` in ``build.py`` acts on that flag.
+
+[M5-07] wraps that in one explicit span. Retrieval is the only node the trace's
+callback handler sees as a black box, because it makes no LLM call: what it
+retrieved, at what scores, under which filter, and why the gate decided as it
+did are all locals here, and most of them never reach state. They are the first
+thing you want when a verdict is wrong, so the span records them -- including
+the three ``InsufficientContextResult`` fields (``threshold``,
+``missing_category``, ``closest_clause_ids``) that are computed on every run and
+otherwise thrown away.
 """
 
 from __future__ import annotations
@@ -54,31 +63,69 @@ def retrieval(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, ob
     query = _build_query(entities, fallback=state["raw_claim_text"])
     metadata_filter = _build_filter(entities)
 
-    hits = context.retriever.retrieve(
-        query, k=RETRIEVAL_K, metadata_filter=metadata_filter
-    )
-
-    citations = [
-        Citation(
-            clause_id=hit.clause_id,
-            document_id=hit.document_id,
-            susep_process=hit.susep_process,
-            clause_type=hit.clause_type,
-            relevance_score=max(hit.score, 0.0),
-            excerpt=hit.excerpt,
+    with context.tracer.span(
+        "retrieval",
+        input={
+            "query": query,
+            "k": RETRIEVAL_K,
+            "filter": _filter_payload(metadata_filter),
+        },
+    ) as traced:
+        hits = context.retriever.retrieve(
+            query, k=RETRIEVAL_K, metadata_filter=metadata_filter
         )
-        for hit in hits
-    ]
 
-    signals = GateSignals(
-        top_score=hits[0].score if hits else 0.0,
-        reranked_scores=tuple(hit.score for hit in hits),
-        retrieved_clause_ids=tuple(hit.clause_id for hit in hits),
-        retrieved_clause_types=tuple(hit.clause_type for hit in hits),
-        k_requested=RETRIEVAL_K,
-        n_returned=len(hits),
-    )
-    gate = evaluate_gate(query, signals)
+        citations = [
+            Citation(
+                clause_id=hit.clause_id,
+                document_id=hit.document_id,
+                susep_process=hit.susep_process,
+                clause_type=hit.clause_type,
+                relevance_score=max(hit.score, 0.0),
+                excerpt=hit.excerpt,
+            )
+            for hit in hits
+        ]
+
+        signals = GateSignals(
+            top_score=hits[0].score if hits else 0.0,
+            reranked_scores=tuple(hit.score for hit in hits),
+            retrieved_clause_ids=tuple(hit.clause_id for hit in hits),
+            retrieved_clause_types=tuple(hit.clause_type for hit in hits),
+            k_requested=RETRIEVAL_K,
+            n_returned=len(hits),
+        )
+        gate = evaluate_gate(query, signals)
+
+        traced.update(
+            {
+                "n_returned": len(hits),
+                # Ranked, scored, and named -- the span's reason to exist. Read
+                # top to bottom this is what the assessment nodes will see.
+                "candidates": [
+                    {
+                        "rank": rank,
+                        "clause_id": hit.clause_id,
+                        "document_id": hit.document_id,
+                        "susep_process": hit.susep_process,
+                        "clause_type": hit.clause_type.value,
+                        "score": hit.score,
+                    }
+                    for rank, hit in enumerate(hits, start=1)
+                ],
+                "gate": {
+                    "sufficient": gate.sufficient,
+                    "trigger": gate.trigger.value or None,
+                    "top_score": gate.top_score,
+                    "threshold": gate.threshold,
+                    "missing_category": gate.missing_category.value
+                    if gate.missing_category is not None
+                    else None,
+                    "closest_clause_ids": list(gate.closest_clause_ids),
+                    "explanation": gate.explanation,
+                },
+            }
+        )
 
     audit_event = AuditEvent(
         node="retrieval",
@@ -93,6 +140,16 @@ def retrieval(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, ob
         "citations": citations,
         "context_sufficient": gate.sufficient,
         "audit_trail": [audit_event],
+    }
+
+
+def _filter_payload(metadata_filter: RetrievalFilter | None) -> dict[str, str | None]:
+    """The metadata pre-filter as trace-friendly fields, or ``None`` for unfiltered."""
+    if metadata_filter is None:
+        return {"susep_process": None, "product_line": None}
+    return {
+        "susep_process": metadata_filter.susep_process,
+        "product_line": metadata_filter.product_line,
     }
 
 

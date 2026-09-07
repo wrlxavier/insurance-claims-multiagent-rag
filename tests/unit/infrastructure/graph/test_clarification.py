@@ -20,6 +20,7 @@ from infrastructure.graph.context import GraphContext, RetrievalPort
 from infrastructure.graph.nodes.clarification import clarification
 from infrastructure.graph.prompts.clarification import CLARIFICATION_FALLBACK_TEMPLATES
 from infrastructure.graph.prompts.scope_preamble import SCOPE_PREAMBLE
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import ClarificationOutput, ClarificationQuestionItem
 from infrastructure.graph.state import ClarificationQuestion, ExtractedEntities
 
@@ -220,4 +221,4 @@ def test_prompt_carries_scope_preamble_and_the_known_facts() -> None:
     assert SCOPE_PREAMBLE in system_text
     assert "valor_franquia_limite" in system_text
     assert "colisão" in system_text
-    assert messages[1].content == "bati o carro"
+    assert messages[1].content == wrap_untrusted("claim_narrative", "bati o carro")

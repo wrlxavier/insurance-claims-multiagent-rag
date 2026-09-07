@@ -9,7 +9,8 @@ config -- a node holds no module-level client and takes no constructor. See
 ``docs/ARCHITECTURE.md`` ([M4-01b]).
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -76,6 +77,122 @@ class AuditTrailSink(Protocol):
         ...
 
 
+class TracePort(Protocol):
+    """Somewhere to open one span of a run, owned by the graph layer -- [M5-07].
+
+    Most of the trace costs a node nothing: the Langfuse callback handler the
+    orchestrator installs on the graph config already opens a span per node and
+    a generation per LLM call. This port exists for the one thing callbacks
+    cannot see -- work a node does *between* those calls, where the interesting
+    numbers are locals. The retrieval node ([M4-04]) is the case that motivates
+    it: its candidates, their scores and the [M3-07] gate's reasoning never
+    appear in an LLM call and mostly never reach state either.
+
+    Deliberately dumb. It deals in plain mappings, not domain objects, so the
+    graph layer grows no tracing vocabulary and a test fake is a handful of
+    lines. It is a context manager rather than a "record this finished span"
+    call because the span's latency should be measured, not reported: the
+    yielded mapping is the span's output, filled in by the body.
+
+        with runtime.context.tracer.span("retrieval", input={...}) as traced:
+            hits = ...
+            traced["n_returned"] = len(hits)
+
+    [infrastructure.observability.tracing.LangfuseTracer] is the
+    implementation; it satisfies this structurally, exactly as ``RetrievalPort``
+    and ``AuditTrailSink`` are satisfied.
+
+    An implementation **must not raise**: a run is not allowed to fail because
+    its observability did.
+    """
+
+    def span(
+        self,
+        name: str,
+        *,
+        input: Mapping[str, object],
+        metadata: Mapping[str, object] | None = None,
+    ) -> AbstractContextManager[MutableMapping[str, object]]:
+        """Open a span named ``name``; fill the yielded mapping to set its output."""
+        ...
+
+
+class _NoTracing:
+    """The do-nothing ``TracePort``: what a node gets when tracing is off."""
+
+    def span(
+        self,
+        name: str,
+        *,
+        input: Mapping[str, object],
+        metadata: Mapping[str, object] | None = None,
+    ) -> AbstractContextManager[MutableMapping[str, object]]:
+        """Yield a throwaway mapping and record nothing."""
+        return nullcontext({})
+
+
+# A null object rather than the ``| None`` shape ``audit_sink`` uses below. The
+# audit sink is consulted once, at the checkpoint; a tracer wraps work inside a
+# node body, and a null object keeps that body free of `if tracer is not None`
+# noise for a call whose whole point is that it changes nothing.
+NO_TRACING: TracePort = _NoTracing()
+
+
+@dataclass(frozen=True)
+class ClassificationResult:
+    """One span's score from the optional prompt-injection classifier.
+
+    ``label`` is whatever the classifier's own taxonomy calls its top
+    prediction (e.g. ``"SAFE"`` / ``"INJECTION"``) -- recorded for the audit
+    trail, never branched on. ``flagged`` is the only field a caller acts on:
+    ``score`` compared against the configured threshold.
+    """
+
+    flagged: bool
+    score: float
+    label: str
+
+
+class InjectionClassifierPort(Protocol):
+    """The optional runtime prompt-injection classifier -- [M5-08 Appendix].
+
+    Advisory only. A node calls ``classify`` on one untrusted span (a claim
+    narrative, or a retrieved clause excerpt) and records what it returns as
+    an ``AuditEvent`` when flagged. Nothing in the graph branches on the
+    result, withholds a verdict, or blocks a node because of it -- the M5-08
+    issue's DoD already treats untrusted text as data through delimiters,
+    schema rejection and metadata-only trust (``docs/ARCHITECTURE.md``'s
+    ``[M5-08]`` section); this is a defense-in-depth *signal* for a human
+    reviewer, not a second decision-maker. The Appendix that motivates it is
+    explicit that an external guardrail is non-blocking.
+
+    An implementation **must not raise**: a run is not allowed to fail
+    because its guardrail did, the same contract ``TracePort`` states above.
+    [infrastructure.guardrails.local_prompt_injection_classifier.LocalPromptInjectionClassifier]
+    is the implementation; the port lives here for the same reason
+    ``RetrievalPort``/``AuditTrailSink``/``TracePort`` do.
+    """
+
+    def classify(self, text: str, *, source: str) -> ClassificationResult:
+        """Score ``text`` (read from ``source``) for injected-instruction risk."""
+        ...
+
+
+class _NoClassifier:
+    """The do-nothing ``InjectionClassifierPort``: the guardrail switched off."""
+
+    def classify(self, text: str, *, source: str) -> ClassificationResult:
+        """Always report unflagged -- no model is consulted."""
+        return ClassificationResult(flagged=False, score=0.0, label="disabled")
+
+
+# A null object, mirroring ``NO_TRACING``: the guardrail is off by default
+# (``PROMPT_INJECTION_CLASSIFIER_ENABLED=false``), so every test, eval script
+# and unconfigured deployment builds a ``GraphContext`` exactly as before and
+# ``injection_scan`` takes the same path either way -- no ``if enabled`` noise.
+NO_CLASSIFIER: InjectionClassifierPort = _NoClassifier()
+
+
 @dataclass(frozen=True)
 class GraphContext:
     """Run-scoped dependencies for the agent graph -- [M4-01b].
@@ -98,3 +215,18 @@ class GraphContext:
     # the same way a deterministic node leaves `AuditEvent.model` unset. The
     # composition root supplies the Postgres-backed sink.
     audit_sink: AuditTrailSink | None = None
+    # [M5-06]. The correlation id for this run -- tied to the originating HTTP
+    # request (or minted by the worker). `infrastructure.graph.build`'s node
+    # wrapper stamps it on every node log line; the orchestrator also puts it in
+    # the graph `config` metadata so LLM calls inherit it. Defaulted so a test
+    # or eval `GraphContext(...)` needs nothing.
+    correlation_id: str = ""
+    # [M5-07]. Where a node records a span the callback-handler trace cannot see
+    # -- see ``TracePort``. Defaults to the no-op, so every test, eval script and
+    # unconfigured deployment builds a ``GraphContext`` exactly as before and the
+    # nodes take the same path either way.
+    tracer: TracePort = NO_TRACING
+    # [M5-08 Appendix]. The optional runtime prompt-injection classifier -- see
+    # ``InjectionClassifierPort``. Defaults to the no-op, off unless
+    # ``PROMPT_INJECTION_CLASSIFIER_ENABLED=true``.
+    classifier: InjectionClassifierPort = NO_CLASSIFIER

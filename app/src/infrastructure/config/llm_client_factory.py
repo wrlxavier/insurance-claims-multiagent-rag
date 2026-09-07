@@ -19,6 +19,8 @@ def build_chat_model(
     *,
     provider_order: list[str] | None = None,
     allow_fallbacks: bool | None = None,
+    timeout: float | None = None,
+    max_retries: int | None = None,
 ) -> BaseChatModel:
     """Build a chat model for ``model`` from the given provider settings.
 
@@ -36,6 +38,12 @@ def build_chat_model(
             provider is unavailable (OpenRouter's `provider.allow_fallbacks`
             request field). ``None`` (the default) omits the key entirely,
             leaving OpenRouter's own default behavior in place.
+        timeout: Per-request timeout in seconds. ``None`` (the default)
+            leaves the client's own default (no timeout) in place. A batch
+            job that must not hang on a stalled upstream sets one.
+        max_retries: The client's own retry count for a transient failure.
+            ``None`` keeps the langchain default (2). A caller that wraps its
+            own retry around ``invoke`` passes ``0`` so the two do not stack.
 
     Raises:
         NotImplementedError: if ``settings.llm_provider`` has no installed
@@ -47,6 +55,10 @@ def build_chat_model(
             "api_key": settings.llm_api_key,
             "base_url": settings.llm_base_url,
         }
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        if max_retries is not None:
+            kwargs["max_retries"] = max_retries
         provider_body: dict[str, object] = {}
         if provider_order:
             provider_body["order"] = provider_order

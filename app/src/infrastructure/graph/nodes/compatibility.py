@@ -35,6 +35,7 @@ from application.use_cases.llm_retry_defaults import (
 from domain.verdict import Verdict
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.prompts.compatibility import build_compatibility_prompt
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.reasoning_format import render_reasoning
 from infrastructure.graph.schemas import CompatibilityOutput
 from infrastructure.graph.state import (
@@ -79,7 +80,7 @@ def compatibility(
     )
     messages: list[Any] = [
         SystemMessage(build_compatibility_prompt(entities, citations)),
-        HumanMessage(state["raw_claim_text"]),
+        HumanMessage(wrap_untrusted("claim_narrative", state["raw_claim_text"])),
     ]
 
     result, parsed, errors, retries = _invoke_grounded(structured, messages, valid_ids)

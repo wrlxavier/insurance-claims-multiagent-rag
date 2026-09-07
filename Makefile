@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check serve worker migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts fetch-embedding-cache package-embedding-cache fetch-demo-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end eval-performance eval-prompt-injection eval-prompt-injection-classifier validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -13,6 +13,8 @@ help:
 	@echo "  test-integration  - Apply migrations, then run the database-backed tests in tests/integration (needs TEST_DATABASE_URL)"
 	@echo "  test-eval         - Run the eval-marked pytest suite (requires build/parsed_clauses.jsonl; run fetch-corpus-artifacts or parse first)"
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
+	@echo "  serve             - M5-04: run the assessment API locally (uvicorn presentation.app:app on :8000; needs make migrate + setup-checkpointer + build-index and LLM_* in .env)"
+	@echo "  worker            - M5-05: run the assessment worker pool draining the Redis queue (ASSESSMENT_WORKER_CONCURRENCY workers; needs the same setup as serve + a running Redis)"
 	@echo "  migrate           - Apply Alembic migrations to the configured database"
 	@echo "  migrate-down      - Roll back the latest Alembic migration"
 	@echo "  setup-checkpointer - M4-09: run the LangGraph Postgres checkpointer's own migrations (its tables live outside Alembic); idempotent, acts on the same DATABASE_URL as make migrate"
@@ -33,6 +35,9 @@ help:
 	@echo "  escalate-vision-boundaries - M1-04d: vision-LLM boundary review of suspicious clauses (opt-in, not part of parse)"
 	@echo "  fetch-corpus-artifacts - Download the pre-computed corpus/LLM caches instead of running make parse"
 	@echo "  package-corpus-artifacts - Maintainer-only: build the release tarball fetch-corpus-artifacts downloads"
+	@echo "  fetch-embedding-cache - M5-09: download the pre-computed embedding cache instead of paying the ~41min cold make embed-chunks pass"
+	@echo "  package-embedding-cache - M5-09: maintainer-only: build the release tarball fetch-embedding-cache downloads"
+	@echo "  fetch-demo-artifacts - M5-09: fetch-corpus-artifacts + fetch-embedding-cache in one step -- the demo-mode shortcut, see README's Quickstart"
 	@echo "  validate-golden-set - Validate data/golden_set/*.jsonl against the schema and the parsed corpus"
 	@echo "  draft-golden-questions-casco - M2-02: draft candidate golden questions over the 15 CASCO documents into eval/golden_set_draft_casco.csv for review (overwrites that file; use repair- once rows are finalized)"
 	@echo "  repair-golden-questions-casco - M2-02: re-draft/complete the CASCO draft using the author's review verdicts (requires REVIEW=<csv>)"
@@ -64,6 +69,9 @@ help:
 	@echo "  eval-parallel-assessment - M4-07: time the compatibility + consistency nodes sequentially vs as the fixed parallel branches over the synthetic claims and report the wall-clock gain, absolute saving and mean per-node latencies (needs LLM_* in .env + build/chunks.jsonl; no retrieval stack); writes eval/runs/parallel_assessment.{md,json} + parallel_assessment_timings.jsonl. Analysis: docs/PARALLEL_ASSESSMENT.md"
 	@echo "  eval-recommendation - M4-08: run retrieval + compatibility + consistency + the recommendation node (real models) over the 42 verdict-labelled golden questions; re-check the structural guarantees live (citation grounding rate, max confidence on an insufficient_information posture, consistency-flag pass-through) plus posture-vs-verdict agreement and confidence by posture (needs LLM_* in .env + same Postgres + embed-group requirement); writes eval/runs/recommendation.{md,json} + recommendation_predictions.jsonl. Analysis: docs/RECOMMENDATION_NODE.md"
 	@echo "  eval-end-to-end   - M4-10: run the WHOLE compiled graph (intake -> clarification -> retrieval -> parallel assessment -> recommendation -> the M4-09 checkpoint, resumed with an automatic approve) over all 51 synthetic claims; report the 3x3 verdict confusion matrix overall and per cohort (the product/claim mismatch subset separately), the failure catalogue, reference-clause recall and the faithfulness / context-relevance judge (needs LLM_* in .env + same Postgres + embed-group requirement); writes eval/runs/end_to_end.{md,json} + end_to_end_predictions.jsonl and the committed eval/end_to_end_citations.json. Analysis: docs/END_TO_END_EVALUATION.md"
+	@echo "  eval-performance  - M5-10: run the WHOLE compiled graph over all 51 synthetic claims (policy-header arm, checkpoint resumed with an automatic approve) and measure p50/p95 latency end-to-end and per node (from the M5-06 node logger), mean/p95 token cost per assessment and per node (a callback handler reading the full usage_metadata incl. reasoning tokens, priced from the LLM_*_COST_PER_1M_TOKENS_USD settings), and the parallel-vs-sequential assessment-branch trade (needs LLM_* in .env + same Postgres + embed-group requirement; --limit N for a smoke run); writes eval/runs/performance.{md,json} + performance_per_claim.jsonl and the committed eval/performance.json. Analysis: docs/PERFORMANCE.md"
+	@echo "  eval-prompt-injection - M5-08: run the real compatibility node (real reasoning model) over the hand-authored adversarial fixtures in data/adversarial_injection/fixtures.jsonl -- a poisoned clause excerpt and a clean/injected claim-narrative pair -- and assert the verdict is unaffected and no citation names a clause outside the fixture's own set (needs LLM_* in .env; no retrieval stack, no Postgres); writes eval/runs/prompt_injection.{md,json}. Analysis: docs/PROMPT_INJECTION.md"
+	@echo "  eval-prompt-injection-classifier - M5-08 Appendix: domain benchmark for the optional runtime classifier -- score the real, non-adversarial imperative clauses in data/adversarial_injection/benign_imperative_clauses.jsonl (false-positive rate) and the adversarial spans in fixtures.jsonl (detection rate), with per-call latency (no LLM, no Postgres; runs the optional embed uv group); writes eval/runs/prompt_injection_classifier.{md,json}. Analysis: docs/PROMPT_INJECTION_CLASSIFIER.md"
 	@echo "  validate-citation-coverage - M4-10: replay eval/end_to_end_citations.json and fail if any assertion on a settled verdict carries no clause id, if any cited id is absent from build/parsed_clauses.jsonl, or if a recommendation cites a clause retrieval never returned (offline; no DB, no LLM). Runs in CI after fetch-corpus-artifacts."
 	@echo "  tune-reranking    - M3-05: sweep the reranker candidate depth on the golden set and record the metrics + latency curve (same Postgres + embed-group requirement); writes eval/runs/rerank_tuning.{md,json}. Curve and chosen depth: docs/RERANKING.md"
 	@echo "  tune-exclusion-co-retrieval - M3-06: sweep the reserved exclusion-slot count on the golden set (pure-Python replay over one cached rerank pass; same Postgres + embed-group requirement for that pass); writes eval/runs/exclusion_co_retrieval_tuning.{md,json}. Curve and chosen count: docs/EXCLUSION_CO_RETRIEVAL.md"
@@ -94,6 +102,12 @@ test-eval:
 	PYTHONPATH=app/src uv run pytest -m eval
 
 check: lint format-check typecheck test
+
+serve:
+	PYTHONPATH=app/src uv run --group embed uvicorn presentation.app:app --reload --port 8000
+
+worker:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.run_assessment_worker
 
 migrate:
 	PYTHONPATH=app/src uv run alembic upgrade head
@@ -163,6 +177,17 @@ fetch-corpus-artifacts:
 
 package-corpus-artifacts:
 	PYTHONPATH=app/src uv run python scripts/package_corpus_artifacts.py
+
+fetch-embedding-cache:
+	PYTHONPATH=app/src uv run python scripts/fetch_embedding_cache.py
+
+package-embedding-cache:
+	PYTHONPATH=app/src uv run python scripts/package_embedding_cache.py
+
+# M5-09: the demo-mode shortcut -- skips both cost-bearing pipeline stages
+# (LLM parsing, then embedding) in one command. See README's Quickstart.
+fetch-demo-artifacts: fetch-corpus-artifacts fetch-embedding-cache
+	@echo "fetch-demo-artifacts: corpus + LLM caches + embedding cache in place. 'make build-index' is now a cache-hit replay, not a cold run."
 
 validate-golden-set:
 	PYTHONPATH=app/src uv run python scripts/validate_golden_set.py
@@ -274,6 +299,18 @@ eval-recommendation:
 # the same module with flags -- see docs/END_TO_END_EVALUATION.md.
 eval-end-to-end:
 	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_end_to_end --judge --write-snapshot
+
+# M5-10. Whole graph over the 51 synthetic claims; p50/p95 latency end-to-end and
+# per node, mean/p95 token cost per node, parallel-vs-sequential. Needs the same
+# stack as eval-end-to-end. --limit N for a smoke run. Analysis: docs/PERFORMANCE.md
+eval-performance:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_performance --write-snapshot
+
+eval-prompt-injection:
+	PYTHONPATH=app/src uv run python -m scripts.eval_prompt_injection
+
+eval-prompt-injection-classifier:
+	PYTHONPATH=app/src uv run --group embed python -m scripts.eval_prompt_injection_classifier
 
 validate-citation-coverage:
 	PYTHONPATH=app/src uv run python -m scripts.validate_citation_coverage

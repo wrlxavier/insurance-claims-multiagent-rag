@@ -1,7 +1,7 @@
 """This module contains the application settings loaded from environment variables."""
 
 from functools import lru_cache
-from typing import Self
+from typing import Literal, Self
 from urllib.parse import quote_plus
 
 from pydantic import Field, SecretStr, model_validator
@@ -25,6 +25,11 @@ class ObservabilitySettings(BaseSettings):
 
     app_env: str = Field(alias="APP_ENV", default="development")
     log_level: str = Field(alias="LOG_LEVEL", default="INFO")
+
+    # [M5-06] `json` (one JSON object per line, to stdout -- the DoD shape) or
+    # `text` (a human-readable line for a local `make serve`). Default `json`:
+    # the deployed service is the common case, a developer opts out.
+    log_format: Literal["json", "text"] = Field(alias="LOG_FORMAT", default="json")
     proxy_headers_enabled: bool = Field(alias="PROXY_HEADERS_ENABLED", default=True)
     forwarded_allow_ips: str = Field(
         alias="FORWARDED_ALLOW_IPS",
@@ -35,9 +40,29 @@ class ObservabilitySettings(BaseSettings):
     langfuse_secret_key: SecretStr = Field(
         alias="LANGFUSE_SECRET_KEY", default=SecretStr("")
     )
-    langfuse_host: str = Field(
-        alias="LANGFUSE_HOST", default="https://api.langfuse.com"
-    )
+    # [M5-07] the self-hosted Langfuse from the compose `tracing` profile, not
+    # Langfuse Cloud: this project ships the server it traces to, so the default
+    # is the one `docker compose --profile tracing up -d` brings up.
+    langfuse_host: str = Field(alias="LANGFUSE_HOST", default="http://localhost:3000")
+    # [M5-07] the off switch. Separate from the keys so tracing can be disabled
+    # without deleting credentials -- which is what makes "the service runs
+    # without it" testable rather than merely claimed.
+    tracing_enabled: bool = Field(alias="TRACING_ENABLED", default=True)
+
+    @property
+    def tracing_active(self) -> bool:
+        """Whether tracing should actually run: switched on *and* credentialed.
+
+        [M5-07]'s "optional via configuration" line, in one place. Keys without
+        the flag, or the flag without keys, both mean no tracing -- the tracer
+        degrades to a no-op rather than failing to start, so an unconfigured
+        clone runs the whole flow with tracing simply absent.
+        """
+        return (
+            self.tracing_enabled
+            and bool(self.langfuse_public_key)
+            and bool(self.langfuse_secret_key.get_secret_value())
+        )
 
     @property
     def is_development(self) -> bool:
@@ -219,6 +244,28 @@ class LlmSettings(BaseSettings):
         alias="LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD", default=2.50
     )
 
+    # [M5-07] registers these two pairs with Langfuse as model definitions, so
+    # the trace UI can price a generation for a model served under a name
+    # Langfuse has never seen. **Priced for the pinned OpenRouter route, not for
+    # the model in general** -- the same model costs 3x more on some routes than
+    # others, so re-pin `LLM_*_PROVIDER_ORDER` above and these go stale. Read
+    # from OpenRouter's endpoints API on 2026-09-04: the fast model on
+    # `baidu/fp8` and the reasoning model on `streamlake`, the defaults pinned
+    # above. List prices, not a measurement -- [M5-10] owns the measured cost
+    # per assessment.
+    llm_fast_input_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_FAST_INPUT_COST_PER_1M_TOKENS_USD", default=0.14
+    )
+    llm_fast_output_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_FAST_OUTPUT_COST_PER_1M_TOKENS_USD", default=0.28
+    )
+    llm_reasoning_input_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_REASONING_INPUT_COST_PER_1M_TOKENS_USD", default=1.1154
+    )
+    llm_reasoning_output_cost_per_1m_tokens_usd: float = Field(
+        alias="LLM_REASONING_OUTPUT_COST_PER_1M_TOKENS_USD", default=3.3462
+    )
+
     # Pinned per M1-08b: baidu/fp8 is the required OpenRouter route for
     # deepseek/deepseek-v4-flash-0731 for corpus classification; fallback is
     # disabled so a transient provider outage surfaces as a classifier
@@ -245,6 +292,31 @@ class LlmSettings(BaseSettings):
     # RAG settings
     embedding_model: str = Field(alias="EMBEDDING_MODEL")
     reranker_model: str = Field(alias="RERANKER_MODEL")
+
+    # [M5-08 Appendix] the optional runtime prompt-injection classifier -- the
+    # off switch, separate from the model choice, mirrors
+    # ObservabilitySettings.tracing_enabled: opt-in (default False, unlike
+    # tracing's default-on) because this is an advisory defense-in-depth
+    # layer, not the containment this project actually relies on ([M5-08]).
+    # See infrastructure.graph.context.InjectionClassifierPort.
+    prompt_injection_classifier_enabled: bool = Field(
+        alias="PROMPT_INJECTION_CLASSIFIER_ENABLED", default=False
+    )
+    # Pinned to an exact Hub revision in code
+    # (infrastructure.guardrails.classifier_config); this key is the
+    # human-facing name, cross-checked against that pin by a test -- same
+    # pattern as EMBEDDING_MODEL / RERANKER_MODEL above.
+    prompt_injection_classifier_model: str = Field(
+        alias="PROMPT_INJECTION_CLASSIFIER_MODEL",
+        default="protectai/deberta-v3-base-prompt-injection-v2",
+    )
+    # The classifier's own "INJECTION" score at or above which a span is
+    # flagged. A deployment knob, unlike the model/revision pin above: it
+    # trades false positives against detection rate without changing which
+    # model produced the score. See docs/PROMPT_INJECTION_CLASSIFIER.md.
+    prompt_injection_classifier_threshold: float = Field(
+        alias="PROMPT_INJECTION_CLASSIFIER_THRESHOLD", default=0.5
+    )
 
 
 class ParsingSettings(BaseSettings):
@@ -319,10 +391,58 @@ class EmbeddingSettings(BaseSettings):
     embedding_batch_size: int = Field(alias="EMBEDDING_BATCH_SIZE", default=64)
 
 
-class Settings(DatabaseSettings, LlmSettings):
-    """Application settings loaded from environment variables."""
+class QueueSettings(BaseSettings):
+    """Settings for the [M5-05] asynchronous-processing queue.
+
+    ``assessment_worker_concurrency`` is the DoD's configurable parallelism bound:
+    each RQ worker runs one assessment at a time, so N workers == N concurrent
+    graph runs against the LLM provider. It is the direct analog of
+    ``LLM_CLASSIFICATION_MAX_WORKERS`` -- an operator knob, tuned to the
+    provider's tolerance (and to VRAM: on the 4 GB-VRAM dev box, keep it at 1 --
+    see ``docs/ASYNC_PROCESSING.md``).
+
+    ``assessment_max_retries`` is the total attempt budget (initial try +
+    retries) a job gets on *transient* failures; ``assessment_retry_backoff_seconds``
+    is the wait before each retry (RQ's ``Retry(interval=...)``). Real errors are
+    not retried at all.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
 
     redis_url: str = Field(alias="REDIS_URL", default="redis://localhost:6379/0")
+    test_redis_url: str | None = Field(alias="TEST_REDIS_URL", default=None)
+
+    assessment_worker_concurrency: int = Field(
+        alias="ASSESSMENT_WORKER_CONCURRENCY", default=2, gt=0
+    )
+    assessment_max_retries: int = Field(alias="ASSESSMENT_MAX_RETRIES", default=3, gt=0)
+    assessment_retry_backoff_seconds: list[int] = Field(
+        alias="ASSESSMENT_RETRY_BACKOFF_SECONDS",
+        default_factory=lambda: [30, 120, 300],
+    )
+    assessment_job_timeout_seconds: int = Field(
+        alias="ASSESSMENT_JOB_TIMEOUT_SECONDS", default=1800, gt=0
+    )
+
+    @property
+    def rq_retry_intervals(self) -> list[int]:
+        """The per-retry wait list, padded/truncated to ``assessment_max_retries - 1``.
+
+        RQ needs one interval per retry (attempts beyond the first). A shorter
+        list repeats its last value; a longer one is truncated.
+        """
+        retries = max(self.assessment_max_retries - 1, 0)
+        backoff = self.assessment_retry_backoff_seconds or [30]
+        return [backoff[min(i, len(backoff) - 1)] for i in range(retries)]
+
+
+class Settings(DatabaseSettings, LlmSettings):
+    """Application settings loaded from environment variables."""
 
     # Logging
     log_level: str = Field(alias="LOG_LEVEL", default="INFO")
@@ -355,6 +475,12 @@ def get_llm_settings() -> LlmSettings:
 def get_settings() -> Settings:
     """Get cached application settings."""
     return Settings()
+
+
+@lru_cache
+def get_queue_settings() -> QueueSettings:
+    """Get cached settings for the asynchronous-processing queue."""
+    return QueueSettings()
 
 
 @lru_cache

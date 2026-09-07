@@ -1,0 +1,95 @@
+name: Evaluation suite
+
+# [M5-09]. The heavy evaluation suite (`tests/eval/*`, `pytest -m eval`) calls
+# real LLM APIs and needs a fully-indexed corpus, so it stays out of `ci.yml`'s
+# per-PR pipeline (see `ci.yml`'s `quality` job -- it never invokes this).
+# `workflow_dispatch` only, deliberately: a `schedule:` trigger would call the
+# configured LLM key unattended on every run. Trigger it by hand from the
+# Actions tab, or `gh workflow run eval.yml`, whenever you want a fresh
+# reading.
+#
+# Needs, configured once under the repo's Settings -> Secrets and variables ->
+# Actions (I cannot set these for you):
+#   Variables (non-sensitive): LLM_PROVIDER, LLM_BASE_URL, LLM_MODEL_FAST,
+#     LLM_MODEL_REASONING
+#   Secrets: LLM_API_KEY
+# Without them this run fails at the eval step -- same as running
+# `make test-eval` locally with no LLM_* in .env.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  eval:
+    name: Heavy evaluation suite (real LLM calls)
+    runs-on: ubuntu-latest
+
+    # Same service-container shape as ci.yml's `integration` job, own database
+    # so a stray failure here never touches that job's fixtures.
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: insurance_claims_eval
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d insurance_claims_eval"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/insurance_claims_eval
+      REDIS_URL: redis://127.0.0.1:6379/0
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_MODEL_FAST: ${{ vars.LLM_MODEL_FAST }}
+      LLM_MODEL_REASONING: ${{ vars.LLM_MODEL_REASONING }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies (incl. the embed group)
+        run: uv sync --locked --group embed
+
+      # [M5-09]'s demo-mode shortcut: skips the LLM-cost parse stage and, once
+      # the m3-embedding-cache-v1 release exists, the ~41min cold embed too.
+      # Until that release is published this falls through to a real cold
+      # embed inside build-index below -- functionally correct either way.
+      - name: Fetch demo artifacts (parsed corpus + embedding cache)
+        run: make fetch-demo-artifacts
+
+      - name: Apply migrations
+        run: make migrate
+
+      - name: Set up the LangGraph checkpointer
+        run: make setup-checkpointer
+
+      - name: Build the retrieval index
+        run: make build-index
+
+      - name: Run the heavy evaluation suite
+        run: make test-eval

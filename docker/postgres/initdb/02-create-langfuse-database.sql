@@ -1,0 +1,14 @@
+-- The self-hosted Langfuse server's own database -- [M5-07].
+--
+-- Langfuse needs a Postgres of its own for users, projects and API keys (its
+-- trace data lives in ClickHouse). It gets a database on this container rather
+-- than a second Postgres: one less service, and the `tracing` profile is a
+-- development/demo convenience, not a production topology.
+--
+-- The name is hardcoded, like the test database above, because `initdb` scripts
+-- run before any compose variable could reach them. Point LANGFUSE_DB_NAME
+-- somewhere else and you own creating it.
+--
+-- Runs only on an empty data volume. On a stack that already has one:
+--   docker compose exec postgres createdb -U postgres langfuse
+CREATE DATABASE langfuse;

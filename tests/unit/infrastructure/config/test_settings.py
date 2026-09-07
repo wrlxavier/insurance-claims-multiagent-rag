@@ -8,6 +8,7 @@ from infrastructure.config.settings import (
     EmbeddingSettings,
     LlmSettings,
     ObservabilitySettings,
+    QueueSettings,
 )
 from infrastructure.rag.embedding_pipeline import EMBEDDING_BATCH_SIZE
 
@@ -192,6 +193,37 @@ def test_embedding_batch_size_reads_the_env_var(
     monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "16")
 
     assert EmbeddingSettings(_env_file=None).embedding_batch_size == 16
+
+
+@pytest.mark.unit
+def test_queue_settings_defaults() -> None:
+    settings = QueueSettings(_env_file=None)
+
+    assert settings.assessment_worker_concurrency == 2
+    assert settings.assessment_max_retries == 3
+    assert settings.assessment_retry_backoff_seconds == [30, 120, 300]
+    assert settings.assessment_job_timeout_seconds == 1800
+    # one interval per retry (attempts beyond the first)
+    assert settings.rq_retry_intervals == [30, 120]
+
+
+@pytest.mark.unit
+def test_rq_retry_intervals_pads_with_the_last_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ASSESSMENT_MAX_RETRIES", "5")
+    monkeypatch.setenv("ASSESSMENT_RETRY_BACKOFF_SECONDS", "[10, 20]")
+
+    assert QueueSettings(_env_file=None).rq_retry_intervals == [10, 20, 20, 20]
+
+
+@pytest.mark.unit
+def test_rq_retry_intervals_is_empty_when_no_retries_are_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ASSESSMENT_MAX_RETRIES", "1")
+
+    assert QueueSettings(_env_file=None).rq_retry_intervals == []
 
 
 @pytest.mark.unit
