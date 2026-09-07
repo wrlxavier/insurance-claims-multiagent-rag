@@ -355,9 +355,12 @@ the expensive call is the one on the critical path either way.
 
 ## What this leaves for later
 
-- **Measured latency and cost** are [M5-10]. M5-07 makes the numbers visible per
-  node and per run; it does not report a p50/p95 or a cost per assessment, and
-  the prices registered here are list prices for the pinned route.
+- **Measured latency and cost** are [M5-10] — now done, `docs/PERFORMANCE.md`.
+  M5-07 makes the numbers visible per node and per run; it does not report a
+  p50/p95 or a cost per assessment, and the prices registered here are list
+  prices for the pinned route. [M5-10] aggregates both over the 51 synthetic
+  claims, from the [M5-06] node logger and a callback handler rather than from a
+  Langfuse trace.
 - **No integration test needs a Langfuse server.** The span assertions in
   `tests/unit/infrastructure/observability/test_tracing.py` run the real graph
   against a real Langfuse client whose exporter writes to memory, so CI proves

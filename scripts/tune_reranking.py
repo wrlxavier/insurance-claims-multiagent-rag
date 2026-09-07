@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import json
 import platform
-import statistics
 import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -50,6 +49,9 @@ from infrastructure.database import (
     create_session_factory,
 )
 from infrastructure.evaluation.golden_set_schema import GoldenQuestion, QuestionType
+from infrastructure.evaluation.latency_stats import (
+    summarise_latency as _summarise_latency,
+)
 from infrastructure.parsing.clause_schema import ParsedClauseRecord
 from infrastructure.parsing.corpus_artifact import JSONL_PATH
 from infrastructure.rag.dense_retriever import DenseRetriever
@@ -104,23 +106,14 @@ RERANK_CANDIDATE_DEPTHS: tuple[int, ...] = (10, 20, 30, 50)
 LATENCY_PROBE_QUESTIONS = 20
 
 
-def _percentile(sorted_values: list[float], fraction: float) -> float:
-    """Nearest-rank percentile, same formula as ``scripts/benchmark_ann_index.py``."""
-    index = min(int(len(sorted_values) * fraction), len(sorted_values) - 1)
-    return sorted_values[index]
-
-
 def summarise_latency(samples_ms: list[float]) -> dict[str, float]:
-    """Summarise per-query rerank latency samples (milliseconds)."""
-    if not samples_ms:
-        return {"n": 0, "p50": 0.0, "p95": 0.0, "mean": 0.0}
-    ordered = sorted(samples_ms)
-    return {
-        "n": len(ordered),
-        "p50": round(_percentile(ordered, 0.50), 1),
-        "p95": round(_percentile(ordered, 0.95), 1),
-        "mean": round(statistics.fmean(ordered), 1),
-    }
+    """Summarise per-query rerank latency samples, rounded to 0.1 ms.
+
+    Rerank latencies here are whole-millisecond scale, so this reports one
+    decimal place (``infrastructure.evaluation.latency_stats.summarise_latency``
+    defaults to 3, for sub-millisecond ANN timings).
+    """
+    return _summarise_latency(samples_ms, digits=1)
 
 
 class _ReplayRetriever:

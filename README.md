@@ -171,6 +171,11 @@ Score every retrieval configuration on the golden set with
 `make eval-retrieval-matrix` — the committed comparison table and verdict are in
 [`docs/RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md).
 
+Latency and token cost per assessment, measured over the whole graph on the 51
+synthetic claims, are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md)
+(`make eval-performance`) — with the one-off corpus-indexing cost reported
+separately.
+
 ### Run the assessment API and the worker
 
 Once the schema, the checkpointer and the index are in place (bare-metal dev
