@@ -1,13 +1,328 @@
 # Architecture
 
-Cross-cutting design decisions that shape the pipeline and are not owned by any
-one stage's document. Each entry states the decision, why it is a deliberate
-choice rather than an incidental one, and where the evidence lives.
+This document explains how the system is put together and, above all, **why the
+non-obvious decisions went the way they did**.
+
+- **Part I — system overview** (this half) is the top-down read: the layers and
+  the dependency rule, the shape of the assessment graph, the retrieval
+  pipeline, a step-by-step for adding a node, and a one-screen table of the
+  calls that went a different way than a first guess would.
+- **The decision log** that follows is one entry per issue (`[M3-06]` …
+  `[M5-09]`): the decision, why it is deliberate rather than incidental, what it
+  costs, any deviation from the original plan, and the test that keeps it true.
+  Code comments and other documents link to these entries by their `[Mx-yy]`
+  tag.
 
 Stage-local rationale stays in the stage's own document — `docs/PARSING.md`,
 `docs/EMBEDDINGS.md`, `docs/LEXICAL_RETRIEVAL.md`, `docs/HYBRID_RETRIEVAL.md`,
-`docs/RERANKING.md`, `docs/EXCLUSION_CO_RETRIEVAL.md`. The project scope
-statement is `docs/SCOPE.md`.
+`docs/RERANKING.md`, `docs/EXCLUSION_CO_RETRIEVAL.md`. The canonical statement of
+what the system may and may not assert is `docs/SCOPE.md`; the measured numbers
+behind every quality claim are in the evaluation documents linked from
+`README.md`.
+
+---
+
+## Layers and the dependency rule
+
+The code is a Clean Architecture core with the framework surface pushed to the
+edges. Four layers under `app/src/`, each depending only on the ones above it:
+
+| Layer | Directory | Holds | May import |
+| --- | --- | --- | --- |
+| Domain | `domain/` | Business entities and their invariants — `Claim`, `Assessment`, `HumanDecision`, `PolicyClause`, the `Citation` / `SusepProcess` / `Cnpj` value objects, the `Verdict` enum. Frozen dataclasses that validate on construction. | the standard library only |
+| Application | `application/` | Use-case interactors (`SubmitClaim`, `GetAssessment`, `SubmitHumanDecision`, …), the ports they depend on (`AssessmentRepository`, `UnitOfWork`, `Clock`, `ClaimAssessmentOrchestrator`, …), and the DTOs that cross them. | `domain` + its own ports |
+| Infrastructure | `infrastructure/` | Every concrete adapter: SQLAlchemy repositories, the LangGraph agent graph, the RAG retrievers, the RQ/Redis queue, Langfuse tracing, the OpenAI-compatible chat clients. | `domain`, `application`, third-party SDKs |
+| Presentation | `presentation/` | The FastAPI app — routes, request/response schemas, the one error→HTTP edge, middleware. | `application`, `infrastructure` (composition only) |
+
+**The dependency rule is tested, not trusted.**
+`tests/architecture/test_layer_boundaries.py` parses every module under
+`domain/` and `application/` with `ast` and fails CI on a forbidden import.
+`domain/` may import nothing outside the standard library; `application/` may
+additionally import `domain` and its own ports but **not** `infrastructure`, and
+not an LLM SDK. The forbidden roots include `fastapi`, `sqlalchemy`, `pydantic`,
+`langgraph`, `langchain`, `langchain_core`, `langchain_openai`, `rq`, `redis`,
+`langfuse`.
+
+**How LangGraph stays inside infrastructure.**
+
+- `langgraph` and `langchain` are forbidden roots in *both* `domain/` and
+  `application/`; `langchain_core` and `langchain_openai` are forbidden in
+  `application/` too, because LangGraph re-exports `langchain_core` types and
+  "the orchestrator hides LangGraph entirely" would otherwise leak.
+- `infrastructure/graph/__init__.py` is the only module in the codebase that
+  should import `langgraph`. The state schema (`infrastructure/graph/state.py`)
+  deliberately imports no `langgraph` at all — it is the pure data contract, so
+  importing it never pulls the framework in.
+- The application layer reaches the graph only through the
+  `ClaimAssessmentOrchestrator` **port**. Its methods — `start` and `resume` —
+  take and return domain / DTO types; no `ClaimState`, `Command`, `interrupt` or
+  `thread_id` crosses the boundary. The concrete
+  `LangGraphClaimAssessmentOrchestrator` lives in `infrastructure/graph/` and is
+  wired in at the composition root (`infrastructure/bootstrap.py`,
+  `presentation/app.py`).
+- The graph works in its own Pydantic **twins** of the domain types
+  (`state.Citation`, `state.CompatibilityAssessment`, `state.HumanDecision`, …)
+  because LangGraph needs Pydantic and Pydantic is banned in `domain/`. Mappers
+  convert at the edge (`infrastructure/graph/state_mapper.py`,
+  `infrastructure/database/assessment_mapper.py`). `domain.verdict.Verdict` is
+  the single type shared verbatim by both sides.
+
+Layer-by-layer detail is in the `[M5-01]`, `[M5-02]`, `[M5-03]` and `[M5-04]`
+entries below.
+
+---
+
+## The assessment graph
+
+One claim narrative in; one recommendation, its citations and a durable audit
+trail out — with a mandatory human pause before anything is final. The graph is
+a LangGraph `StateGraph` assembled by `build_claim_graph()` in
+`infrastructure/graph/build.py` and compiled by the caller against a Postgres
+checkpointer.
+
+```mermaid
+flowchart TD
+  START([claim narrative]) --> intake
+  intake -->|"missing info, rounds left"| clarification
+  clarification --> intake
+  intake -->|"clarification cap (2) reached"| clarification_exhausted
+  intake -->|complete| retrieval
+  clarification_exhausted --> recommendation
+  retrieval -->|"context sufficient"| compatibility
+  retrieval -->|"context sufficient"| consistency
+  retrieval -->|"context sufficient"| injection_scan
+  retrieval -->|"insufficient context"| recommendation
+  compatibility --> recommendation
+  consistency --> recommendation
+  injection_scan --> recommendation
+  recommendation --> human_review
+  human_review -->|"interrupt() — approve / edit / reject"| DONE([settled + audit trail])
+```
+
+`route_after_intake` and `route_after_retrieval` in `build.py` are the two
+routers; every other edge is fixed. `injection_scan` is a fixed member of the
+fan-out but a no-op unless the optional classifier is configured.
+
+**The nodes.** Each is a plain function `(state, runtime) -> dict` under
+`infrastructure/graph/nodes/`, returning only the state keys it changed plus at
+least one `AuditEvent`.
+
+| Node | Kind | Model | Does |
+| --- | --- | --- | --- |
+| `intake` | LLM | fast | Free-text narrative → `ExtractedEntities` + `missing_information`; classifies the product line. Merges over prior entities on a clarification re-entry. |
+| `clarification` | LLM | fast | One specific question per open gap; increments `clarification_rounds`. Per-tag fallback template if the model omits one. |
+| `clarification_exhausted` | deterministic | — | Marks `clarification_exhausted = True` when the loop cap is hit with gaps still open. |
+| `retrieval` | deterministic | — | Builds the query from entities and the metadata pre-filter from the classification, calls `RetrievalPort`, hydrates a `Citation` per hit, runs the `[M3-07]` gate to set `context_sufficient`. |
+| `compatibility` | LLM | reasoning | The verdict. Every assertion must cite a retrieved clause id or the output is rejected and retried; unfixable → degrade to `insufficient_information`. |
+| `consistency` | deterministic + LLM | fast | Internal-consistency **signals**, never a verdict. Arithmetic leg in Python, coherence leg on the fast model. Two audit events. |
+| `injection_scan` | deterministic / optional LLM | — | Advisory prompt-injection classifier over the narrative and clause excerpts. Writes only `audit_trail`; nothing branches on it. |
+| `recommendation` | deterministic + LLM | fast | The single terminal consolidation. Action, citations, flags and confidence are computed in Python from upstream state; the model writes only the prose justification. |
+| `human_review` | deterministic | — | Surfaces the recommendation, `interrupt()`s, records the analyst's decision *beside* it, writes the durable audit trail. |
+
+**The conditional loop.** When `intake` leaves `missing_information` non-empty,
+`route_after_intake` sends the claim to `clarification` and back to `intake`.
+The loop is **self-capping in the router**: `MAX_CLARIFICATION_ROUNDS = 2` is a
+code constant in `build.py`, and once it is reached with gaps still open the
+router routes to `clarification_exhausted` — the graph never relies on
+LangGraph's `recursion_limit`. `clarification_exhausted` is its own state
+channel, distinct from `context_sufficient`: "the claimant never supplied
+enough" is not "retrieval did not return enough". Full account: `[M4-03]`,
+`docs/CLARIFICATION_LOOP.md`.
+
+**The parallel branches.** On the sufficient-context path `route_after_retrieval`
+returns the *list* `["compatibility", "consistency", "injection_scan"]` —
+LangGraph's **fixed parallel branches** primitive (a conditional edge to known
+nodes), run in one superstep, converging on `recommendation`. It is deliberately
+not `Send`, which is for dynamic map-reduce over a runtime-sized list. The three
+nodes write disjoint state channels; the one shared channel, `audit_trail`,
+carries the `append_audit_events` reducer so concurrent appends are defined
+rather than a race. If a branch raises a real exception LangGraph cancels the
+siblings and re-raises — no partial superstep is committed. Full account:
+`[M4-07]`, `docs/PARALLEL_ASSESSMENT.md`.
+
+**The interrupt point.** `human_review` is the only node with an edge to `END`,
+and it is unconditional — the checkpoint is the product, not a mode, so
+`build_claim_graph()` has no flag that removes it. It calls LangGraph's
+`interrupt()`; because an interrupted node re-runs from the top on resume, the
+node is pure above the `interrupt()` line (read state, build the payload) and
+does its one side effect — the durable audit write — strictly below it. A
+malformed decision re-asks rather than raising. **The compiled graph therefore
+requires a checkpointer and a `thread_id` at every call site** — `PostgresSaver`
+in production (`infrastructure/graph/checkpointer.py`, brought up by
+`make setup-checkpointer`), `InMemorySaver` in a unit test. Full account:
+`[M4-09]`, `docs/HUMAN_CHECKPOINT.md`.
+
+**Run-scoped dependencies.** A node never holds a module-level client. The fast
+and reasoning chat models, the `RetrievalPort`, the audit sink, the tracer, the
+optional injection classifier and the model config are all fields of a frozen
+`GraphContext` (`infrastructure/graph/context.py`), registered with
+`context_schema=` and read inside a node as `runtime.context`. Every node is also
+registered through `build._instrumented`, which brackets each run with a
+correlation-tagged `node.start` / `node.completed` / `node.failed` log line — in
+`build.py`, not the node files, so the node convention is untouched (the
+`[M4-01b]` entry's *Instrumentation* note; tracing adds spans the same way,
+`[M5-07]`).
+
+---
+
+## Retrieval design
+
+Retrieval answers one question — *which registered-product clauses bear on this
+described event?* — and is built so that a clause that changes the answer cannot
+be silently dropped. The pipeline is fully deterministic (both models run
+locally, $0.00 per query) and every stage has its own document with the method,
+the sweep and the numbers.
+
+The shipped configuration, end to end:
+
+1. **Metadata pre-filter.** Before any ranking, the search space is cut to the
+   relevant document(s). A stated SUSEP process selects one filing and wins
+   alone; absent a process, intake's product-line classification constrains the
+   segment; absent both, retrieval runs unconstrained (the degraded path).
+   Insurers are matched by CNPJ, never by name. This single step drives the
+   foreign-document rate to **0.0%** and lifts Recall@10 by 27–39 points on
+   every leg. `docs/HYBRID_RETRIEVAL.md`; the process-beats-product-line rule is
+   `[M4-04]`'s amendment, `docs/END_TO_END_EVALUATION.md`.
+
+2. **Two retrieval legs.** A hand-rolled Okapi **BM25 lexical** leg (`k1 = 1.5`,
+   `b = 0.75`, a Portuguese stem-then-accent-fold analyzer, no stopword removal
+   because `não` / `sem` / `salvo` flip a clause into an exclusion) over the
+   in-memory chunk corpus; a **dense** leg (`Alibaba-NLP/gte-multilingual-base`,
+   cosine, exact search) over pgvector. `docs/LEXICAL_RETRIEVAL.md`,
+   `docs/EMBEDDINGS.md`.
+
+3. **Reciprocal Rank Fusion** combines the two rankings (`RRF_K = 60`). RRF is
+   kept over weighted score fusion: weighted wins fusion-stage MRR, but RRF wins
+   on every metric once the reranker is in the loop. `docs/HYBRID_RETRIEVAL.md`,
+   `docs/RETRIEVAL_BENCHMARK.md`.
+
+4. **Cross-encoder reranking** re-scores the fused top-10 with
+   `Alibaba-NLP/gte-multilingual-reranker-base`, reading each `(question,
+   clause)` pair together. It can only reorder, never pad. Candidate depth 10 —
+   the sweep has no rising limb. CPU latency is ~9.75 s/query, so this is a
+   batch-eval / GPU-serving component. `docs/RERANKING.md`.
+
+5. **Exclusion co-retrieval — a domain rule, not a ranking heuristic.** For
+   every retrieved `coverage` clause the system pulls the structurally linked
+   `exclusion` clauses (same section, an adjacent section within a 3-page window,
+   or an in-text `cláusula N` cross-reference) and reserves one slot of the final
+   context for the best-linked exclusion the ranking missed. A coverage clause
+   says an event *is* covered; the exclusion three paragraphs down says it *is
+   not*, under the circumstances that actually apply — an assessment built on the
+   first without the second is fluent, well-cited and wrong, which is the single
+   failure mode M3 was scoped around. The linked exclusion is therefore treated
+   as *as load-bearing as the coverage clause it modifies*, and the pipeline is
+   not allowed to return one without the other when a structural link exists. The
+   step is deterministic Python over the M1 clause tree. It lifts exclusion-clause
+   recall from 92.6% to **100% (27/27)** and overall Recall@10 from 91.5% to
+   **92.3%**, every other question type unchanged. Full account: the `[M3-06]`
+   entry and `docs/EXCLUSION_CO_RETRIEVAL.md`.
+
+6. **The insufficient-context gate** turns *"the corpus does not contain this"*
+   into a first-class outcome. A pure function over signals the pipeline already
+   computed (the rank-1 reranker score, whether anything was returned, whether
+   the question asks for a policy-instance value the corpus cannot hold) sets
+   `context_sufficient`; the retrieval node records it and `route_after_retrieval`
+   acts on it. On the golden set's 23 unanswerable questions it abstains 23/23
+   with zero false abstentions on the 117 scorable ones. `[M3-07]`, `[M4-04]`,
+   `docs/INSUFFICIENT_CONTEXT_GATE.md`.
+
+Shipped end to end: **Recall@10 92.3%, MRR 0.806, exclusion recall 100%,
+foreign-document rate 0.0%** on `golden-set-v1` (117 scorable questions).
+`docs/RETRIEVAL_BENCHMARK.md` has the full matrix and the reproducible
+`make build-index && make eval-retrieval-matrix` path.
+
+**The deterministic / LLM split is a system-wide choice, not a retrieval one.**
+The metadata pre-filter, exclusion co-retrieval, the insufficient-context gate,
+the consistency node's arithmetic checks (`consistency_checks.py`), the grounding
+check on every compatibility assertion, and every confidence ceiling in the
+recommendation node are all plain Python. The LLM is used only where the work is
+genuinely judgement — extracting entities from prose, weighing a coverage clause
+against an exclusion, reading a narrative for coherence, summarising for a
+reviewer. Routing a decidable question through a model turns a system that is
+right into one that is usually right; the boundary is drawn to keep that from
+happening. The consistency node is where the line is sharpest — see its entry
+below.
+
+---
+
+## Adding a node
+
+The node-authoring convention is fixed (`[M4-01b]`) and enforced
+(`tests/architecture/test_graph_node_conventions.py`, unit-marked, in CI). To add
+one:
+
+1. **`schemas.py`** — if the node calls an LLM, add a frozen Pydantic
+   `class <Node>Output(BaseModel)` with
+   `model_config = ConfigDict(frozen=True, extra="forbid")`. This is the exact
+   shape passed to `.with_structured_output(...)`; the node maps it onto the
+   `state.py` sub-model. A deterministic node adds no schema and no prompt.
+
+2. **`prompts/<node>.py`** — add `build_<node>_prompt(...) -> str` returning
+   `with_scope_preamble(body)` (which also prepends the untrusted-content
+   notice). Prompt text never appears inline in a node function; wrap every span
+   of claimant- or clause-derived text in `wrap_untrusted(...)`.
+
+3. **`nodes/<node>.py`** — the function
+   `def <node>(state: ClaimState, runtime: Runtime[GraphContext]) -> dict[str, object]`.
+   Read dependencies off `runtime.context` (`fast_model`, `reasoning_model`,
+   `retriever`, `llm_settings`, `audit_sink`, `tracer`, `classifier`); read
+   optional state with `state.get(...)`. Return only the keys you changed, plus
+   at least one `AuditEvent` appended to `audit_trail` — set `model` and
+   `token_usage` for an LLM call, leave them `None` for a deterministic one.
+   Every other function in the module is a `_`-prefixed private helper. An LLM
+   node degrades or retries on a bad response; it never mutates state and never
+   coerces malformed structured output.
+
+4. **`tests/unit/infrastructure/graph/test_<node>.py`** (`@pytest.mark.unit`) —
+   call the function with a literal state dict and a `GraphContext` of fakes (a
+   fake `BaseChatModel`, a stub retriever); no graph, no `compile()`, no network.
+   Accuracy against the synthetic claims is a separate `eval`-marked test.
+
+5. **Edges** are `build.py`'s concern, not the node's — register the node in
+   `build_claim_graph()` (wrapped in `_instrumented`) and wire its edges there.
+   A node that ends the graph still routes through `human_review`; only
+   `human_review` has an edge to `END`.
+
+The verdict vocabulary (`compatible` / `incompatible` /
+`insufficient_information`, never `covered` / `denied`) is scanned across the
+whole graph package by `tests/architecture/test_scope_vocabulary.py`. The *why*
+behind this shape — a function and not a class, `Runtime[GraphContext]` and not a
+constructor — is in the `[M4-01b]` entry.
+
+---
+
+## Decisions that went the other way
+
+The calls a first guess would probably get wrong, each with a pointer to the full
+account. "Rejected" means considered and deliberately not shipped.
+
+| Decision | Shipped | Rejected | Why |
+| --- | --- | --- | --- |
+| Graph node shape | Plain `(state, runtime) -> dict` functions | Class-based / `Runnable` nodes holding deps in `__init__` | Reintroduces the construction-order and shared-mutable-state problems `context_schema` exists to remove. Enforced by test. `[M4-01b]` |
+| Parallel assessment | Fixed parallel branches (a router returning a list of node names) | `Send` | `Send` is dynamic map-reduce over a runtime-sized list; this is known nodes, always all of them. `[M4-07]` |
+| Clarification-loop termination | A cap (`MAX_CLARIFICATION_ROUNDS = 2`) checked in the router | LangGraph's `recursion_limit` / `GraphRecursionError` | Termination should be a property of the product logic, not a framework safety net; and the cap is product behaviour, so it is a code constant, not an `.env` knob. `[M4-03]` |
+| Fusion strategy | Reciprocal Rank Fusion | Weighted score fusion | Weighted wins fusion-stage MRR, but RRF wins every metric once the cross-encoder reranker is in the loop — measured, after `[M3-04]` deferred the call. `docs/RETRIEVAL_BENCHMARK.md` |
+| Approximate-nearest-neighbour index | Exact pgvector search; `make build-index` stops at the embedded queryable table | An HNSW index | The filtered path reads the btree partition and never touches a vector index; ANN does not earn its place even at real-embedding recall 0.9932. `docs/EMBEDDINGS.md` |
+| Lexical retrieval backend | A ~60-line hand-rolled BM25 over the in-memory chunk corpus | Postgres `ts_rank` / a full-text extension | `ts_rank` is not BM25, and real in-DB BM25 needs a heavy extension; with the metadata pre-filter in hand the in-memory leg is enough. `docs/LEXICAL_RETRIEVAL.md` |
+| Exclusion clauses | A reserved context slot, filled deterministically from the clause tree | Leaving it to the reranker's relevance score | A coverage-phrased question scores the limiting exclusion lower; the exclusion is load-bearing, not "a nice extra result". `[M3-06]` |
+| Consistency node output | Signals for a human, tagged by source | A verdict, or a fraud score | The data carries no fraud labels and the method is not one; the node flags, the recommendation node consolidates. `[M4-06]`, `docs/SCOPE.md` |
+| Policy-period (vigência) check | Not attempted; intake's `data_evento_vigencia` tag records the gap | A date-in-period check | The corpus is registered-product conditions, not contracts — there is no period to compare against. `docs/SCOPE.md` |
+| `RetrievalService` application port | Not built | A port with no caller | This codebase lands a port with its first real consumer, never ahead of one; retrieval stays internal to the graph. `[M5-02]` |
+| Runtime prompt-injection classifier | Wired, tested, **disabled by default** | Shipping it on, or not building it | The one open model evaluated flags ~70% of real Portuguese policy clauses; the wiring stays as a worked reference and for domains closer to the model's training data. `[M5-08 Appendix]`, `docs/PROMPT_INJECTION_CLASSIFIER.md` |
+| Submit endpoint | `202` + a Redis/RQ queue and a worker | Running the graph synchronously in the request handler | `[M5-04]` shipped the synchronous stand-in behind the `202` shape on purpose; `[M5-05]` replaced the body with the queue without changing the contract. |
+| The human decision | Recorded *beside* the recommendation (`human_decision.edited_recommendation`) | Overwriting `state.recommendation` | What the machine produced and what the analyst did with it must both survive, separately, to be auditable. `[M4-09]` |
+
+---
+
+## The decision log
+
+One entry per issue, in the order the issues landed, each stating the decision,
+why it is deliberate, what it costs, any deviation on record, and the test that
+enforces it. By area: **retrieval** — `[M3-06]`; **the graph and its nodes** —
+`[M4-01b]`, `[M4-03]`–`[M4-09]`, `[M5-08]` and its Appendix; **domain,
+application and persistence** — `[M5-01]`, `[M5-02]`, `[M5-03]`; **service and
+operations** — `[M5-04]`, `[M5-05]`, `[M5-07]`, `[M5-09]`.
 
 ---
 
