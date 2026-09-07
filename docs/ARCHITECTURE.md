@@ -127,6 +127,25 @@ first two parameters are not `(state, runtime)`.
 `tests/architecture/test_scope_vocabulary.py` already scans the same tree for
 verdict-vocabulary drift.
 
+**Instrumentation — [M5-06].** `build.py` registers every node through a
+`_instrumented(node)` wrapper: each run brackets itself with a correlation-tagged
+`node.start` / `node.completed` log line on the `infrastructure.graph.node`
+logger (`node.failed` on a real exception; LangGraph control-flow exceptions such
+as `human_review`'s `interrupt()` bubble silently), plus a `duration_ms`. It sits
+in `build.py`, not the node files, so the `(state, runtime) -> dict` convention
+and its enforcement test are untouched. The correlation id is
+`GraphContext.correlation_id`, set by `LangGraphClaimAssessmentOrchestrator` from
+the ambient request/worker id; the orchestrator also puts it in the graph
+`config` metadata, which LangGraph copies onto every node's child
+`RunnableConfig` so LLM calls carry it. See `docs/API.md` "Structured logging &
+correlation IDs".
+
+[M5-07] adds spans beside those log lines, and adds them **without touching this
+wrapper or any node** — the Langfuse callback handler goes on the run's config in
+the orchestrator, where it sees the nodes *and* the LLM calls inside them. See
+"Tracing is one callback handler on the run" below and
+`docs/OBSERVABILITY.md`.
+
 ---
 
 ## The clarification loop is self-capping in the router, not in the framework — [M4-03]
@@ -573,3 +592,638 @@ without passing the checkpoint); `tests/integration/test_human_checkpoint.py`
 paused run survives a restart).
 
 Full contract, the verified `interrupt()` semantics and the table: `docs/HUMAN_CHECKPOINT.md`.
+
+---
+
+## Domain entities are frozen dataclasses that validate on construction — [M5-01]
+
+**Decision.** The business layer (`app/src/domain/`) is `Policy`, `PolicyClause`,
+`Claim`, `Assessment`, `HumanDecision`, the `Citation` value object and the
+`SusepProcess` / `Cnpj` identifier value objects — every one a
+`@dataclass(frozen=True)` whose `__post_init__` raises if the invariant it owns
+is broken. Closed vocabularies are `enum.Enum` (`Verdict` reused unchanged from
+[M4-01], `DecisionOutcome` new). Value objects take a strict constructor
+(already-canonical input) plus a lenient `parse()` classmethod that normalises
+I/O forms — `Cnpj.parse` applies the 14-digit zero-pad the upstream SUSEP
+catalogue needs; `SusepProcess.parse` accepts the 17-digit filename stem. One
+`domain/errors.py` holds the exception hierarchy. Standard library and typing
+only — no Pydantic, no SQLAlchemy, no LangGraph.
+
+**Why validate in `__post_init__`, and why the enum field still needs a guard.**
+A frozen dataclass gives immutability and structural equality for free but does
+**not** check its field types at runtime, so `Assessment(verdict="compatible",
+…)` would construct happily and the DoD's "a verdict is one of the three
+permitted values" invariant would be unenforced. Each entity therefore
+`isinstance`-guards its enum fields explicitly (`VerdictNotPermittedError`) and
+checks its cross-field rules (an assessment has ≥1 citation always — including
+for `insufficient_information`; a `HumanDecision` always carries the
+`assessment_id` it acted on, and an `edited_assessment` must revise that same
+id). `Cnpj` verifies the real mod-11 check digits — a public, stable algorithm,
+and a wrong-length or transposed-digit CNPJ is exactly the upstream-data bug
+class the value object exists to catch; `SusepProcess` is format-only, because
+SUSEP's process check-digit algorithm is not a published spec and a false
+rejection of a real filing is unrecoverable.
+
+**Why a twin of `infrastructure/graph/state.py`, not a move.** `state.py` is
+Pydantic (LangGraph needs it) and forbidden in `domain/` by
+`tests/architecture/test_layer_boundaries.py`. The graph keeps producing its
+`CompatibilityAssessment` / `HumanDecision` inside a run; the domain dataclasses
+are what the application ports ([M5-02]) and repositories ([M5-03]) speak in,
+with the mappers between the two owned by [M5-03]. `Verdict` is the one type
+already shared across both.
+
+**Deviation on record.** (a) The DoD names the clause entity `Clause`; it ships
+as `PolicyClause` so it does not shadow the existing 18-field parse-tree
+`Clause` (`domain/clause_tree.py`) — the two are never imported together, and
+both module docstrings state the split. (b) `domain/errors.py` centralises the
+exception hierarchy, unlike the per-module `OrphanTextExceedsThresholdError`
+pattern elsewhere in `domain/`: M5-01's errors are a cluster the API boundary
+catches as one group. (c) `Assessment` omits consistency signals — no M5-01
+invariant touches them; persisting `ConsistencyReport` is [M5-03]'s call. (d)
+The ≥1-citation invariant is unconditional, so the compatibility node's
+abstain-on-empty-retrieval output is not a persistable `Assessment` — it stays
+in claim state and the audit trail, a fact [M5-02]/[M5-03] account for.
+`ClauseProvenance` is left untouched; `Policy` is additive.
+
+**Enforcement.** `tests/unit/domain/` — one `test_<module>.py` per entity, every
+invariant with its rejection case (`test_assessment.py` on the ≥1-citation and
+verdict-type rules, `test_human_decision.py` on the assessment reference and the
+edit-consistency rules, `test_cnpj.py` parametrized over all 30 manifest CNPJs).
+`tests/architecture/test_layer_boundaries.py` already AST-scans all of
+`app/src/domain/` for a forbidden import and needs no change — the new
+stdlib-only modules are covered automatically.
+`tests/architecture/test_scope_vocabulary.py` now scans the whole `domain/`
+package, not just `verdict.py`.
+
+Full field tables, the invariant list and the relationship to `state.py`:
+`docs/DOMAIN.md`.
+
+---
+
+## The application layer is ports + use cases; the orchestrator hides LangGraph — [M5-02]
+
+**Decision.** `app/src/application/` gains the claim-assessment surface: five
+ports (`app/src/application/ports/`), four use-case interactors
+(`app/src/application/use_cases/`), and the DTOs they speak in
+(`app/src/application/{assessment_record,orchestrator_result,consistency_flag,edited_assessment_input,errors}.py`).
+
+- `ClauseRepository` — read-only lookup over the registered-product clause
+  corpus. Stands apart from the transaction: the corpus is reference data the
+  assessment use cases never write.
+- `AssessmentRepository` — persists and queries `AssessmentRecord`. Its writes
+  run inside a `UnitOfWork`; its reads do not.
+- `UnitOfWork` — one transaction, exposing only `assessments`. The use cases
+  take a `UnitOfWorkFactory` (`Callable[[], UnitOfWork]`), so each call opens
+  its own unit — the session-per-transaction shape [M5-03] needs.
+- `Clock` — `now() -> datetime` (tz-aware UTC). Formalises the
+  `now=datetime.now(UTC)` parameter injection `consistency_checks.py` already
+  uses, so the use cases' timestamps are assertable.
+- `ClaimAssessmentOrchestrator` — `start(*, assessment_id, claim)` and
+  `resume(*, assessment_id, decision)`, returning an `OrchestratorResult`.
+  **No graph type crosses it**: no `ClaimState`, `Command`, `interrupt`,
+  `thread_id`, or `infrastructure.graph` model. `assessment_id` is the sole run
+  key (the implementation uses it as the LangGraph `thread_id`), so
+  re-submitting a claim is simply a fresh `assessment_id` — the "one claim, a
+  second thread" case `docs/HUMAN_CHECKPOINT.md` describes.
+
+The use cases (`SubmitClaim`, `GetAssessment`, `SubmitHumanDecision`,
+`ListAssessments`) are frozen-dataclass interactors — ports injected as fields,
+one `__call__` — unlike the earlier pure-function pipeline use cases, because
+they carry dependencies.
+
+**Why `AssessmentRecord`, not `domain.Assessment`, is the stored unit.**
+`Assessment`'s ≥1-citation invariant is unconditional by design (M5-01, above).
+But the graph can finish an insufficient-context or clarification-exhausted run
+with a recommendation that cites nothing, and `GET /v1/assessments/{id}` /
+`ListAssessments` must still serve those — after the LangGraph thread, and its
+checkpoint, may be gone. So the persisted/servable aggregate is
+`application.assessment_record.AssessmentRecord`: the full lifecycle (system
+verdict, prose, citations — possibly empty; the retrieval/clarification signals;
+status; and, once settled, the analyst's `HumanDecision` recorded *beside* the
+system's opinion). `AssessmentRecord.as_domain_assessment()` is the grounded
+projection back — and it raises `CitationRequiredError` for an abstain record,
+which is the invariant doing its job.
+
+**Deviation on record.**
+(a) `RetrievalService` is **not** delivered. No M5-02 use case consumes semantic
+retrieval — the assessment use cases never search, and `Citation.excerpt`
+already carries the hydrated clause text — so a `RetrievalService` port would be
+a contract with no caller. This codebase lands a port with its first real
+consumer (M4-04's `RetrievalPort`/`GraphRetrievalAdapter`, M4-09's
+`AuditTrailSink`/`SqlAlchemyAuditTrailSink`), never ahead of one. Retrieval
+stays internal to the graph (`infrastructure.graph.context.RetrievalPort`,
+satisfied by `GraphRetrievalAdapter`), reached only through
+`ClaimAssessmentOrchestrator`.
+(b) The concrete `ClaimAssessmentOrchestrator` adapter (wrapping
+`build_claim_graph`) and the real `Clock` (`SystemClock`) are **M5-04's**
+composition root — M5-02 is fakes-only per its DoD ("contracts first, adapters
+after"). The port shape is proven sufficient for that adapter: every
+`OrchestratorResult` field maps to a concrete graph source, and both methods
+reduce to one `compiled.invoke(...)` keyed by `assessment_id` (the verdict —
+which `Recommendation` has no field for — is read from the recommendation
+node's audit event).
+(c) An `edit` decision always produces a *grounded* `Assessment` (≥1 citation,
+every cited clause validated against `ClauseRepository` before the graph is
+resumed). Keeping a 0-citation abstain unchanged is an `approve`, not an `edit`.
+(d) The application import check
+(`tests/architecture/test_layer_boundaries.py::test_application_imports_no_infrastructure_or_llm_sdk`)
+adds `infrastructure`, `langchain_core` and `langchain_openai` to a
+layer-scoped forbidden set — `_top_level_module` does not fold the latter two
+into the existing `langchain` root, and LangGraph re-exports `langchain_core`
+types, so "the orchestrator hides LangGraph entirely" needs all three barred.
+
+**Enforcement.** `tests/unit/application/**` — every use case with its rejection
+cases, driven through in-memory fakes (`tests/unit/application/fakes.py`), no
+LLM, no database, no graph; `test_assessment_record.py` on the projection and
+the status/decision pairing;
+`tests/architecture/test_layer_boundaries.py::test_application_imports_no_infrastructure_or_llm_sdk`.
+
+**Downstream.** [M5-03] implements the SQLAlchemy adapters behind these ports
+(see the next section). [M5-04] adds the FastAPI endpoints, the LangGraph
+orchestrator adapter, `SystemClock`, the `policy_ref` → retrieval-filter path,
+and the domain/application-error → HTTP status mapping.
+
+---
+
+## Persistence adapters mirror the ports; the audit trail is append-only in the database — [M5-03]
+
+**Decision.** `app/src/infrastructure/database/` gains the SQLAlchemy
+implementations of the [M5-02] ports: `SqlAlchemyAssessmentRepository`,
+`SqlAlchemyClauseRepository`, `SqlAlchemyUnitOfWork` (+
+`sqlalchemy_unit_of_work_factory`), the `assessment` / `human_decision` tables
+(`models.py`, migration `20260903_01`), and the row ↔ aggregate mapper
+(`assessment_mapper.py`). `audit_event` becomes append-only at the database via
+a `BEFORE UPDATE OR DELETE` trigger (migration `20260903_02`). Full column
+rationale: `docs/DATABASE.md`.
+
+**Why `citations` / `consistency_flags` are `JSONB`, not child tables.** They
+are frozen value-object tuples with no identity, read whole with the record and
+never queried by field — the same call as `audit_event.payload`. A normalised
+child table buys nothing here and costs a join, an ordering column and a mapper
+layer. `decisions` *is* its own table, as the DoD enumerates, because a decision
+has a lifecycle (it settles a specific assessment) and its own foreign key.
+
+**Why the `ClauseRepository` reads `chunk`.** There is no separate `clause`
+table and [M5-02]'s port docstring already commits to this. A `PolicyClause` is
+projected from the chunk rows whose `source_clause_ids` contains the wanted id —
+the same reconstruction `graph_retrieval_adapter.build_clause_index` does, and
+the id a `Citation` carries.
+
+**Why a trigger, not a rule, for append-only.** An `ON UPDATE … DO INSTEAD
+NOTHING` rule swallows the write silently; the trigger `RAISE`s, so a tamper
+attempt fails loudly and the DoD's "cannot be updated" test can assert it. The
+`INSERT … ON CONFLICT DO NOTHING` insert path never fires an `UPDATE`, so the
+checkpoint node's idempotent re-write is unaffected.
+
+**Two DoD items met differently, both recorded.** (a) "Alembic migrations: …
+checkpointer tables" — met by `make setup-checkpointer` ([M4-09]), not a
+migration duplicating `PostgresSaver.setup()`; the split is a settled decision
+(`alembic/env.py`'s `UNMANAGED_TABLES` filter, `docs/DATABASE.md`). (b) "folds
+the record write into the audit-sink transaction" — **deferred to [M5-04]**.
+The audit sink writes inside the `human_review` graph node; wrapping that write
+and the use case's record write in one transaction needs the orchestrator
+adapter and the composition root to coordinate, neither of which exists until
+[M5-04]. The `state.py` ↔ domain mapper (`docs/DOMAIN.md` "Deferred") is
+[M5-04]'s for the same reason — no [M5-03] consumer.
+
+**Enforcement.** `tests/unit/infrastructure/database/test_models.py` (the
+`CHECK` sets tie back to the domain enums; column/nullable/index/FK assertions);
+`tests/unit/infrastructure/database/test_assessment_mapper.py` (round-trip on
+grounded / abstain / every decision outcome, no DB);
+`tests/integration/test_assessment_repository.py`,
+`test_clause_repository.py`, `test_unit_of_work.py`,
+`test_audit_event_append_only.py` (real Postgres, one per repository plus the
+append-only guarantee). `make test-integration` and CI's `integration` job pick
+these up from the directory.
+
+---
+
+## The HTTP surface: FastAPI over the use cases, errors mapped at one edge — [M5-04]
+
+**Decision.** `app/src/presentation/` gains the FastAPI app: `app.py`
+(`create_app()` + the `lifespan` composition root), `dependencies.py`
+(`Depends` providers building a use case per request off `app.state.components`),
+`schemas.py` / `mappers.py` (Pydantic request/response models, pure
+dataclass↔schema conversions), `errors.py` (the single error→HTTP edge), and
+`routes/` (`assessments.py` — the five endpoints — and `health.py`). Three
+infrastructure pieces the application layer was designed around land with it:
+`infrastructure/graph/orchestrator.py`
+(`LangGraphClaimAssessmentOrchestrator`, the concrete
+`ClaimAssessmentOrchestrator` wrapping `build_claim_graph`),
+`infrastructure/graph/state_mapper.py` (the `state.py` ↔ domain mapper — its
+only consumer, so it is [M5-04]'s per `docs/DOMAIN.md`), and
+`infrastructure/clock.py` (`SystemClock`). `infrastructure/graph/verdict_readout.py`
+extracts the "read the verdict from the recommendation node's audit event"
+logic that `scripts/eval_end_to_end.py` had inline; `infrastructure/rag/retriever_factory.py`
+consolidates the ad-hoc retrieval-stack assembly the eval scripts each carried.
+The new audit read model is a port (`AuditTrailReader`), a use case
+(`GetAuditTrail`) and an adapter (`SqlAlchemyAuditTrailReader`), landing with its
+first caller like every other port.
+
+**Why.** (a) `POST /v1/assessments` returns **202** but runs the graph
+synchronously in the handler for now — the real Redis queue and the
+`PENDING/RUNNING/FAILED` run states are [M5-05]'s, which owns the queue; the id
+in the 202 body and `Location` always resolves on `GET`. (b) `policy_ref` reaches
+retrieval as a **text header** the adapter prepends to the narrative
+(`[Apólice registrada: processo SUSEP …]`), byte-identical to the measured
+headline arm of `scripts/eval_end_to_end.py::build_claim_text` — intake extracts
+the process, `nodes/retrieval._build_filter` pre-filters on it, no graph change
+and no eval re-run. (c) The orchestrator opens `open_claim_checkpointer` and a
+fresh session **per call**; a pooled connection is "the M5 shape"
+(`docs/DATABASE.md`), deferred to [M5-05]'s worker model. (d) The
+`start`-must-pause / `resume`-must-finish contract stays the **use case's** to
+enforce (per the port docstring) — the adapter reports `awaiting_review` as it
+found it. (e) Errors map at one Starlette exception-handler layer: each
+`application.errors` / `domain.errors` type → an HTTP status + a stable string
+`code`, in the envelope `{"error": {"code", "message", "details"}}`; a client
+branches on `code`, never on a status or a message.
+
+**The transactional fold (the [M5-03]-deferred DoD item).** On the `resume` path
+the composition root gives the graph a `_CapturingAuditSink` instead of the
+committing `SqlAlchemyAuditTrailSink`: the `human_review` node's trail comes back
+in `OrchestratorResult.audit_records`, and `SubmitHumanDecision` writes it
+through the new `UnitOfWork.audit` writer in the **same transaction** as the
+settled record — one `commit()`, both or neither. `resume` does no model calls
+(it re-runs only `human_review`), so nothing long-running is pulled into the
+transaction. The append is idempotent on `(thread_id, sequence)`, so the
+self-healing retry (a second decision on a record still `AWAITING_REVIEW` whose
+thread the first attempt finished) rewrites the same rows harmlessly. `start`
+has no fold — the run pauses before it writes any trail; that window is
+inherent (the checkpoint is a separate psycopg connection) and [M5-05]'s
+run-status closes it.
+
+**Deviation on record.** (a) `POST` blocks behind its 202 (above). (b)
+`GET /v1/assessments/{id}/audit` returns `200 {"entries": []}` for an
+`AWAITING_REVIEW` assessment — the durable trail is written once, in
+`human_review`, after the decision, a deliberate [M4-09] design. (c) An analyst
+`edit` drops the recommendation's consistency flags: an `EditedAssessmentInput` →
+domain `Assessment` carries none, and flags are attention points kept beside the
+verdict, not part of the decision ([M4-08]). (d) The `presentation/` layer is
+not scanned by `test_layer_boundaries.py`; the `langgraph` import stays in
+`infrastructure/`, and `domain` + `application` stay free of FastAPI/SQLAlchemy/
+LangGraph as the M5 exit criteria require.
+
+**Enforcement.** `tests/unit/presentation/**` (every endpoint's happy path and
+every error→status mapping, driven through `tests/unit/application/fakes.py` via
+`app.dependency_overrides` — no Postgres, graph or LLM);
+`tests/unit/infrastructure/graph/test_{state_mapper,verdict_readout,orchestrator}.py`;
+`tests/unit/infrastructure/test_clock.py`;
+`tests/unit/application/test_get_audit_trail.py`;
+`tests/unit/application/use_cases/test_submit_human_decision.py` (the fold — the
+record and the trail roll back together). `tests/integration/test_assessment_api.py`
+runs the whole flow against real Postgres (assessment/decision/audit tables + the
+LangGraph checkpointer) with a fake model and stub retriever: submit → 202 → read
+→ submit a decision → observe the resumed run and its durable trail.
+`make test-integration` and CI's `integration` job pick it up; CI's `quality` job
+runs the presentation unit tests.
+
+**Downstream.** [M5-05] replaces the synchronous 202 with a Redis queue and adds
+run-status states (below). [M5-06] **done** — `/ready` with per-check detail, one
+JSON log line per event to stdout, and a correlation id accepted or minted per
+request and propagated into every graph node log line and LLM call (via
+`presentation/middleware.py`, `infrastructure/observability/`, and the `build.py`
+node wrapper); see `docs/API.md`. [M5-09] **done** — the Compose `api` / `worker`
+services and the Dockerfile; see below.
+
+---
+
+## Asynchronous assessment: an RQ/Redis queue behind a non-blocking 202 — [M5-05]
+
+**Decision.** `POST /v1/assessments` no longer runs the graph. `SubmitClaim`
+persists an `application.assessment_job.AssessmentJob` (`PENDING`) and enqueues
+it on an RQ queue; `RunAssessment` (a new use case) runs on
+`ASSESSMENT_WORKER_CONCURRENCY` workers (`make worker` / `scripts/run_assessment_worker.py`),
+drives the claim to the human checkpoint through the orchestrator port, and — on
+success — writes the `AssessmentRecord` and flips the job to `SUCCEEDED` in one
+transaction. New ports: `AssessmentQueue`, `AssessmentJobRepository` (added to
+`UnitOfWork`). New infra: `infrastructure/queue/` (the RQ adapter, the job
+function, the worker pool), `infrastructure/llm_errors.py` (the transient
+classifier), `infrastructure/bootstrap.py` (the heavy singletons, now shared by
+the API `lifespan` and the worker). `GET /v1/assessments/{id}` returns an
+`AssessmentReadModel` spanning the lifecycle. Full walkthrough:
+`docs/ASYNC_PROCESSING.md`.
+
+**Why RQ, and why a separate aggregate.** RQ is the sync Redis-backed queue the
+"reuse the queue pattern professionally" framing points at — native
+`Retry(interval=[…])` for backoff, `FailedJobRegistry` for the dead-letter, and
+`WorkerPool` for concurrency, with no second broker. The codebase is sync
+throughout (SQLAlchemy/psycopg3, `compiled.invoke`, sentence-transformers), so a
+sync worker is the honest shape. `AssessmentJob` is deliberately **not** part of
+`AssessmentRecord`: the record's invariants (non-empty verdict/prose, the
+≥1-citation projection) can't represent a claim that has not been assessed yet,
+and weakening them to bolt on a `PENDING` state would undo M5-01/02. Two
+aggregates, two tables; the read path composes them.
+
+**Why retry stays at the job boundary.** The transient/real split
+(`is_transient_llm_error` + RQ `Retry` + the `stop_retry_on_permanent` handler)
+lives entirely in the queue layer. The six per-node `_invoke_with_retry` helpers
+are untouched — they cover a mid-run blip (seconds); a sustained 429 now bubbles
+past them to the job, which backs off for minutes, which is what
+`docs/END_TO_END_EVALUATION.md` measured a rate limit needs. Keeping M4 node code
+out of scope also keeps the M4 eval baselines reproducible.
+
+**Deviations on record.** (a) `GET /v1/assessments` (list) stays record-only —
+queued/failed jobs are not in the collection; the per-id `GET` is "status
+tracking per assessment id". (b) `SubmitClaim` commits the job before enqueueing
+it, so a crash in that window leaves a `PENDING` job that is never picked up — a
+reconciler is left to operations. (c) The checkpointer connection is still
+per-call, not pooled (`docs/DATABASE.md` "the M5 shape"). (d) `compose.yaml`
+gained `redis` here; the `api` / `worker` services and the Dockerfile
+followed in [M5-09] (`docs/DEPLOYMENT.md`).
+
+**Enforcement.** `tests/unit/application/use_cases/test_run_assessment.py` (the
+state machine), `test_submit_claim.py` (persist-then-enqueue),
+`tests/unit/infrastructure/test_llm_errors.py` (the classifier truth table),
+`tests/unit/infrastructure/queue/**` (the adapter and the retry gate),
+`tests/unit/infrastructure/database/test_assessment_job_mapper.py`.
+`tests/integration/test_assessment_job_repository.py` (real Postgres) and
+`tests/integration/test_assessment_queue.py` (real Postgres + real Redis: submit
+→ burst worker → completion, transient retry, dead-letter). `test_layer_boundaries.py`
+adds `rq` / `redis` to the forbidden roots. CI's `integration` job gains a
+`redis` service.
+
+## Tracing is one callback handler on the run, plus two hand-written spans — [M5-07]
+
+**Decision.** Trace the graph into a self-hosted Langfuse by installing its
+LangChain `CallbackHandler` on the graph's run config in
+`LangGraphClaimAssessmentOrchestrator._invoke`, and add exactly two spans by
+hand for the work no LLM call passes through. `docs/OBSERVABILITY.md` is the
+reader's guide; this section is the why.
+
+**Why the orchestrator and not `build.py`.** [M5-06] already wraps every node in
+`build._instrumented` for its log lines, so wrapping them again for spans is the
+obvious move — and it is the wrong one. LangGraph nodes are runnables, so a
+handler on the *run* already sees every node, and it sees something a node
+wrapper never can: the `chain.invoke(messages)` calls **inside** the nodes,
+with their prompts, completions and token usage. `_invoke` is also the only
+place a whole run passes through, which makes it the only sensible flush point —
+it covers the worker, the synchronous `resume` the API serves, and the eval
+scripts at once. So `build.py`, all eight node modules and the [M4-01b]
+`(state, runtime) -> dict` convention are untouched by this issue.
+
+The handler must go on the run rather than on the model objects, because the
+nodes deliberately pass no `config` to their own `chain.invoke` and rely on
+LangChain's ambient child config; a handler bound to a model would be bypassed.
+
+**Why two spans are still hand-written.** Callbacks see runnables. Retrieval is
+deterministic Python — no LLM call — so to a callback handler the node is a
+black box, and its candidate list, their scores and the [M3-07] gate's reasoning
+are locals that mostly never reach state. Three gate fields (`threshold`,
+`missing_category`, `closest_clause_ids`) are computed on every single run and
+recorded *nowhere*: state keeps the boolean, the audit event keeps the trigger
+name. Since those are the first thing you want when a verdict is wrong, the
+retrieval node opens a span for them, and `GraphRetrievalAdapter` nests a second
+one showing each candidate's hybrid rank against its cross-encoder rank.
+
+**Why the graph layer owns a `TracePort`.** Same reason it owns `RetrievalPort`
+and `AuditTrailSink`: a node depends on a capability, never on an adapter, and
+`infrastructure.observability.tracing.LangfuseTracer` satisfies it structurally.
+`infrastructure.rag` restates the same shape as `SpanRecorder` rather than
+importing it, so the `graph -> rag` dependency direction is not reversed for a
+span. The port deals in plain mappings and is a context manager, so the span's
+latency is measured rather than reported, and a test fake is a handful of lines.
+
+**A null object, not `| None`.** `GraphContext.tracer` defaults to `NO_TRACING`
+rather than to `None` the way `audit_sink` does. The sink is consulted once, at
+the checkpoint, where a branch is cheap and readable; a tracer is called from
+node bodies, and the null object keeps those bodies free of `if tracer is not
+None` noise for a call whose entire point is that it changes nothing. It also
+means an untraced deployment runs the identical code path, not a second one.
+
+**Optional means two things.** At the application layer,
+`ObservabilitySettings.tracing_active` is the `TRACING_ENABLED` flag **and** both
+keys; inactive, no Langfuse client is constructed at all. At the infrastructure
+layer the four langfuse services sit behind a Compose `profiles: ["tracing"]`,
+so plain `docker compose up -d` remains postgres + redis. And tracing never
+raises into a run: every SDK call is guarded, so a broken tracer degrades to no
+tracing, exactly as the compatibility node degrades rather than raising.
+
+**Deviations on record.** (a) `GET /ready` deliberately does *not* check
+Langfuse — readiness means "can serve an assessment", and an optional dependency
+must not be able to take the service out of rotation. (b) Cost is registered as
+list prices for the *pinned provider route*, not measured; re-pinning
+`LLM_*_PROVIDER_ORDER` makes them stale, and [M5-10] owns the measured number.
+(c) The langfuse services share this stack's Postgres (own database) and Redis
+(db index 1 against the queue's db 0) instead of running their own — a
+development-stack choice, stated rather than hidden. (d) The `langchain`
+meta-package became a direct dependency: Langfuse's handler does
+`import langchain` purely to branch on `langchain.__version__` and refuses to
+import without it, though every symbol it uses comes from `langchain_core`.
+
+**Enforcement.** `tests/unit/infrastructure/observability/test_tracing.py` runs
+the **real compiled graph** against a real Langfuse client whose span exporter
+writes to memory, and asserts a span per node, the retrieval span's candidates
+and scores, the correlation id on the trace, and that a deliberately broken
+tracer still runs the body it wraps — no server, no credentials, so it holds in
+CI. `tests/unit/infrastructure/graph/test_retrieval.py` covers the retrieval
+span's payload against a recording fake port.
+
+---
+
+## Retrieved and claimant text are data, never instructions — [M5-08]
+
+**The threat model.** Every prompt in this system carries text from two
+channels this project does not control: a clause excerpt extracted from a
+third-party PDF (`docs/PARSING.md`), and the claim narrative a claimant typed.
+Both reach an LLM call. Neither is sanitized for content — a filed insurance
+document is full of imperative Portuguese by nature (*"o segurado é obrigado
+a..."*, *"fica vedado..."*), so a keyword filter would misfire constantly and
+solves the wrong problem anyway. The actual requirement is narrower and
+mechanical: nothing read from either channel may change which instructions the
+model follows, and nothing it decides may pick which document or clause gets
+trusted. Three structural defenses, one empirical check.
+
+**Defense 1 — delimiters, not a blocklist.** Every node prompt is built
+through `prompts.scope_preamble.with_scope_preamble`, which now prepends
+`prompts.untrusted_content.UNTRUSTED_CONTENT_NOTICE` alongside the scope
+constraint — the same "one machine-enforceable copy" the scope preamble
+already used, extended rather than duplicated. Every untrusted span — a
+retrieved clause excerpt, the claim narrative, the entity facts intake
+extracted from it, even the compatibility node's own reasoning when
+`recommendation` summarises it — is wrapped by
+`prompts.untrusted_content.wrap_untrusted` before it reaches a prompt:
+`prompts.prompt_fragments.known_facts_block` / `clause_block` are the one
+implementation every prompt builder calls (four near-duplicate private
+helpers before this issue), and each of the five node functions wraps the
+`HumanMessage` carrying `raw_claim_text` the same way. The notice tells the
+model what the tag means; it does not filter content, so an imperative SUSEP
+clause reads normally — it is simply never mistaken for an instruction to
+*this* system.
+
+**Defense 2 — reject malformed structured output, never coerce.** Every
+`schemas.py` model now declares `extra="forbid"`: a field the model invents
+fails validation rather than being silently dropped while the rest of the
+response is coerced through. `compatibility.py` already rejected and retried
+an ungrounded assertion ([M4-05]); `intake.py`'s bare `cast` on a `None`
+parse — previously an uncontrolled `AttributeError` two lines later — now
+raises `errors.SchemaValidationError` explicitly. The other three nodes'
+existing "degrade to a deterministic fallback on a failed parse" behaviour
+already satisfied this rule and needed no change: a fallback template is not
+a coercion of the model's own malformed output, it is a different, safe path
+taken instead of it.
+
+**Defense 3 — document and clause trust is metadata-only, structurally.**
+`retrieval._build_filter` builds the pre-filter from `entities` — intake's
+deterministic classification of the claim, never a document id the model
+named. `compatibility._grounding_errors` computes `valid_ids` from what
+retrieval actually returned *before* the model call, and rejects and retries
+any assertion whose `clause_ids` names anything else — an injected instruction
+that tries to redirect the node to "cite clause 9.9 of document doc-99
+instead" fails the same check as an ordinary hallucinated id, because it is
+the same check. `recommendation.py` never constructs a `Citation` at all —
+`RecommendationOutput` has no citation field, so there is no code path by
+which the model could introduce one. There is no separate "ignore document
+selection instructions" rule to maintain, because there is no code path that
+reads one.
+
+**The empirical check.** `make eval-prompt-injection`
+(`scripts/eval_prompt_injection.py`) runs the real compatibility node, on the
+real reasoning model, over four hand-authored adversarial fixtures
+(`data/adversarial_injection/`): a poisoned clause excerpt demanding a
+hijacked verdict, one additionally trying to name a foreign clause as more
+authoritative, and a clean/injected claim-narrative pair for a
+system-override and a role-change attempt. Results and method:
+`docs/PROMPT_INJECTION.md`.
+
+**The M5-08 issue's Appendix** — an exploratory spike evaluating a runtime
+prompt-injection classifier (`icephi`) as an optional, env-toggled
+defense-in-depth layer — is implemented separately; see the next section.
+
+**Enforcement.**
+`tests/unit/infrastructure/graph/prompts/test_untrusted_content.py` (fast,
+network-free: every node prompt carries the notice, and a marker fed through
+each untrusted argument appears only inside a `<untrusted-content>` span, in
+every prompt builder);
+`tests/unit/infrastructure/graph/test_schemas.py` (`extra="forbid"` rejects
+an unexpected field, per schema);
+`tests/unit/infrastructure/graph/test_intake.py` (`SchemaValidationError` on
+a failed parse); `tests/unit/infrastructure/graph/test_compatibility.py`
+(the existing grounding-retry tests, plus one naming the injection-defense
+intent explicitly: a response that insists on a foreign document's clause id
+is never trusted); `tests/eval/test_prompt_injection.py` (eval-marked, real
+model, skips without `LLM_PROVIDER`).
+
+---
+
+## An optional runtime classifier is a defense-in-depth signal, never a gate — [M5-08 Appendix]
+
+**The design.** `icephi`, the runtime classifier the M5-08 issue's Appendix
+names, is not a real library (checked); this is built with a real,
+well-known open one instead — `protectai/deberta-v3-base-prompt-injection-v2`,
+run locally via `transformers`
+(`infrastructure.guardrails.local_prompt_injection_classifier.LocalPromptInjectionClassifier`).
+It sits behind `infrastructure.graph.context.InjectionClassifierPort`, a
+`Protocol` with a null-object default (`NO_CLASSIFIER`) — the exact recipe
+`TracePort`/`NO_TRACING` ([M5-07]) already established: every test, eval
+script and unconfigured deployment builds a `GraphContext` exactly as
+before, and the graph's topology never reads the toggle.
+
+The classifier is exercised by a new, fixed node — `injection_scan` — added
+to the existing parallel fan-out alongside `compatibility`/`consistency`
+([M4-07]'s topology, extended: `infrastructure.graph.build`). It runs on
+every claim; when the classifier is `NO_CLASSIFIER` (the default,
+`PROMPT_INJECTION_CLASSIFIER_ENABLED=false`), every `classify()` call is a
+no-op. When enabled, it scores the claim narrative and every retrieved
+clause excerpt and, for each flagged span, appends one `AuditEvent`
+(`node="injection_scan"`, `confidence=<score>`) — nothing else.
+**`injection_scan` returns only `audit_trail` or `{}`; no verdict, citation,
+or routing decision is ever conditioned on its output.** That is what makes
+"advisory, never blocking" a structural fact about the code, matching the
+Appendix's own framing ("non-blocking evaluation... optional defense-in-depth
+layer"), not a policy someone could quietly violate later.
+
+**The empirical check.** `make eval-prompt-injection-classifier`
+(`scripts/eval_prompt_injection_classifier.py`) measures exactly what the
+Appendix asks for: false-positive rate on real, non-adversarial imperative
+SUSEP clause language, and detection rate + latency on the existing M5-08
+adversarial fixtures. Results and the recommendation this drives:
+`docs/PROMPT_INJECTION_CLASSIFIER.md`. In short: this particular classifier,
+trained only on English text, flags 70% of real Portuguese policy clauses —
+the false-positive risk the issue named by name is real — so
+`PROMPT_INJECTION_CLASSIFIER_ENABLED` ships `false` by default. That result
+is a fact about this model on this domain, not about the technique — the
+wiring stays real, tested, and available both for a deployment that wants
+the signal anyway and as a worked reference for applying the same pattern
+(port, null object, one advisory-only node, measure before trusting) to a
+domain closer to the model's training distribution.
+
+**Enforcement.** `tests/unit/infrastructure/graph/test_injection_scan.py`
+(a fake classifier; the node returns only `audit_trail` or `{}`, and the
+default `GraphContext.classifier` is `NO_CLASSIFIER`);
+`tests/unit/infrastructure/guardrails/` (the pinned model contract and the
+classifier's own wiring, faked at the `transformers` import boundary — no
+network, mirrors `test_cross_encoder_reranker.py`);
+`tests/unit/infrastructure/graph/test_claim_graph.py` (the three-branch
+fan-out, the compiled graph's structure);
+`tests/eval/test_prompt_injection_classifier.py` (eval-marked, real model,
+skips without `transformers` installed).
+
+---
+
+## One Compose image for `api` and `worker`, with a one-shot `migrate` service ahead of both — [M5-09]
+
+**Decision.** `compose.yaml` gains `migrate`, `api` and `worker`, all built
+from a new root `Dockerfile`. `api` and `worker` are the same image — they
+share `infrastructure.bootstrap.build_core_components`, so they share the
+same dependency set (including the optional `embed` uv group, needed at
+runtime because both the request path and the queue-worker path load the
+embedder and cross-encoder in-process) — `worker` only overrides `command:`.
+`migrate` runs `alembic upgrade head && python -m scripts.setup_checkpointer`
+once (`restart: "no"`) and `api`/`worker` `depends_on` it completing
+(`condition: service_completed_successfully`), because
+`build_core_components()` probes the checkpointer at API startup and raises
+if its schema is missing — plain `depends_on: postgres (healthy)` is not
+enough ordering. Full rationale, the healthcheck choice (`/health`, not
+`/ready` — Compose has no "healthy but degraded"), and the environment-
+override shape: `docs/DEPLOYMENT.md`.
+
+**Why demo mode extends the existing artifact pattern instead of a new one.**
+The DoD asks that a reviewer not pay `make build-index`'s embedding cost (a
+real ~41-minute CPU pass, `docs/EMBEDDINGS.md`) to try the system.
+`scripts/fetch_corpus_artifacts.py`/`package_corpus_artifacts.py` already
+solve the identical shape of problem one stage earlier (skip the LLM-cost
+parsing stage via a pinned GitHub Release tarball + checksum). The new
+`fetch_embedding_cache.py`/`package_embedding_cache.py` are the same script
+shape, one stage later, bundling `data/cache/embeddings/cache.jsonl` — the
+existing content-addressed cache `CachingEmbedder` already reads before
+loading the model. No new mechanism, no Postgres dump, no vector-index file
+format — the same "download the expensive artifact instead of computing it"
+idea the corpus already established.
+
+**Deviations on record.** (a) The `m3-embedding-cache-v1` release itself is
+not published as part of this change — the fetch/package scripts and Makefile
+targets (`fetch-embedding-cache`, `package-embedding-cache`,
+`fetch-demo-artifacts`) exist and work, but actually paying the ~41-minute
+embedding pass once and running `gh release create` is left as a deliberate
+manual step; until it exists, `make build-index` still works, it just falls
+through to a real cold embed. (b) `PROXY_HEADERS_ENABLED`/
+`FORWARDED_ALLOW_IPS` (`ObservabilitySettings`, already defined since
+[M5-06]) stay unwired — they'd matter behind a reverse proxy, and this
+Compose stack publishes `api` directly with none in front; earlier notes in
+this document and in `docs/API.md`/`docs/ASYNC_PROCESSING.md`/
+`docs/DATABASE.md` anticipating that wiring as part of this issue are
+superseded by this entry. (c) The heavy evaluation suite's on-demand/
+scheduled trigger (`.github/workflows/eval.yml`) is `workflow_dispatch` only
+— no `schedule:` cron, so it never calls the configured LLM key unattended;
+the DoD's "on demand **or** a schedule" is satisfied by the "on demand" half.
+(d) The retrieval stack turned out not to be a pure Postgres client: its
+lexical/BM25 leg and exclusion-clause graph load `build/chunks.jsonl` and
+`build/parsed_clauses.jsonl` off the local filesystem
+(`docs/LEXICAL_RETRIEVAL.md`), and the lexical analyzer needs the committed
+`data/rag/lexical_stemming_exceptions.csv`. Neither was anticipated by the
+original "the graph reads Postgres" framing this entry started with — found
+by actually running `docker compose up -d --build` end-to-end (`api`/
+`worker` crash-looped on both, in turn) rather than by static review. Fixed
+with a read-only bind mount of `./build` (a regenerated artifact — no reason
+to bake a snapshot into the image) and a normal `COPY data/rag` in the
+Dockerfile (committed source, unlike `build/`'s gitignored output). Full
+account: `docs/DEPLOYMENT.md`.
+
+**Enforcement.** `docker build .` and `ci.yml`'s new `docker-image` job (the
+DoD's "image built" clause — `integration` already covered "integration
+tests against Postgres" and "migrations applied", from [M5-05]/[M5-01]-era
+work, before this issue started). `docker compose config` validates every
+YAML anchor resolves. No automated test drives the full containerised stack
+end-to-end (that needs Docker-in-CI plus real LLM credentials); README's
+Quickstart is written to be run and checked by hand against a clean clone,
+which is what this issue's own DoD asks for.

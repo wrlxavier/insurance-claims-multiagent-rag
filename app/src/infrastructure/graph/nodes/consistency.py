@@ -59,6 +59,7 @@ from infrastructure.graph.consistency_checks import (
 )
 from infrastructure.graph.context import GraphContext
 from infrastructure.graph.prompts.consistency import build_consistency_prompt
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import ConsistencyOutput
 from infrastructure.graph.state import (
     AuditEvent,
@@ -128,7 +129,7 @@ def _semantic_signals(
     )
     messages: list[Any] = [
         SystemMessage(build_consistency_prompt(entities)),
-        HumanMessage(raw_claim_text),
+        HumanMessage(wrap_untrusted("claim_narrative", raw_claim_text)),
     ]
     try:
         result = _invoke_with_retry(structured, messages)

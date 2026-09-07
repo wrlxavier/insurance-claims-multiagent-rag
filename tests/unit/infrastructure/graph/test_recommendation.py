@@ -30,6 +30,7 @@ from infrastructure.graph.nodes.recommendation import (
 )
 from infrastructure.graph.prompts.recommendation import build_recommendation_prompt
 from infrastructure.graph.prompts.scope_preamble import SCOPE_PREAMBLE
+from infrastructure.graph.prompts.untrusted_content import wrap_untrusted
 from infrastructure.graph.schemas import RecommendationOutput
 from infrastructure.graph.state import (
     Citation,
@@ -456,7 +457,7 @@ def test_prompt_is_the_system_message_and_the_narrative_is_the_human_message() -
     )
     messages = cast(list[BaseMessage], model.received[0])
     assert SCOPE_PREAMBLE in str(messages[0].content)
-    assert messages[1].content == "bati o carro"
+    assert messages[1].content == wrap_untrusted("claim_narrative", "bati o carro")
 
 
 # --- graph wiring ----------------------------------------------------------

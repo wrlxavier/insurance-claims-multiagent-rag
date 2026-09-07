@@ -458,7 +458,32 @@ can run. Latency and cost stop being unknowns and become measured numbers.
   LangChain symbols — enforced by an import test, not by convention.
 - CI runs lint, type-check, unit tests, integration tests against Postgres,
   and builds the image.
-- p95 latency and mean cost per assessment measured and recorded.
+- p95 latency and mean cost per assessment measured and recorded
+  (`docs/PERFORMANCE.md`).
+
+**[M5-10] measurement (2026-09-07).** `scripts/eval_performance.py`
+(`make eval-performance`) ran the whole compiled graph over all 51 synthetic
+claims (policy-header arm, checkpoint resumed with an automatic approve) and
+measured p50/p95 latency end-to-end and per node (from the [M5-06] node logger),
+mean/p95 token cost per assessment and per node (a callback handler reading the
+full `usage_metadata`, priced from the configured list prices), the
+parallel-vs-sequential assessment-branch trade, and — separately — the one-off
+corpus indexing cost. Full method, pre-registered prediction, tables and
+findings: `docs/PERFORMANCE.md`.
+
+| exit criterion | measured | verdict |
+| --- | --- | --- |
+| p95 latency per assessment measured and recorded | **250 s** (p50 83 s, mean 99 s), end-to-end over 46/51 scored | **met** |
+| mean cost per assessment measured and recorded | **$0.0125** (p95 $0.037); whole run $0.58 | **met** |
+| per-node breakdown, parallel vs sequential, one-off indexing cost | all in `docs/PERFORMANCE.md` | **met** |
+
+The compatibility (reasoning-model) node is 72% of mean latency and 84% of mean
+cost; 91% of the run's output tokens were reasoning tokens. Five claims (10%)
+failed at intake when the fast model returned no structured output, and the audit
+trail was found to under-report the compatibility node's cost by ~27% (it keeps
+only the last of up to three grounding-retry calls) — two audit-fidelity
+follow-ups filed. Route-sensitive: reasoning on `alibaba`, fast on `baidu/fp8`,
+AMD Ryzen 5 5600H + RTX 3050.
 
 ## M6 — Release and portfolio
 

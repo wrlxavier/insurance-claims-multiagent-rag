@@ -23,7 +23,6 @@ from scripts.benchmark_ann_index import (
     recall_at_k,
     render_markdown_report,
     render_real_report,
-    summarise_latency,
     vector_literal,
 )
 
@@ -115,19 +114,8 @@ def test_recall_at_k() -> None:
     assert recall_at_k([], []) == 1.0  # nothing to miss
 
 
-@pytest.mark.unit
-def test_summarise_latency_percentiles() -> None:
-    summary = summarise_latency([float(value) for value in range(1, 21)])
-
-    assert summary["n"] == 20
-    assert summary["p50"] == 11.0
-    assert summary["p95"] == 20.0
-    assert summary["mean"] == 10.5
-
-
-@pytest.mark.unit
-def test_summarise_latency_handles_no_samples() -> None:
-    assert summarise_latency([]) == {"n": 0, "p50": 0.0, "p95": 0.0, "mean": 0.0}
+# `summarise_latency` moved to `infrastructure.evaluation.latency_stats` [M5-10];
+# its cases live in `tests/unit/infrastructure/evaluation/test_latency_stats.py`.
 
 
 @pytest.mark.unit

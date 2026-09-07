@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from application.audit_trail_entry import AuditTrailEntry
 from infrastructure.database.models import AuditEventRow
 from infrastructure.graph.state import AuditRecord
 
@@ -50,6 +51,53 @@ def _row_values(
     }
 
 
+def _entry_values(
+    entry: AuditTrailEntry, *, claim_id: str, thread_id: str
+) -> dict[str, object]:
+    """Map one ``AuditTrailEntry`` DTO to an ``audit_event`` row.
+
+    The [M5-04] resume path captures the graph's trail as ``AuditTrailEntry``
+    DTOs (``sequence`` already assigned) so the use case can persist it in its
+    own transaction; this is the same row shape ``_row_values`` produces.
+    """
+    return {
+        "thread_id": thread_id,
+        "sequence": entry.sequence,
+        "claim_id": claim_id,
+        "timestamp": entry.timestamp,
+        "node": entry.node,
+        "action": entry.action,
+        "model": entry.model,
+        "model_version": entry.model_version,
+        "input_tokens": entry.input_tokens,
+        "output_tokens": entry.output_tokens,
+        "total_tokens": entry.total_tokens,
+        "confidence": entry.confidence,
+        "node_input": entry.node_input,
+        "payload": dict(entry.payload) if entry.payload is not None else None,
+    }
+
+
+def _insert_rows(session: Session, rows: list[dict[str, object]]) -> int:
+    """Insert ``rows`` into ``audit_event``, skipping any already written.
+
+    RETURNING, not ``rowcount``: a multi-row insert goes through SQLAlchemy's
+    executemany path, where the driver may report ``rowcount`` as -1. The rows
+    that come back are exactly the ones the conflict clause did *not* skip. The
+    caller owns the transaction -- this flushes but never commits.
+    """
+    if not rows:
+        return 0
+    statement = (
+        pg_insert(AuditEventRow)
+        .on_conflict_do_nothing(index_elements=["thread_id", "sequence"])
+        .returning(AuditEventRow.sequence)
+    )
+    written = session.execute(statement, rows).all()
+    session.flush()
+    return len(written)
+
+
 def append_audit_events(
     session: Session,
     *,
@@ -63,23 +111,32 @@ def append_audit_events(
     its ``sequence``. The caller owns the transaction -- this flushes but never
     commits.
     """
-    if not records:
-        return 0
-
-    # RETURNING, not `rowcount`: a multi-row insert goes through SQLAlchemy's
-    # executemany path, where the driver may report `rowcount` as -1. The rows
-    # that come back are exactly the ones the conflict clause did *not* skip.
-    statement = (
-        pg_insert(AuditEventRow)
-        .on_conflict_do_nothing(index_elements=["thread_id", "sequence"])
-        .returning(AuditEventRow.sequence)
-    )
-    written = session.execute(
-        statement,
+    return _insert_rows(
+        session,
         [
             _row_values(record, claim_id=claim_id, thread_id=thread_id, sequence=index)
             for index, record in enumerate(records)
         ],
-    ).all()
-    session.flush()
-    return len(written)
+    )
+
+
+def append_audit_entries(
+    session: Session,
+    *,
+    claim_id: str,
+    thread_id: str,
+    entries: Sequence[AuditTrailEntry],
+) -> int:
+    """Insert one row per entry, skipping any already written. Return the count.
+
+    The [M5-04] counterpart of ``append_audit_events``: the entries already carry
+    their ``sequence`` (assigned when the resume path captured the trail), and
+    the idempotent ``ON CONFLICT`` keeps a decision retry a no-op.
+    """
+    return _insert_rows(
+        session,
+        [
+            _entry_values(entry, claim_id=claim_id, thread_id=thread_id)
+            for entry in entries
+        ],
+    )

@@ -26,6 +26,11 @@ recommendation node computes every other field of ``state.Recommendation``
 deterministically from upstream state -- the model is asked for the prose
 summary and nothing load-bearing, so it can neither invent a citation nor turn
 an ``insufficient_information`` verdict into a confident one.
+
+Every schema here also carries ``extra="forbid"`` ([M5-08]): a field the model
+invents that isn't in the schema fails validation -- ``parsed`` comes back
+``None`` -- rather than being silently dropped and the rest of the response
+coerced through. Reject, never coerce.
 """
 
 from typing import Literal
@@ -64,7 +69,7 @@ class IntakeOutput(BaseModel):
     state the fact, rather than inventing a value.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     event_type: str | None = Field(
         default=None,
@@ -146,7 +151,7 @@ class ClarificationQuestionItem(BaseModel):
     fallback template.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     field: MissingInfoTag
     question: str = Field(
@@ -166,7 +171,7 @@ class ClarificationOutput(BaseModel):
     list.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     questions: list[ClarificationQuestionItem]
 
@@ -190,7 +195,7 @@ class ReasonedAssertion(BaseModel):
     makes that a field check rather than a parse of free prose.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     statement: str = Field(
         description=(
@@ -220,7 +225,7 @@ class CompatibilityOutput(BaseModel):
     ``ClaimState.citations``.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     verdict: CompatibilityVerdict = Field(
         description=(
@@ -269,7 +274,7 @@ class ConsistencySignalItem(BaseModel):
     signals for human attention and decides nothing.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     check: ConsistencyCheckName = Field(
         description=(
@@ -304,7 +309,7 @@ class ConsistencyOutput(BaseModel):
     node returns signals for a human, never a decision.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     signals: list[ConsistencySignalItem] = Field(
         default_factory=list,
@@ -328,7 +333,7 @@ class RecommendationOutput(BaseModel):
     node owns both.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     justification: str = Field(
         description=(

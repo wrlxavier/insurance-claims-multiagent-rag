@@ -63,6 +63,7 @@ from infrastructure.database.chunk_repository import (
     write_chunk_embeddings,
 )
 from infrastructure.evaluation.golden_set_schema import QuestionType
+from infrastructure.evaluation.latency_stats import summarise_latency
 from infrastructure.rag.ann_index import (
     HNSW_EF_CONSTRUCTION,
     HNSW_EF_SEARCH,
@@ -142,25 +143,6 @@ def recall_at_k(approx_ids: Sequence[str], exact_ids: Sequence[str]) -> float:
     if not exact_ids:
         return 1.0
     return len(set(approx_ids) & set(exact_ids)) / len(exact_ids)
-
-
-def _percentile(sorted_values: list[float], fraction: float) -> float:
-    """Nearest-rank percentile, same formula as the other measurement scripts."""
-    index = min(int(len(sorted_values) * fraction), len(sorted_values) - 1)
-    return sorted_values[index]
-
-
-def summarise_latency(samples_ms: list[float]) -> dict[str, float]:
-    """Summarise per-call latency samples (milliseconds)."""
-    if not samples_ms:
-        return {"n": 0, "p50": 0.0, "p95": 0.0, "mean": 0.0}
-    ordered = sorted(samples_ms)
-    return {
-        "n": len(ordered),
-        "p50": round(_percentile(ordered, 0.50), 3),
-        "p95": round(_percentile(ordered, 0.95), 3),
-        "mean": round(statistics.fmean(ordered), 3),
-    }
 
 
 class Partition(NamedTuple):

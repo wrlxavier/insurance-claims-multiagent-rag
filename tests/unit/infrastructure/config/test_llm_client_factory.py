@@ -99,3 +99,21 @@ def test_build_chat_model_allow_fallbacks_without_provider_order() -> None:
 
     assert isinstance(model, ChatOpenAI)
     assert model.extra_body == {"provider": {"allow_fallbacks": True}}
+
+
+@pytest.mark.unit
+def test_build_chat_model_timeout_and_retries_are_opt_in() -> None:
+    settings = build_settings(LlmProvider.OPENAI)
+
+    default = build_chat_model(settings, settings.llm_model_fast)
+    assert isinstance(default, ChatOpenAI)
+    assert default.request_timeout is None
+    default_retries = default.max_retries
+
+    tuned = build_chat_model(
+        settings, settings.llm_model_fast, timeout=120.0, max_retries=0
+    )
+    assert isinstance(tuned, ChatOpenAI)
+    assert tuned.request_timeout == 120.0
+    assert tuned.max_retries == 0
+    assert tuned.max_retries != default_retries
