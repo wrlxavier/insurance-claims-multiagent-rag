@@ -28,6 +28,7 @@ from typing import Protocol
 
 from tokenizers import Tokenizer
 
+from infrastructure.evaluation.latency_stats import percentile
 from infrastructure.rag.chunk_artifact import CHUNKS_JSONL_PATH, read_chunks_jsonl
 from infrastructure.rag.chunk_schema import ChunkRecord
 from infrastructure.rag.embedding_config import (
@@ -66,12 +67,6 @@ class TokenLengthSummary:
         return self.n_over_limit == 0
 
 
-def _percentile(sorted_values: list[int], fraction: float) -> int:
-    """Nearest-rank percentile, same formula as ``chunking._build_report``."""
-    index = min(int(len(sorted_values) * fraction), len(sorted_values) - 1)
-    return sorted_values[index]
-
-
 def token_counts(records: list[ChunkRecord], tokenizer: _Tokenizer) -> list[int]:
     """Token count per chunk, tokenising exactly what the index side embeds."""
     return [
@@ -88,9 +83,9 @@ def summarise_token_counts(counts: list[int], *, limit: int) -> TokenLengthSumma
         chunk_count=len(ordered),
         limit=limit,
         minimum=ordered[0],
-        p50=_percentile(ordered, 0.50),
-        p90=_percentile(ordered, 0.90),
-        p99=_percentile(ordered, 0.99),
+        p50=percentile(ordered, 0.50),
+        p90=percentile(ordered, 0.90),
+        p99=percentile(ordered, 0.99),
         maximum=ordered[-1],
         n_over_limit=sum(1 for count in ordered if count > limit),
     )
