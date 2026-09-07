@@ -1,287 +1,182 @@
 # insurance-claims-multiagent-rag
-Multi-agent assistant that checks insurance claims against real Brazilian policy conditions (SUSEP). LangGraph conditional graph with parallel agents, hybrid RAG with reranking, human-in-the-loop checkpoint and full audit trail. FastAPI + Clean Architecture. Retrieval and end-to-end quality measured on a hand-curated golden set.
 
-The MIT license covers the source code in this repository only.
-Documents under `data/policies/raw/` are published by their respective
-insurers and remain their property — see NOTICE.md.
+A multi-agent assistant that checks a described insurance event against the
+filed conditions of a registered Brazilian motor-insurance product (SUSEP): a
+LangGraph conditional graph with a clarification loop and parallel assessment
+agents, hybrid RAG with cross-encoder reranking and domain-rule exclusion
+co-retrieval, a mandatory human checkpoint, and a durable audit trail. FastAPI
+over a Clean Architecture core. Every quality claim below is measured against a
+hand-curated golden set and committed to `docs/`.
 
-This system can say whether a described event is consistent or
-inconsistent with the conditions of a registered insurance product — it
-cannot say whether a real claim is covered or denied. See
-[`docs/SCOPE.md`](docs/SCOPE.md) for the full statement.
+> **Setup, how to run it, and API usage** live in
+> [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) — per-OS prerequisites,
+> `.env` configuration, Docker/container management, and a full worked API
+> session. This README is the project overview and its results.
+
+The MIT license covers the source code in this repository only. Documents under
+`data/policies/raw/` are published by their respective insurers and remain their
+property — see [NOTICE.md](NOTICE.md).
+
+## The problem, and the scope constraint
+
+The corpus is 30 sets of *condições gerais* — the general and special conditions
+of SUSEP-registered motor-insurance products across five product lines. Those
+are **product templates filed with the regulator, not individual contracts**:
+they carry no contracted coverage, insured amount, deductible, premium or policy
+period. Given a described event and a registered product's filed conditions,
+this system says whether the event is **consistent, inconsistent, or
+insufficiently determined** against those conditions — it cannot, and does not,
+say whether a real claim would be covered or denied. The full statement is
+[`docs/SCOPE.md`](docs/SCOPE.md).
+
+## Results
+
+Every number is quoted from a committed report; follow the link for the method,
+the pre-registered prediction and the findings.
+
+| Stage | Metric | Result | Basis |
+| --- | --- | --- | --- |
+| Clause parsing | boundary / type accuracy | **98.0% / 92.0%** | 50-clause stratified sample, LLM-judged — [`PARSING.md`](docs/PARSING.md) |
+| Retrieval | Recall@10 | **92.3%** | golden-set-v1, 117 scorable questions — [`RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md) |
+| Retrieval | MRR | **0.806** | same |
+| Retrieval | exclusion-clause recall | **100% (27/27)** | with exclusion co-retrieval; 92.6% without — [`EXCLUSION_CO_RETRIEVAL.md`](docs/EXCLUSION_CO_RETRIEVAL.md) |
+| Retrieval | foreign-document rate | **0.0%** | metadata pre-filter — [`HYBRID_RETRIEVAL.md`](docs/HYBRID_RETRIEVAL.md) |
+| End-to-end | verdict accuracy (3-class) | **56.9%** | 51 synthetic claims, one run; graph completion 100% — [`END_TO_END_EVALUATION.md`](docs/END_TO_END_EVALUATION.md) |
+| End-to-end | faithfulness (LLM judge) | **93.8%** | 128 assertions, cross-family judge — [`END_TO_END_EVALUATION.md`](docs/END_TO_END_EVALUATION.md) |
+| Latency | p50 / p95, end to end | **83 s / 250 s** | 46 assessments, one sample — [`PERFORMANCE.md`](docs/PERFORMANCE.md) |
+| Cost | mean / p95 per assessment | **$0.013 / $0.037** | same run; one-off corpus index build ~$4–6 |
+
+- **Parsing.** Figures are under the corrected boundary criterion; the
+  conservative reading is 96.0% boundary (one disputed sample excluded), and the
+  same corpus measures 84.0% / 86.0% under the original un-clarified criterion.
+  See [`PARSING.md`](docs/PARSING.md).
+- **End-to-end.** 56.9% is a single non-deterministic run over a small,
+  single-author synthetic set. The system's characteristic error is
+  over-abstention, not a wrong verdict — `incompatible` precision is 92.3% at
+  50.0% recall. The value of this measurement is the failure catalogue behind
+  it, which found and fixed a retrieval pre-filter defect (35.3% → 56.9% in the
+  same pass). The compatibility node in isolation scores 88.1% on the 42
+  verdict-labelled golden questions — [`COMPATIBILITY_ASSESSMENT.md`](docs/COMPATIBILITY_ASSESSMENT.md).
+- **Latency and cost.** One sample, n = 46. About 72% of latency and 84% of cost
+  is a single reasoning-model call, so both move with the model and the provider
+  route — [`PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+The retrieval numbers are strong and reproducible byte-for-byte
+(`make eval-retrieval-matrix`). The end-to-end number is an early, honest,
+small-sample measurement — reported with its `n` and its caveats rather than
+rounded up.
+
+## Architecture
+
+A Clean Architecture core (domain → application → infrastructure/presentation)
+with **LangGraph confined to the infrastructure layer** — the domain and
+application layers import no framework symbol, enforced by a test. The pipeline
+splits deterministic work from model work deliberately: the metadata pre-filter,
+the exclusion co-retrieval, the insufficient-context gate, the consistency
+arithmetic checks and every confidence ceiling are plain Python; the LLM is used
+only where judgement is unavoidable, and every compatibility assertion must cite
+a retrieved clause or it is rejected and retried. The two assessment nodes run
+as fixed parallel branches. Nothing reaches a final state without a person
+approving, editing or rejecting the recommendation at the checkpoint.
+
+```mermaid
+flowchart TD
+  START([claim narrative]) --> intake
+  intake -->|missing info| clarification
+  clarification --> intake
+  intake -->|"clarification cap (2) reached"| clarification_exhausted
+  intake -->|complete| retrieval
+  clarification_exhausted --> recommendation
+  retrieval -->|context sufficient| compatibility
+  retrieval -->|context sufficient| consistency
+  retrieval -->|insufficient context| recommendation
+  compatibility --> recommendation
+  consistency --> recommendation
+  recommendation --> human_review
+  human_review -->|"interrupt() — approve / edit / reject"| DONE([settled + audit trail])
+```
+
+`compatibility` and `consistency` run in one parallel superstep (alongside an
+optional advisory prompt-injection scan, off by default); `recommendation`
+consolidates but never re-decides; `human_review` is unconditional. Design
+rationale, the deterministic/LLM boundary and a decision log are in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quickstart
 
-The literal, followable path from a clean clone to a running assessment,
-entirely through Docker Compose — [M5-09]. Design rationale for the stack
-is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+The full path — per-OS notes, `.env` details, container management and a worked
+API session — is [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md). The short
+version, from a clean clone, entirely through Docker Compose:
 
 ```bash
 cp .env.example .env
-# fill in LLM_PROVIDER / LLM_BASE_URL / LLM_API_KEY / LLM_MODEL_FAST /
-# LLM_MODEL_REASONING -- the rest of .env.example's defaults already match
-# the Compose services below.
+# fill LLM_PROVIDER / LLM_BASE_URL / LLM_API_KEY / LLM_MODEL_FAST /
+# LLM_MODEL_REASONING (and the matching provider pins) — the rest of
+# .env.example's defaults already match the Compose services.
 
-docker compose up -d postgres redis   # infra first -- api/worker need data in place before they can start
-make fetch-corpus-artifacts           # skip the LLM-cost parsing stage (~10MB download)
-make build-index                      # chunk -> Postgres -> embeddings against the running stack
-docker compose up -d --build          # migrate, api, worker -- each healthchecked
+docker compose up -d postgres redis   # infra first
+make fetch-corpus-artifacts           # pre-processed corpus (~10 MB) — skips the LLM parse
+make build-index                      # chunks -> Postgres -> embeddings
+docker compose up -d --build          # migrate (once), then api + worker
 ```
 
-`api`/`worker` read `build/chunks.jsonl` (the lexical retriever's BM25 index
-and the exclusion-clause graph, `docs/DEPLOYMENT.md`) at startup, which is
-why `make build-index` runs before the full `up`: starting `api`/`worker`
-before it exists just crash-loops them on a clear "file not found" error.
-The second `docker compose up -d --build` runs `migrate` once (schema +
-checkpointer setup) then starts `api` (`curl localhost:${API_PORT:-8000}/health`
-→ `200`) and `worker`. `make build-index`'s embedding step is a real,
-one-time ~41-minute CPU pass the first time it runs — $0 in API cost, since
-the embedder runs locally, but real wall-clock time (`docs/EMBEDDINGS.md`).
-**Skipping that too:** `make fetch-embedding-cache` (or `make
-fetch-demo-artifacts` in place of `fetch-corpus-artifacts` above, for both
-fetches in one step) downloads a pre-computed embedding cache so the same
-`make build-index` re-fills every vector in seconds instead — once the
-maintainer has published that release (see `docs/DEPLOYMENT.md`'s "What
-this issue ships, and what it deliberately doesn't (yet)"); until then it's
-equivalent to the corpus-only fetch above.
+`make build-index`'s embedding step is a one-time ~41-minute local CPU pass
+($0 in API cost). `make fetch-demo-artifacts` in place of `fetch-corpus-artifacts`
+downloads a pre-computed cache so it replays in seconds instead — once the
+maintainer has published that release ([`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)).
 
 ```bash
-curl -s -X POST localhost:${API_PORT:-8000}/v1/assessments \
+curl -s -X POST localhost:8000/v1/assessments \
   -H 'Content-Type: application/json' \
   -d '{"raw_text": "Bati o carro na traseira de outro veículo ao tentar estacionar."}'
-# -> 202, {"assessment_id": "<id>", "status": "pending"}
+# -> 202 {"assessment_id": "<id>", "status": "pending"}
 
-curl -s localhost:${API_PORT:-8000}/v1/assessments/<id>
-# -> status moves pending -> running -> awaiting_review, with the
-# recommendation and its citations once ready
+curl -s localhost:8000/v1/assessments/<id>
+# status moves pending -> running -> awaiting_review, with the recommendation
+# and its citations once ready
 ```
 
-Endpoint shapes, the human-decision step and the audit trail are in
-[`docs/API.md`](docs/API.md). `docker compose --profile tracing up -d` adds
-the self-hosted Langfuse stack alongside the above — see "Tracing" below.
+## What this system cannot do
 
-## Fast start: inspect the parsed corpus without running the pipeline
+- **It assesses registered products, not contracts.** The corpus holds no
+  contracted coverage, insured amount, deductible, premium or policy period. A
+  `compatible` verdict means the described event does not contradict a product's
+  filed conditions — it does **not** mean a claim would be paid. No amount of
+  retrieval or reasoning recovers a fact that was never in the source documents.
+- **The evaluation is small and single-author.** 140 golden questions and 51
+  synthetic claims, all selected, written and reviewed by the person who built
+  the system; scorable retrieval questions cover 2 of the 5 product lines; the
+  end-to-end run is one non-deterministic sample where a single claim moves
+  overall accuracy by ~2 points. The numbers are measured and reproducible —
+  they are not an independent benchmark ([`docs/EVALUATION.md`](docs/EVALUATION.md),
+  "What this evaluation cannot establish").
+- **It is not a fraud detector.** The consistency node flags internal
+  contradictions in a narrative for a human to look at. Neither the data nor the
+  method supports a fraud claim, and none is made.
+- **It does not decide.** Every run stops at a human checkpoint before anything
+  is recorded. The output is a recommendation with citations, for a person to
+  approve, edit or reject.
 
-The full M1 parsing pipeline (OCR, LLM clause classification, the vision-LLM
-boundary-escalation pass, LLM validation) costs real tokens and real
-wall-clock time. If you just want to inspect the already-published result —
-the finished 4,925-clause corpus and the LLM caches behind it — run this
-instead of `make parse`:
+## Where this sits
 
-```bash
-make fetch-corpus-artifacts
-```
+This is the author's third production-shaped multi-agent orchestration. The
+first was an auto-insurance sales assistant built directly on the OpenAI SDK
+with keyword-map retrieval; the second, a customer-loyalty WhatsApp assistant on
+LangGraph + LangChain. Both shipped in production; neither is public. This one is
+the most demanding of the three: a conditional graph with a self-capping
+clarification loop, parallel assessment branches, an interrupt checkpoint,
+hybrid RAG with reranking and a domain-rule co-retrieval step, and a
+pre-registered evaluation behind every claim it makes. Career context:
+[linkedin.com/in/warley-xavier-a8b8811b7](https://www.linkedin.com/in/warley-xavier-a8b8811b7).
 
-This downloads a small (~10MB) release asset and needs no `.env`/LLM
-credentials. See [`docs/PARSING.md`](docs/PARSING.md) for the published
-accuracy numbers this corpus was measured against. Note: if you later run
-`make parse` locally anyway, `git status`/`git diff` on `build/manifest.json`
-will show a one-line difference on the `built_at_utc` timestamp field only —
-everything else reproduces byte-identical.
+## Documentation
 
-## Development Commands
-
-### System dependencies
-
-Two policy PDFs have no extractable text layer and are OCR'd via
-[Tesseract](https://github.com/tesseract-ocr/tesseract) (see [M1-02]).
-Install it locally before running `make extract-text`:
-
-```bash
-sudo apt update && sudo apt install tesseract-ocr tesseract-ocr-por
-```
-
-Verify with `tesseract --version`, and confirm the Portuguese language pack
-is present with `tesseract --list-langs`.
-
-### Environment variables
-
-Copy the example file and fill in the values for your environment:
-
-```bash
-cp .env.example .env
-```
-
-### Database (Postgres + pgvector) and Redis
-
-This is the bare-metal dev loop -- infra in containers, `make serve` /
-`make worker` on the host for hot reload. (For the fully containerized stack,
-including `api` / `worker` themselves, see the Quickstart above; don't run
-both at once against the same ports.) Postgres is required by the retrieval
-index, the LangGraph checkpointer and the audit trail; Redis backs the
-asynchronous assessment queue ([M5-05]). Bring both up locally, in this
-order, on a clean clone:
-
-```bash
-cp .env.example .env
-docker compose up -d postgres redis   # infra only -- not migrate/api/worker
-make migrate
-make setup-checkpointer
-```
-
-The `.env.example` defaults match the Compose services, so the sequence works
-as written without editing anything first. `make migrate` applies the Alembic
-migrations (the first one enables the `vector` extension); `make migrate-down`
-rolls the latest one back. `make setup-checkpointer` is the second half of the
-schema: the LangGraph checkpointer creates and migrates its own tables outside
-Alembic, so a database with `make migrate` applied is still not ready to run the
-graph. It is idempotent and reads the same `DATABASE_URL`.
-
-Run the database-backed tests with:
-
-```bash
-make test-integration
-```
-
-This applies migrations to the `insurance_claims_test` database — created by
-the Compose service on first boot — before running `pytest -m integration`.
-
-See [`docs/DATABASE.md`](docs/DATABASE.md) for the pinned pgvector version and
-why, how `CREATE EXTENSION vector` is executed and what privilege it needs,
-the sync-vs-async engine decision, and why the checkpointer's schema is a
-separate step. The human checkpoint that uses it is
-[`docs/HUMAN_CHECKPOINT.md`](docs/HUMAN_CHECKPOINT.md).
-
-### Index the corpus
-
-One command rebuilds the whole searchable index from `data/policies/raw/`:
-
-```bash
-make build-index     # parse -> chunk -> Postgres -> embeddings
-```
-
-It needs the same environment as `make parse` (the `LLM_*` keys in `.env`, plus
-Tesseract) and a running Postgres. When `build/parsed_clauses.jsonl` is already
-present — from an earlier `make parse` or `make fetch-corpus-artifacts` — the
-parse stage is skipped and the rest runs from cache. The manual breakdown of the
-last two steps:
-
-```bash
-make load-chunks     # upsert the chunk corpus into Postgres (idempotent)
-make embed-chunks    # embed the chunks; installs the optional `embed` group on first run
-```
-
-The embedding model (`Alibaba-NLP/gte-multilingual-base`) runs locally, so the
-dollar cost is **$0.00** — no API key needed. A cold pass over the ~4,540-chunk
-corpus is ~41 min of CPU time on an AMD Ryzen 5 5600H (a few minutes on a GPU);
-re-runs are served from an on-disk cache and do zero inference. See
-[`docs/EMBEDDINGS.md`](docs/EMBEDDINGS.md).
-
-Score every retrieval configuration on the golden set with
-`make eval-retrieval-matrix` — the committed comparison table and verdict are in
-[`docs/RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md).
-
-Latency and token cost per assessment, measured over the whole graph on the 51
-synthetic claims, are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md)
-(`make eval-performance`) — with the one-off corpus-indexing cost reported
-separately.
-
-### Run the assessment API and the worker
-
-Once the schema, the checkpointer and the index are in place (bare-metal dev
-loop -- see the note above; skip this if you're already running the
-containerized `api` / `worker` from the Quickstart):
-
-```bash
-make serve           # the API: uvicorn presentation.app:app on :8000
-make worker          # the queue workers (a second shell)
-```
-
-`POST /v1/assessments` submits a claim (202, `status: "pending"`); a worker runs
-the graph in the background. `GET /v1/assessments/{id}` reads its lifecycle state
-(`pending` → `running` → `awaiting_review`, or `failed`) and, once ready, the
-recommendation. `POST /v1/assessments/{id}/decision` submits the human decision
-and resumes the run; `GET /v1/assessments/{id}/audit` returns the audit trail.
-Endpoint shapes and error codes are in [`docs/API.md`](docs/API.md); the queue,
-the retry/back-off policy and the dead-letter path are in
-[`docs/ASYNC_PROCESSING.md`](docs/ASYNC_PROCESSING.md). `api` and `worker` also
-run as Compose services from the same Dockerfile — see the Quickstart above
-and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) [M5-09].
-
-### Tracing (optional)
-
-A run is a tree of nodes, LLM calls and one retrieval step; when a verdict is
-wrong, the question is which of them was. [M5-07] traces that into a
-self-hosted Langfuse, which rides along in the Compose stack behind a profile:
-
-```bash
-# .env: set the three secrets first -- openssl rand -hex 32 each
-#   LANGFUSE_NEXTAUTH_SECRET, LANGFUSE_SALT, LANGFUSE_ENCRYPTION_KEY
-docker compose --profile tracing up -d    # + langfuse-web, langfuse-worker, clickhouse, minio
-open http://localhost:3000                # sign in with LANGFUSE_INIT_USER_*
-```
-
-This also brings up `migrate` / `api` / `worker` alongside the tracing
-services (they have no profile, so any `up` starts them) — if you're running
-the bare-metal `make serve` / `make worker` instead, stop them first to avoid
-a port clash. The project is seeded on first boot with the
-`LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` already in your `.env`, so
-there is no key-copying step. Tracing is off unless both keys are set and
-`TRACING_ENABLED` is not `false`, and the plain `docker compose up -d` from
-the Quickstart runs identically with none of this. Reading a trace, and a
-worked example of diagnosing a wrong verdict, are in
-[`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
-
-### Prompt-injection classifier (optional)
-
-Every prompt in this system carries text this project does not control: a
-retrieved clause excerpt or a claimant's own narrative
-([`docs/PROMPT_INJECTION.md`](docs/PROMPT_INJECTION.md)). Delimiters, schema
-rejection and metadata-only document trust are the actual guard and are
-always on. The M5-08 issue's Appendix additionally spikes a runtime
-classifier as an optional, advisory-only defense-in-depth layer — off by
-default:
-
-```bash
-uv sync --group embed                          # transformers + torch
-PROMPT_INJECTION_CLASSIFIER_ENABLED=true make serve   # and/or `make worker`
-```
-
-It never blocks a node or changes a verdict — a flagged span only adds one
-entry to the audit trail. **On this project's own Portuguese corpus it is
-not recommended**: the pinned model
-(`protectai/deberta-v3-base-prompt-injection-v2`) is trained only on English
-text and flags 70% of real, non-adversarial policy clauses in the measured
-benchmark. That is a property of this model on this domain, not of the
-approach — the code is kept as a working, tested reference for the pattern
-on a domain closer to the model's training language. Method, the real
-numbers and the reasoning behind the `false` default are in
-[`docs/PROMPT_INJECTION_CLASSIFIER.md`](docs/PROMPT_INJECTION_CLASSIFIER.md).
-
-### Pre-commit hooks
-
-1. Install the dev dependency (skip if already in the lockfile — run `uv sync` instead):
-
-```bash
-uv add --dev pre-commit
-```
-
-2. Enable the hooks in your local clone:
-
-```bash
-uv run pre-commit install
-```
-
-3. Run the hooks against all files once, to check the existing codebase:
-
-```bash
-uv run pre-commit run --all-files
-```
-
-### Jupyter kernel for notebooks
-
-Notebooks under `notebooks/` should run against this project's virtual
-environment rather than a globally installed kernel. Register a
-project-bound kernel with:
-
-```bash
-./scripts/setup_dev_kernel.sh
-```
-
-This adds `ipykernel` as a dev dependency (via `uv`) and registers a Jupyter
-kernel named "Insurance Claims (uv)". Select it in Jupyter/VS Code, or launch
-directly with:
-
-```bash
-uv run jupyter lab
-```
+| Doc | What it covers |
+| --- | --- |
+| [`GETTING_STARTED.md`](docs/GETTING_STARTED.md) | prerequisites, `.env`, running the stack, container management, API usage |
+| [`SCOPE.md`](docs/SCOPE.md) | the canonical statement of what the system may and may not assert |
+| [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | layer boundaries, graph topology, the deterministic/LLM split, decision log |
+| [`DATA_SOURCES.md`](docs/DATA_SOURCES.md) | corpus selection, composition and known limitations |
+| [`EVALUATION.md`](docs/EVALUATION.md) | the golden set, metric definitions, the second-reviewer pass |
+| [`PARSING.md`](docs/PARSING.md) · [`RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md) · [`END_TO_END_EVALUATION.md`](docs/END_TO_END_EVALUATION.md) · [`PERFORMANCE.md`](docs/PERFORMANCE.md) | the measurements behind the results table |
+| [`API.md`](docs/API.md) · [`DEPLOYMENT.md`](docs/DEPLOYMENT.md) | endpoint reference and the Compose stack's design |

@@ -1,9 +1,10 @@
 # Deployment: the Docker Compose stack
 
 How the `api` / `worker` / `migrate` Compose services are built and wired —
-[M5-09]. Step-by-step run instructions live in README's Quickstart; this
-document is the "why", the same split `docs/ASYNC_PROCESSING.md` and
-`docs/OBSERVABILITY.md` use for their own services.
+[M5-09]. Step-by-step run instructions live in
+[`docs/GETTING_STARTED.md`](GETTING_STARTED.md); this document is the "why", the
+same split `docs/ASYNC_PROCESSING.md` and `docs/OBSERVABILITY.md` use for their
+own services.
 
 ## One image, two containers
 
@@ -142,7 +143,7 @@ content-addressed cache `CachingEmbedder` already reads before ever loading
 the model. With that cache in place, `embed-chunks` re-fills every vector
 from disk in ~2.6 seconds instead of running the model at all. `make
 fetch-demo-artifacts` runs both fetches (corpus + embedding cache) in one
-step; README's Quickstart uses it.
+step; [`docs/GETTING_STARTED.md`](GETTING_STARTED.md) uses it.
 
 **What this issue ships, and what it deliberately doesn't (yet).** The
 fetch/package scripts and Makefile targets exist and are ready to use; the

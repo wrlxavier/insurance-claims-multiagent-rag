@@ -50,8 +50,12 @@ Code:
 
 ## Bring-up
 
+The full setup — per-OS prerequisites, `.env`, the Compose stack and container
+management — is [`docs/GETTING_STARTED.md`](GETTING_STARTED.md). The bare-metal
+short version:
+
 ```bash
-cp .env.example .env          # fill LLM_PROVIDER / LLM_API_KEY / DATABASE_URL
+cp .env.example .env          # fill LLM_PROVIDER / LLM_BASE_URL / LLM_API_KEY / LLM_MODEL_*
 make migrate                  # assessment / decision / audit_event tables
 make setup-checkpointer       # the LangGraph checkpointer's own tables
 make build-index              # raw PDFs -> parsed -> chunks -> Postgres -> embeddings
