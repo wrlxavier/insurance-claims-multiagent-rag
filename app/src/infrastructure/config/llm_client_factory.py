@@ -30,8 +30,11 @@ def build_chat_model(
         provider_order: For an OpenRouter-style gateway, an optional
             preferred upstream routing order (OpenRouter's `provider.order`
             request field) -- pins the model to specific backend(s) instead
-            of OpenRouter's default routing. Ignored by a direct OpenAI
-            endpoint.
+            of OpenRouter's default routing. This is OpenRouter-specific
+            request-body syntax; a gateway that does not understand it (a
+            direct OpenAI endpoint, say) may reject the request rather than
+            ignore the extra field, so only pass this when ``settings``
+            actually points at an OpenRouter-style gateway.
         allow_fallbacks: For an OpenRouter-style gateway, explicitly
             disables (``False``) or allows (``True``) OpenRouter's
             automatic fallback to alternate providers when the pinned

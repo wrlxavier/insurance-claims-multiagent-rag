@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Claims Assessment — local demo</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Claims Assessment</span>
+        <span class="brand-tag">local demo</span>
+      </a>
+      <nav class="topnav">
+        <a href="#/">New assessment</a>
+        <a href="#/history">History</a>
+        <a href="/docs" target="_blank" rel="noopener">API</a>
+      </nav>
+    </header>
+
+    <main id="view" aria-live="polite"></main>
+
+    <footer class="foot">
+      <p>
+        A recording surface, not a product. It checks a described event against a
+        registered SUSEP motor-insurance product's filed conditions — it does not
+        decide whether a real claim would be paid. Every run stops at a human
+        checkpoint.
+      </p>
+    </footer>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

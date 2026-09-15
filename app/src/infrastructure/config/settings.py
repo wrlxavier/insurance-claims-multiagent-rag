@@ -190,93 +190,96 @@ class LlmSettings(BaseSettings):
     llm_model_reasoning: str = Field(alias="LLM_MODEL_REASONING")
     llm_model_vision: str | None = Field(alias="LLM_MODEL_VISION", default=None)
 
-    # Matches the vision model's required OpenRouter route
-    # (google/gemini-3.7-flash via google-vertex/global) -- reused by both
-    # scripts/validate_parsing_quality_sample.py and
-    # scripts/escalate_vision_boundaries.py rather than reinvented per
-    # script. Fallback disabled so a transient provider outage surfaces as
-    # an exception (caught and retried by each caller) instead of silently
-    # rerouting to a different, unvalidated upstream.
+    # No pin by default -- an OpenRouter-style gateway routes to whatever
+    # backend serves the configured model on its own. A pin (and disabling
+    # fallback) only makes sense for a *specific* model on a *specific*
+    # gateway, so it must not be a code default: the model is a developer
+    # choice ([LLM_MODEL_VISION]), and a stale pin validated for a different
+    # model silently 404s or misroutes it. See docs/GETTING_STARTED.md for
+    # the pin this project's own bundled model was validated against.
     llm_vision_provider_order: list[str] = Field(
-        alias="LLM_VISION_PROVIDER_ORDER",
-        default_factory=lambda: ["google-vertex/global"],
+        alias="LLM_VISION_PROVIDER_ORDER", default_factory=list
     )
-    llm_vision_allow_fallbacks: bool = Field(
-        alias="LLM_VISION_ALLOW_FALLBACKS", default=False
+    # None (unset) omits `provider.allow_fallbacks` from the request entirely,
+    # leaving the gateway's own default routing in place -- same rationale as
+    # the pin above. Forwarding a concrete `False` by default (this field's
+    # old type) telling OpenRouter never to fall back to another endpoint,
+    # which starves routing for a model that only serves through a fallback
+    # path, regardless of what model is actually configured.
+    llm_vision_allow_fallbacks: bool | None = Field(
+        alias="LLM_VISION_ALLOW_FALLBACKS", default=None
     )
 
-    # The reasoning model (deepseek/deepseek-v4-pro-0813) is pinned to the
-    # streamlake OpenRouter route, fallback disabled -- same rationale as the
-    # vision and classification pins above. No consumer yet; M4's assessment
-    # node ([M4-05]) is the first. Kept here so the pin is decided at the
-    # point the model is chosen, like every other model in the project.
+    # No pin by default -- same rationale as the vision pin above: the
+    # reasoning model is a developer choice, so a route validated for one
+    # model must not silently apply to whatever model is actually
+    # configured. See docs/GETTING_STARTED.md for the pin this project's own
+    # bundled model was validated against.
     llm_reasoning_provider_order: list[str] = Field(
-        alias="LLM_REASONING_PROVIDER_ORDER",
-        default_factory=lambda: ["streamlake"],
+        alias="LLM_REASONING_PROVIDER_ORDER", default_factory=list
     )
-    llm_reasoning_allow_fallbacks: bool = Field(
-        alias="LLM_REASONING_ALLOW_FALLBACKS", default=False
+    # None (unset) by default -- see the vision field's comment above; same
+    # rationale and the same bug it fixes.
+    llm_reasoning_allow_fallbacks: bool | None = Field(
+        alias="LLM_REASONING_ALLOW_FALLBACKS", default=None
     )
 
-    # The fast model (deepseek/deepseek-v4-flash-0731) reused outside the corpus
-    # classification pass -- first by M4's intake node ([M4-02]). baidu/fp8 is
-    # the same OpenRouter route [M1-08b] validated for this model, fallback
-    # disabled -- same rationale as the pins above: a transient provider outage
-    # should surface as an exception the caller retries, not a silent reroute to
-    # an unvalidated upstream. Kept here so the pin is decided where the model
-    # is chosen, like every other model in the project.
+    # No pin by default -- same rationale as the pins above. See
+    # docs/GETTING_STARTED.md for the pin this project's own bundled model
+    # was validated against.
     llm_fast_provider_order: list[str] = Field(
-        alias="LLM_FAST_PROVIDER_ORDER",
-        default_factory=lambda: ["baidu/fp8"],
+        alias="LLM_FAST_PROVIDER_ORDER", default_factory=list
     )
-    llm_fast_allow_fallbacks: bool = Field(
-        alias="LLM_FAST_ALLOW_FALLBACKS", default=False
+    # None (unset) by default -- see the vision field's comment above; same
+    # rationale and the same bug it fixes.
+    llm_fast_allow_fallbacks: bool | None = Field(
+        alias="LLM_FAST_ALLOW_FALLBACKS", default=None
     )
 
-    # Rough, provider-published per-1M-token prices at time of writing --
-    # check against the provider's current pricing before treating
-    # estimated_cost_usd (scripts/escalate_vision_boundaries.py) as
-    # authoritative for a real budgeting decision.
+    # No default price: a list price is only meaningful for a specific model
+    # on a specific route, so a stale figure would silently misprice whatever
+    # model is actually configured. Unset means $0 in cost reporting -- set
+    # these for the model you choose. See docs/GETTING_STARTED.md for the
+    # prices this project's own bundled model was validated against.
     llm_vision_input_cost_per_1m_tokens_usd: float = Field(
-        alias="LLM_VISION_INPUT_COST_PER_1M_TOKENS_USD", default=0.30
+        alias="LLM_VISION_INPUT_COST_PER_1M_TOKENS_USD", default=0.0
     )
     llm_vision_output_cost_per_1m_tokens_usd: float = Field(
-        alias="LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD", default=2.50
+        alias="LLM_VISION_OUTPUT_COST_PER_1M_TOKENS_USD", default=0.0
     )
 
     # [M5-07] registers these two pairs with Langfuse as model definitions, so
     # the trace UI can price a generation for a model served under a name
-    # Langfuse has never seen. **Priced for the pinned OpenRouter route, not for
-    # the model in general** -- the same model costs 3x more on some routes than
-    # others, so re-pin `LLM_*_PROVIDER_ORDER` above and these go stale. Read
-    # from OpenRouter's endpoints API on 2026-09-04: the fast model on
-    # `baidu/fp8` and the reasoning model on `streamlake`, the defaults pinned
-    # above. List prices, not a measurement -- [M5-10] owns the measured cost
-    # per assessment.
+    # Langfuse has never seen. No default price -- same rationale as the
+    # vision prices above: a list price is only valid for one model on one
+    # route, so it must not silently apply to whatever model is actually
+    # configured. Unset means $0 in cost reporting and in the Langfuse trace
+    # UI. [M5-10] owns the measured cost per assessment; see
+    # docs/GETTING_STARTED.md for the prices this project's own bundled model
+    # was validated against.
     llm_fast_input_cost_per_1m_tokens_usd: float = Field(
-        alias="LLM_FAST_INPUT_COST_PER_1M_TOKENS_USD", default=0.14
+        alias="LLM_FAST_INPUT_COST_PER_1M_TOKENS_USD", default=0.0
     )
     llm_fast_output_cost_per_1m_tokens_usd: float = Field(
-        alias="LLM_FAST_OUTPUT_COST_PER_1M_TOKENS_USD", default=0.28
+        alias="LLM_FAST_OUTPUT_COST_PER_1M_TOKENS_USD", default=0.0
     )
     llm_reasoning_input_cost_per_1m_tokens_usd: float = Field(
-        alias="LLM_REASONING_INPUT_COST_PER_1M_TOKENS_USD", default=1.1154
+        alias="LLM_REASONING_INPUT_COST_PER_1M_TOKENS_USD", default=0.0
     )
     llm_reasoning_output_cost_per_1m_tokens_usd: float = Field(
-        alias="LLM_REASONING_OUTPUT_COST_PER_1M_TOKENS_USD", default=3.3462
+        alias="LLM_REASONING_OUTPUT_COST_PER_1M_TOKENS_USD", default=0.0
     )
 
-    # Pinned per M1-08b: baidu/fp8 is the required OpenRouter route for
-    # deepseek/deepseek-v4-flash-0731 for corpus classification; fallback is
-    # disabled so a transient provider outage surfaces as a classifier
-    # exception (caught and retried by classify_and_enrich_clauses) instead
-    # of silently rerouting to a different, unvalidated upstream.
+    # No pin by default -- same rationale as the pins above. See
+    # docs/GETTING_STARTED.md for the pin this project's own bundled model
+    # was validated against.
     llm_classification_provider_order: list[str] = Field(
-        alias="LLM_CLASSIFICATION_PROVIDER_ORDER",
-        default_factory=lambda: ["baidu/fp8"],
+        alias="LLM_CLASSIFICATION_PROVIDER_ORDER", default_factory=list
     )
-    llm_classification_allow_fallbacks: bool = Field(
-        alias="LLM_CLASSIFICATION_ALLOW_FALLBACKS", default=False
+    # None (unset) by default -- see the vision field's comment above; same
+    # rationale and the same bug it fixes.
+    llm_classification_allow_fallbacks: bool | None = Field(
+        alias="LLM_CLASSIFICATION_ALLOW_FALLBACKS", default=None
     )
 
     # Empirically: concurrency past ~5-10 workers gave diminishing/negative
