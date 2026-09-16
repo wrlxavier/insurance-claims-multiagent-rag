@@ -1,6 +1,6 @@
 # Add Makefile targets: install, lint, format, format-check, typecheck, test, test-integration, check.
 
-.PHONY: install lint format format-check typecheck test test-integration test-eval check serve worker migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts fetch-embedding-cache package-embedding-cache fetch-demo-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end eval-performance eval-prompt-injection eval-prompt-injection-classifier validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
+.PHONY: install lint format format-check typecheck test test-integration test-eval check serve worker demo migrate migrate-down setup-checkpointer extract-text remove-boilerplate build-clause-tree parse build-chunks check-embedding-input-length load-chunks embed-chunks build-index benchmark-ann-index benchmark-ann-index-real sample-parsing-quality validate-parsing-quality-sample score-parsing-quality escalate-vision-boundaries fetch-corpus-artifacts package-corpus-artifacts fetch-embedding-cache package-embedding-cache fetch-demo-artifacts validate-golden-set draft-golden-questions-casco repair-golden-questions-casco finalize-golden-set-casco draft-golden-questions-adversarial repair-golden-questions-adversarial finalize-golden-set-adversarial draft-synthetic-claims finalize-synthetic-claims validate-synthetic-claims draft-product-claim-mismatch finalize-product-claim-mismatch validate-product-claim-mismatch draft-unanswerable-questions finalize-unanswerable-questions eval-retrieval eval-retrieval-lexical eval-retrieval-dense eval-retrieval-hybrid eval-retrieval-rerank eval-retrieval-co-retrieval eval-retrieval-matrix eval-insufficient-context-gate eval-intake eval-clarification eval-retrieval-node eval-compatibility eval-consistency eval-parallel-assessment eval-recommendation eval-end-to-end eval-performance eval-prompt-injection eval-prompt-injection-classifier validate-citation-coverage tune-reranking tune-exclusion-co-retrieval review-golden-set-sample
 
 help:
 	@echo "Available targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  check             - Run all checks (lint, format-check, typecheck, test)"
 	@echo "  serve             - M5-04: run the assessment API locally (uvicorn presentation.app:app on :8000; needs make migrate + setup-checkpointer + build-index and LLM_* in .env)"
 	@echo "  worker            - M5-05: run the assessment worker pool draining the Redis queue (ASSESSMENT_WORKER_CONCURRENCY workers; needs the same setup as serve + a running Redis)"
+	@echo "  demo              - M6-03: bring up the full Compose stack and print the local demo UI URL (http://localhost:8000/)"
 	@echo "  migrate           - Apply Alembic migrations to the configured database"
 	@echo "  migrate-down      - Roll back the latest Alembic migration"
 	@echo "  setup-checkpointer - M4-09: run the LangGraph Postgres checkpointer's own migrations (its tables live outside Alembic); idempotent, acts on the same DATABASE_URL as make migrate"
@@ -37,7 +38,7 @@ help:
 	@echo "  package-corpus-artifacts - Maintainer-only: build the release tarball fetch-corpus-artifacts downloads"
 	@echo "  fetch-embedding-cache - M5-09: download the pre-computed embedding cache instead of paying the ~41min cold make embed-chunks pass"
 	@echo "  package-embedding-cache - M5-09: maintainer-only: build the release tarball fetch-embedding-cache downloads"
-	@echo "  fetch-demo-artifacts - M5-09: fetch-corpus-artifacts + fetch-embedding-cache in one step -- the demo-mode shortcut, see README's Quickstart"
+	@echo "  fetch-demo-artifacts - M5-09: fetch-corpus-artifacts + fetch-embedding-cache in one step -- the demo-mode shortcut, see docs/GETTING_STARTED.md"
 	@echo "  validate-golden-set - Validate data/golden_set/*.jsonl against the schema and the parsed corpus"
 	@echo "  draft-golden-questions-casco - M2-02: draft candidate golden questions over the 15 CASCO documents into eval/golden_set_draft_casco.csv for review (overwrites that file; use repair- once rows are finalized)"
 	@echo "  repair-golden-questions-casco - M2-02: re-draft/complete the CASCO draft using the author's review verdicts (requires REVIEW=<csv>)"
@@ -108,6 +109,12 @@ serve:
 
 worker:
 	PYTHONPATH=app/src uv run --group embed python -m scripts.run_assessment_worker
+
+demo:
+	docker compose up -d --build
+	@echo ""
+	@echo "  Local demo UI:  http://localhost:8000/"
+	@echo "  (needs an index -- run 'make fetch-corpus-artifacts && make build-index' if you have not)"
 
 migrate:
 	PYTHONPATH=app/src uv run alembic upgrade head
@@ -185,7 +192,7 @@ package-embedding-cache:
 	PYTHONPATH=app/src uv run python scripts/package_embedding_cache.py
 
 # M5-09: the demo-mode shortcut -- skips both cost-bearing pipeline stages
-# (LLM parsing, then embedding) in one command. See README's Quickstart.
+# (LLM parsing, then embedding) in one command. See docs/GETTING_STARTED.md.
 fetch-demo-artifacts: fetch-corpus-artifacts fetch-embedding-cache
 	@echo "fetch-demo-artifacts: corpus + LLM caches + embedding cache in place. 'make build-index' is now a cache-hit replay, not a cold run."
 
