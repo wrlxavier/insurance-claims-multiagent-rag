@@ -72,17 +72,29 @@ Compose services, so the only values you must supply are the LLM ones.
 | `LLM_MODEL_FAST` | the fast model — intake, clarification, consistency, the recommendation prose |
 | `LLM_MODEL_REASONING` | the reasoning model — the compatibility verdict |
 
-If your gateway is **OpenRouter**, also pin the provider route for each model —
-the built-in defaults (`["baidu/fp8"]` for fast, `["streamlake"]` for reasoning)
-can return HTTP 404 for a model that route does not serve:
+The model itself is entirely your choice — any model id your gateway serves
+works, with no code change. `LLM_FAST_PROVIDER_ORDER` /
+`LLM_REASONING_PROVIDER_ORDER` (and the vision/classification equivalents in
+`.env.example`) are **unset by default, meaning no pin**: an OpenRouter-style
+gateway falls back to its own routing for whichever model you name. Only set
+one of these if you're on OpenRouter and want to pin a model to a specific
+upstream route — and only to a route that actually serves *your* model, since
+a route validated for a different model returns HTTP 404:
 
 | Key | Example |
 | --- | --- |
 | `LLM_FAST_PROVIDER_ORDER` | `["streamlake/fp8"]` |
 | `LLM_REASONING_PROVIDER_ORDER` | `["novita/fp8"]` |
 
+If you also want the fast/reasoning cost figures in the per-node cost table
+and Langfuse traces to be accurate, set
+`LLM_{FAST,REASONING}_{INPUT,OUTPUT}_COST_PER_1M_TOKENS_USD` to your chosen
+model's own per-1M-token list price — these default to `0.0` (no cost
+reported) rather than guessing at a price validated for a different model.
+
 A concrete, known-good configuration (the one behind
-[`PERFORMANCE.md`](PERFORMANCE.md)):
+[`PERFORMANCE.md`](PERFORMANCE.md)) — reproduce it exactly, or use it as a
+template for your own model choice:
 
 ```dotenv
 LLM_PROVIDER=openai
@@ -92,7 +104,16 @@ LLM_MODEL_FAST=deepseek/deepseek-v4-flash-0731
 LLM_MODEL_REASONING=deepseek/deepseek-v4-pro-0813
 LLM_FAST_PROVIDER_ORDER=["streamlake/fp8"]
 LLM_REASONING_PROVIDER_ORDER=["novita/fp8"]
+LLM_FAST_INPUT_COST_PER_1M_TOKENS_USD=0.14
+LLM_FAST_OUTPUT_COST_PER_1M_TOKENS_USD=0.28
+LLM_REASONING_INPUT_COST_PER_1M_TOKENS_USD=1.1154
+LLM_REASONING_OUTPUT_COST_PER_1M_TOKENS_USD=3.3462
 ```
+
+To use a different model — say Google's Gemini via OpenRouter — change
+`LLM_MODEL_FAST`/`LLM_MODEL_REASONING` (and `LLM_BASE_URL` if you're not using
+OpenRouter); nothing else here, or in the code, is tied to any specific model
+or provider.
 
 `LLM_MODEL_VISION` (e.g. `google/gemini-3.8-flash`) is **optional** — it is only
 used by `make escalate-vision-boundaries` and
@@ -159,6 +180,7 @@ and on Postgres/Redis being healthy.
 docker compose ps                       # migrate = exited (0); api, worker = healthy
 curl -s localhost:8000/health           # {"status":"ok"}
 curl -s localhost:8000/ready            # 200 once the chunk table has embedded rows
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8000/demo/   # 200 — the demo UI
 ```
 
 `GET /ready` returns **503** with `"vector_index": {"status": "error", ...}`
@@ -180,7 +202,7 @@ has loaded and embedded the corpus, and it is why the container healthcheck uses
 | Stop everything (keep data) | `docker compose stop` |
 | Tear down (keep volumes) | `docker compose down` |
 | Tear down **and wipe** DB + model cache | `docker compose down -v` — next start re-downloads ~1.2 GB of model weights |
-| Add self-hosted tracing | `docker compose --profile tracing up -d` (see §8) |
+| Add self-hosted tracing | `docker compose --profile tracing up -d` (see §9) |
 
 **Before `make test-integration`, stop the worker.** The Compose `worker` and
 the integration tests share the Redis queue name `assessments`; a running worker
@@ -214,7 +236,19 @@ corpus is missing.
 
 ---
 
-## 7. Use the API
+## 7. The demo UI
+
+Open **`http://localhost:8000/`** (it redirects to `/demo/`). A single static
+page that drives the same `/v1` API the rest of this section curls: submit a
+claim or pick a prepared example, watch the pipeline stepper advance, read the
+recommendation with each citation rendered as the full clause text plus its page
+span, then approve / edit / reject at the human checkpoint and read the audit
+trail. It is served by the `api` container — no separate service. Details in
+[`DEMO_UI.md`](DEMO_UI.md).
+
+---
+
+## 8. Use the API
 
 Full endpoint reference, the error envelope and the `code` table are in
 [`API.md`](API.md). A complete session:
@@ -326,7 +360,7 @@ worker | grep <id>` follows one claim end to end. See
 
 ---
 
-## 8. Optional components
+## 9. Optional components
 
 **Tracing (self-hosted Langfuse).** Set the three secrets in `.env`
 (`openssl rand -hex 32` each): `LANGFUSE_NEXTAUTH_SECRET`, `LANGFUSE_SALT`,
@@ -357,7 +391,7 @@ kernel ("Insurance Claims (uv)") for the notebooks under `notebooks/`.
 
 ---
 
-## 9. Inspect the parsed corpus without running the pipeline
+## 10. Inspect the parsed corpus without running the pipeline
 
 To read the published parsing result — the 4,925-clause corpus and the LLM
 caches behind it — without spending tokens or time:
@@ -373,7 +407,7 @@ timestamp.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | Cause / fix |
 | --- | --- |
@@ -387,7 +421,7 @@ timestamp.
 
 ---
 
-## 11. Verify your setup
+## 12. Verify your setup
 
 ```bash
 make check                                    # lint + format-check + typecheck + unit tests

@@ -103,7 +103,7 @@ def _llm_settings(**overrides: object) -> LlmSettings:
 
 
 @pytest.mark.unit
-def test_llm_reasoning_provider_pin_defaults_to_streamlake_no_fallback(
+def test_llm_reasoning_provider_order_defaults_to_no_pin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("LLM_REASONING_PROVIDER_ORDER", raising=False)
@@ -111,8 +111,8 @@ def test_llm_reasoning_provider_pin_defaults_to_streamlake_no_fallback(
 
     settings = _llm_settings()
 
-    assert settings.llm_reasoning_provider_order == ["streamlake"]
-    assert settings.llm_reasoning_allow_fallbacks is False
+    assert settings.llm_reasoning_provider_order == []
+    assert settings.llm_reasoning_allow_fallbacks is None
 
 
 @pytest.mark.unit
@@ -125,16 +125,16 @@ def test_llm_reasoning_provider_order_reads_the_env_var(
 
 
 @pytest.mark.unit
-def test_llm_vision_provider_order_defaults_to_the_zone_qualified_route(
+def test_llm_vision_provider_order_defaults_to_no_pin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("LLM_VISION_PROVIDER_ORDER", raising=False)
 
-    assert _llm_settings().llm_vision_provider_order == ["google-vertex/global"]
+    assert _llm_settings().llm_vision_provider_order == []
 
 
 @pytest.mark.unit
-def test_llm_fast_provider_pin_defaults_to_baidu_fp8_no_fallback(
+def test_llm_fast_provider_order_defaults_to_no_pin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("LLM_FAST_PROVIDER_ORDER", raising=False)
@@ -142,8 +142,8 @@ def test_llm_fast_provider_pin_defaults_to_baidu_fp8_no_fallback(
 
     settings = _llm_settings()
 
-    assert settings.llm_fast_provider_order == ["baidu/fp8"]
-    assert settings.llm_fast_allow_fallbacks is False
+    assert settings.llm_fast_provider_order == []
+    assert settings.llm_fast_allow_fallbacks is None
 
 
 @pytest.mark.unit

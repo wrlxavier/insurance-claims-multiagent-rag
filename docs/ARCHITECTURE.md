@@ -32,7 +32,7 @@ edges. Four layers under `app/src/`, each depending only on the ones above it:
 | Domain | `domain/` | Business entities and their invariants — `Claim`, `Assessment`, `HumanDecision`, `PolicyClause`, the `Citation` / `SusepProcess` / `Cnpj` value objects, the `Verdict` enum. Frozen dataclasses that validate on construction. | the standard library only |
 | Application | `application/` | Use-case interactors (`SubmitClaim`, `GetAssessment`, `SubmitHumanDecision`, …), the ports they depend on (`AssessmentRepository`, `UnitOfWork`, `Clock`, `ClaimAssessmentOrchestrator`, …), and the DTOs that cross them. | `domain` + its own ports |
 | Infrastructure | `infrastructure/` | Every concrete adapter: SQLAlchemy repositories, the LangGraph agent graph, the RAG retrievers, the RQ/Redis queue, Langfuse tracing, the OpenAI-compatible chat clients. | `domain`, `application`, third-party SDKs |
-| Presentation | `presentation/` | The FastAPI app — routes, request/response schemas, the one error→HTTP edge, middleware. | `application`, `infrastructure` (composition only) |
+| Presentation | `presentation/` | The FastAPI app — routes, request/response schemas, the one error→HTTP edge, middleware. Plus `presentation/demo/` — the [M6-03] local demo UI: a vanilla static SPA served by the same app, driving `/v1` unchanged, with a `/demo/api` that adds only a citation→clause join and a checkpoint-progress read. | `application`, `infrastructure` (composition only) |
 
 **The dependency rule is tested, not trusted.**
 `tests/architecture/test_layer_boundaries.py` parses every module under
@@ -1542,3 +1542,47 @@ YAML anchor resolves. No automated test drives the full containerised stack
 end-to-end (that needs Docker-in-CI plus real LLM credentials); the Quickstart
 (now `docs/GETTING_STARTED.md`) is written to be run and checked by hand against
 a clean clone, which is what this issue's own DoD asks for.
+
+## The demo UI is static assets served by the API, not a new service — [M6-03]
+
+**Decision.** The local demo UI is a vanilla single-page app (no framework, no
+build step, no npm) under `app/src/presentation/demo/static/`, served by the
+existing `api` process: a `StaticFiles` mount at `/demo` and a `GET /` redirect
+to it, added in `create_app()` after the real routers. It ships in the image via
+the existing `COPY app/src` — no `Dockerfile`, `compose.yaml` or `.dockerignore`
+change, no second container, no CORS (same origin). The SPA drives the `/v1`
+assessment API unchanged; a sibling `demo/router.py` adds three read-only
+endpoints under `/demo/api` for what `/v1` deliberately does not carry:
+`examples` (the curated one-click synthetic claims, shipped as
+`demo/examples.json`), `clause-context` (joins a citation's `clause_id` to the
+full clause text + `page_start`/`page_end` + a source label, from
+`build/parsed_clauses.jsonl`), and `assessments/{id}/progress` (a live read of
+the LangGraph checkpoint's `audit_trail` channel so the pipeline stepper moves
+— the `/v1` status is only `pending`/`running`/`awaiting_review`).
+
+**Why.** (a) The whole feature is timeboxed and throwaway — a recording surface
+for the M6-04 video, not a product — so it lives in **one directory** and is
+removed with `git rm -r app/src/presentation/demo/` plus reverting one hunk in
+`app.py`. That cohesion is worth the deliberate deviation from the
+`presentation/routes/` convention. (b) The `/demo/api` helpers stay entirely
+out of the audited M5-04 contract: `CitationSchema`, its mapper and the domain
+`Citation` are untouched, and the page/full-text join is a demo-only side
+channel. (c) `demo/router.py` takes no `Depends` and reads nothing off
+`app.state`, so a bare `TestClient(create_app())` exercises it — the unit tests
+need no Postgres, graph or LLM. (d) Both `clause-context` and `progress` degrade
+rather than fail: an absent `build/parsed_clauses.jsonl` gives excerpt-only
+citations, and an unreadable checkpoint gives a plain elapsed timer.
+
+**Deviations on record.** (a) `presentation/demo/` breaks the "routers live in
+`presentation/routes/`" convention — see (a) above. (b) The mount is at `/demo`,
+not `/`, precisely so a mistyped `/v1/...` still returns the JSON `{"error": …}`
+envelope and never an HTML page.
+
+**Enforcement.** `tests/unit/presentation/test_demo_router.py` — the examples
+endpoint's coverage, that each example's `raw_text` is a byte-identical copy of
+its `data/synthetic_claims/` source narrative, the `clause-context` join, its
+degradation with no corpus, and `progress` reporting `available: false` when the
+checkpoint cannot be read. `make check` stays green (ruff and mypy scan `.py`
+only, so `static/*` and `examples.json` are invisible to both). No automated
+test drives the SPA itself; `docs/DEMO_UI.md`'s run-through is checked by hand
+during M6-04 prep.

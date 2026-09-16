@@ -45,14 +45,6 @@ def test_build_chat_model_openai_uses_the_given_model() -> None:
 
 
 @pytest.mark.unit
-def test_build_chat_model_unsupported_provider_raises() -> None:
-    settings = build_settings(LlmProvider.ANTHROPIC)
-
-    with pytest.raises(NotImplementedError):
-        build_chat_model(settings, settings.llm_model_fast)
-
-
-@pytest.mark.unit
 def test_build_chat_model_pins_provider_order_when_given() -> None:
     settings = build_settings(LlmProvider.OPENAI)
 

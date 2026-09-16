@@ -136,6 +136,10 @@ curl -s localhost:8000/v1/assessments/<id>
 # and its citations once ready
 ```
 
+Or open **`http://localhost:8000/`** for the local demo UI — submit a claim,
+watch the pipeline, read the citations, and work the human checkpoint
+([`docs/DEMO_UI.md`](docs/DEMO_UI.md)).
+
 ## What this system cannot do
 
 - **It assesses registered products, not contracts.** The corpus holds no
@@ -180,3 +184,4 @@ pre-registered evaluation behind every claim it makes. Career context:
 | [`EVALUATION.md`](docs/EVALUATION.md) | the golden set, metric definitions, the second-reviewer pass |
 | [`PARSING.md`](docs/PARSING.md) · [`RETRIEVAL_BENCHMARK.md`](docs/RETRIEVAL_BENCHMARK.md) · [`END_TO_END_EVALUATION.md`](docs/END_TO_END_EVALUATION.md) · [`PERFORMANCE.md`](docs/PERFORMANCE.md) | the measurements behind the results table |
 | [`API.md`](docs/API.md) · [`DEPLOYMENT.md`](docs/DEPLOYMENT.md) | endpoint reference and the Compose stack's design |
+| [`DEMO_UI.md`](docs/DEMO_UI.md) | the local demo UI — what it shows and how to run it |

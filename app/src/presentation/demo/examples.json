@@ -1,0 +1,79 @@
+[
+  {
+    "id": "compatible-001",
+    "label": "Farol trincado por pedra na estrada",
+    "category": "compatible",
+    "expected_verdict": "compatible",
+    "note": "Um sinistro de dano próprio coberto, descrito de forma simples. Esperado: compatível, com base na cláusula de vidros.",
+    "raw_text": "Olha, acho que foi no meio da semana retrasada, tava uma chuva bem chata no fim de tarde e eu tava voltando do supermercado com as compras no banco de trás. Um caminhão passou na pista ao lado e espirrou uma pedra daquelas britas de asfalto direto no meu farol dianteiro e pegou de raspão na carcaça do retrovisor. O farol trincou todinho na hora e rachou a lente. Tentei passar um pano depois pra ver se era só sujeira, mas quebrou mesmo. Queria ver como faço pra agendar essa troca porque tá horrível de dirigir à noite com o farol quebrado.",
+    "policy_ref": "15414.610650/2024-59",
+    "claim_id": "DEMO-compatible-001",
+    "source_claim_id": "compatible-001"
+  },
+  {
+    "id": "compatible-005",
+    "label": "Lesão corporal a um pedestre (responsabilidade civil)",
+    "category": "compatible",
+    "expected_verdict": "compatible",
+    "note": "Um sinistro genuíno de RCF-A — lesão a terceiro é exatamente o que este produto cobre. Esperado: compatível.",
+    "raw_text": "Olha, aconteceu um acidente meio chato faz umas duas semanas, era uma terça ou quarta de chuva e o trânsito tava bem parado perto do centro da cidade. Eu estava voltando do trabalho, super cansado da rotina, fui arrancar no semáforo quando abriu e acabei atingindo um rapaz que estava atravessando a pé. Foi sem querer, ele acabou caindo e quebrou o braço no meio-fio, precisou até chamar a ambulância pro pronto-socorro. Fiquei no local até o atendimento e agora a família dele me procurou para a gente fazer um acerto sobre os gastos médicos e o tratamento dele, então gostaria de ver com a seguradora como fazemos esse acordo de danos corporais.",
+    "policy_ref": "15414.642930/2025-15",
+    "claim_id": "DEMO-compatible-005",
+    "source_claim_id": "compatible-005"
+  },
+  {
+    "id": "incompatible-007",
+    "label": "Colisão com patinete em via onde é proibido",
+    "category": "incompatible",
+    "expected_verdict": "incompatible",
+    "note": "O relato admite a circulação em um trecho proibido. Esperado: incompatível — uma cláusula de exclusão descarta a cobertura.",
+    "raw_text": "Eu tava voltando pra casa no começo do mês passado, acho que era uma terça-feira e o trânsito tava um caos total por causa de uma chuva que caiu à tarde. Como a avenida de baixo tava completamente travada, resolvi cortar caminho subindo a rodovia expressa com o meu patinete elétrico, mesmo sabendo que tem aquela placa grande proibindo o trânsito de patinetes e bicicletas naquele trecho. Pensei que não ia dar nada porque era um pedaço curto, mas um carro freou forte na descida e eu não consegui segurar no asfalto molhado, acabei batendo na traseira dele e quebrando o para-choque. Fiquei um tempão esperando resolver tudo na beira da pista e ainda acabei perdendo a hora de um compromisso importante.",
+    "policy_ref": "15414.614145/2021-31",
+    "claim_id": "DEMO-incompatible-007",
+    "source_claim_id": "incompatible-007"
+  },
+  {
+    "id": "insufficient_information-002",
+    "label": "Colisão lateral, mas a data do evento nunca é informada",
+    "category": "insufficient_information",
+    "expected_verdict": "insufficient_information",
+    "note": "A entrada sinaliza a data ausente, o ciclo de esclarecimento pergunta duas vezes, nenhuma resposta chega. Esperado: informação insuficiente (esclarecimento esgotado).",
+    "raw_text": "Estou abrindo este sinistro porque bateram na lateral do meu carro enquanto eu tentava fazer uma conversão para entrar no estacionamento. O outro motorista estava tentando ultrapassar pela direita em velocidade alta e pegou em cheio as duas portas do lado do passageiro e quebrou o retrovisor. Minha esposa estava comigo no banco do carona e tomou um susto terrível, até derrubou as coisas da bolsa dela no chão do carro com o impacto. O carro continua andando, mas as portas ficaram bem amassadas e travadas, sem abrir por fora, e preciso levar em uma oficina referenciada para fazerem o reparo da funilaria e pintura.",
+    "policy_ref": "15414.603040/2022-37",
+    "claim_id": "DEMO-insufficient_information-002",
+    "source_claim_id": "insufficient_information-002"
+  },
+  {
+    "id": "insufficient_information-001",
+    "label": "Uma marca no vidro — impacto ou objeto em queda, causa desconhecida",
+    "category": "insufficient_information",
+    "expected_verdict": "insufficient_information",
+    "note": "O reclamante não sabe dizer o que causou o dano, e a cláusula aplicável depende disso. Esperado: informação insuficiente após a recuperação.",
+    "raw_text": "Eu tava saindo do trabalho faz uns dias, acho que numa quinta-feira bem abafada, e quando cheguei no estacionamento aberto notei um dano bem chato no vidro do carro. Tinha uma marca estranha bem visível, não sei se alguém bateu com alguma coisa ou se caiu algo de uma árvore por perto, fiquei bem chateado porque tinha acabado de mandar lavar o carro no dia anterior. Como uso o carro todo dia pra levar meu filho na escola, preciso ver como a seguradora resolve isso pra mim.",
+    "policy_ref": "15414.610650/2024-59",
+    "claim_id": "DEMO-insufficient_information-001",
+    "source_claim_id": "insufficient_information-001"
+  },
+  {
+    "id": "mismatch-004",
+    "label": "Dano na traseira do próprio veículo, contra um produto só de responsabilidade civil",
+    "category": "product_claim_mismatch",
+    "expected_verdict": "incompatible",
+    "note": "Um sinistro no formato CASCO contra um produto RCF-A que estruturalmente não cobre dano ao próprio veículo. Esperado: incompatível.",
+    "raw_text": "Olha, estou abrindo o chamado porque bateram no meu carro faz uns dez dias, mais ou menos numa terça ou quarta-feira, não anotei o dia exato. Eu estava voltando do supermercado com as compras da semana no porta-malas, o trânsito estava horrível por causa de uma chuva fraca que começou do nada, e quando parei no semáforo um carro prata não conseguiu frear e acertou em cheio a traseira do meu carro. Amassou todo o para-choque traseiro, quebrou a lanterna e a tampa da mala nem fecha direito. Tentei ligar antes mas a linha de vocês demorou demais para atender, então estou registrando por aqui para levar na oficina e arrumar logo meu carro.",
+    "policy_ref": "15414.634764/2024-94",
+    "claim_id": "DEMO-mismatch-004",
+    "source_claim_id": "mismatch-004"
+  },
+  {
+    "id": "mismatch-002",
+    "label": "Incêndio no motor destrói o próprio veículo, contra um produto só de responsabilidade civil",
+    "category": "product_claim_mismatch",
+    "expected_verdict": "incompatible",
+    "note": "Perda por incêndio do próprio veículo contra um produto RCF-A. Esperado: incompatível — o produto cobre apenas danos a terceiros.",
+    "raw_text": "Olha, preciso dar entrada no seguro porque meu carro pegou fogo. Acho que foi numa terça-feira, faz umas duas semanas mais ou menos, eu tinha acabado de sair do supermercado com as compras do mês, inclusive perdi tudo que era congelado na correria. Eu estava dirigindo tranquilo e do nada começou a sair uma fumaça preta com cheiro horrível de queimado debaixo do capô. Parei no acostamento correndo e logo começou a subir labareda do motor. Algumas pessoas tentaram ajudar com extintor mas não deu conta, queimou a frente toda do carro, derreteu o painel por dentro e acabou com a lataria. Queria saber como funciona pra vocês avaliarem o estrago e liberar a indenização do meu veículo.",
+    "policy_ref": "15414.902071/2014-68",
+    "claim_id": "DEMO-mismatch-002",
+    "source_claim_id": "mismatch-002"
+  }
+]

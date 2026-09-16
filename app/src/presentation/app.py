@@ -26,6 +26,8 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from infrastructure.bootstrap import build_core_components
 from infrastructure.clock import SystemClock
@@ -36,6 +38,8 @@ from infrastructure.config.settings import (
 from infrastructure.observability.logging import configure_logging
 from infrastructure.observability.readiness import ReadinessProbe
 from infrastructure.queue import build_assessment_queue
+from presentation.demo import DEMO_STATIC_DIR
+from presentation.demo.router import router as demo_router
 from presentation.dependencies import AppComponents
 from presentation.errors import register_exception_handlers
 from presentation.middleware import RequestContextMiddleware
@@ -84,6 +88,24 @@ def create_app(*, lifespan: _LifespanFactory | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(assessments.router)
     register_exception_handlers(app)
+
+    # The [M6-03] demo UI: the helper API first, then the static SPA mounted at
+    # `/demo` (never `/`, so a mistyped `/v1/...` still gets the JSON error
+    # envelope), then a redirect so `localhost:8000` lands on it. Registered
+    # after the real routes -- `/docs`, `/health`, `/ready`, `/v1/*` are all
+    # matched before this and none sits under `/demo`.
+    app.include_router(demo_router)
+    app.mount(
+        "/demo",
+        StaticFiles(directory=DEMO_STATIC_DIR, html=True),
+        name="demo",
+    )
+
+    @app.get("/", include_in_schema=False)
+    def _demo_root() -> RedirectResponse:
+        """Send the bare host to the demo UI."""
+        return RedirectResponse(url="/demo/")
+
     return app
 
 

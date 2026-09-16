@@ -14,6 +14,10 @@ GET    /health                              liveness                 -> 200
 GET    /ready                               dependency readiness     -> 200 / 503
 ```
 
+`/demo/*` and `/demo/api/*` are the [M6-03] local demo UI — a static SPA plus
+three read-only helper endpoints. Not part of this contract; see
+[`DEMO_UI.md`](DEMO_UI.md).
+
 Since [M5-05] the graph runs on a background worker, not in the request. `POST`
 persists a job and returns; `GET /v1/assessments/{id}` reports a lifecycle
 `status` — `pending` → `running` → `awaiting_review` (or `failed`) — and fills in
