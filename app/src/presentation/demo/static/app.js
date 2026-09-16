@@ -1,6 +1,7 @@
 // M6-03 local demo UI. Vanilla ES module, no dependencies, no build.
 // Drives the real /v1 assessment API; /demo/api adds the examples, the
 // citation -> full-clause join, and the live pipeline-progress read.
+// UI language: pt-BR. No changes to API contracts or endpoints below.
 
 const POLL_MS = 2500;
 const PROGRESS_POLL_MS = 3500;
@@ -16,7 +17,7 @@ function h(tag, props, ...kids) {
   for (const [k, v] of Object.entries(props || {})) {
     if (v == null || v === false) continue;
     if (k === "class") el.className = v;
-    else if (k === "text") el.textContent = v; // model text always arrives this way
+    else if (k === "text") el.textContent = v;
     else if (k === "value") el.value = v;
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else if (k === "dataset") Object.assign(el.dataset, v);
@@ -55,7 +56,7 @@ async function apiFetch(path, opts) {
       ...opts,
     });
   } catch {
-    throw new ApiError(0, "unreachable", "API unreachable — is the stack up?");
+    throw new ApiError(0, "unreachable", "API inacessível — o serviço está no ar?");
   }
   const bodyText = await res.text();
   let body = null;
@@ -98,65 +99,113 @@ function addRecent(entry) {
 }
 
 // ---------------------------------------------------------------------------
-// labels
+// labels (pt-BR)
 // ---------------------------------------------------------------------------
 const NODE_LABEL = {
-  intake: "Intake",
-  clarification: "Clarification",
-  clarification_exhausted: "Clarification exhausted",
-  retrieval: "Retrieval",
-  compatibility: "Compatibility",
-  consistency: "Consistency",
-  injection_scan: "Injection scan",
-  recommendation: "Recommendation",
-  human_review: "Human review",
+  intake: "Entrada",
+  clarification: "Esclarecimento",
+  clarification_exhausted: "Esclarecimento esgotado",
+  retrieval: "Recuperação",
+  compatibility: "Compatibilidade",
+  consistency: "Consistência",
+  injection_scan: "Verificação de injeção",
+  recommendation: "Recomendação",
+  human_review: "Revisão humana",
 };
 const ACTION_LABEL = {
-  extract_entities: "extracted entities",
-  generate_questions: "generated questions",
-  exhaust_clarification_budget: "clarification budget exhausted",
-  retrieve_clauses: "retrieved clauses",
-  assess: "assessed compatibility",
-  deterministic_checks: "deterministic checks",
-  semantic_judgement: "semantic judgement",
-  flagged: "flagged a span",
-  consolidate: "consolidated recommendation",
-  persist_audit_trail_failed: "audit-trail write failed",
+  extract_entities: "entidades extraídas",
+  generate_questions: "perguntas geradas",
+  exhaust_clarification_budget: "orçamento de esclarecimento esgotado",
+  retrieve_clauses: "cláusulas recuperadas",
+  assess: "compatibilidade avaliada",
+  deterministic_checks: "verificações determinísticas",
+  semantic_judgement: "julgamento semântico",
+  flagged: "trecho sinalizado",
+  consolidate: "recomendação consolidada",
+  persist_audit_trail_failed: "falha ao gravar trilha de auditoria",
 };
 const MISSING_LABEL = {
-  ambito_geografico: "Geographic scope",
-  uso_do_veiculo: "Vehicle use",
-  data_evento_vigencia: "Event date vs. policy period",
-  valor_franquia_limite: "Amount / deductible / limit",
-  tipo_evento_condicao: "Event type / condition",
+  ambito_geografico: "Abrangência geográfica",
+  uso_do_veiculo: "Uso do veículo",
+  data_evento_vigencia: "Data do evento × vigência da apólice",
+  valor_franquia_limite: "Valor / franquia / limite",
+  tipo_evento_condicao: "Tipo de evento / condição",
 };
+const VERDICT_LABEL = {
+  compatible: "Compatível",
+  incompatible: "Incompatível",
+  insufficient_information: "Informação insuficiente",
+};
+const DECISION_LABEL = { approve: "aprovado", reject: "rejeitado", edit: "editado" };
+
 // the stepper's collapsed view of the graph
 const STAGES = [
-  { key: "intake", label: "Intake", nodes: ["intake"] },
+  { key: "intake", label: "Entrada", nodes: ["intake"] },
   {
     key: "clarification",
-    label: "Clarification",
+    label: "Esclarecimento",
     nodes: ["clarification", "clarification_exhausted"],
     conditional: true,
   },
-  { key: "retrieval", label: "Retrieval", nodes: ["retrieval"] },
+  { key: "retrieval", label: "Recuperação", nodes: ["retrieval"] },
   {
     key: "assessment",
-    label: "Assessment",
+    label: "Avaliação",
     nodes: ["compatibility", "consistency", "injection_scan"],
   },
-  { key: "recommendation", label: "Recommendation", nodes: ["recommendation"] },
-  { key: "review", label: "Human review", nodes: ["human_review"] },
+  { key: "recommendation", label: "Recomendação", nodes: ["recommendation"] },
+  { key: "review", label: "Revisão humana", nodes: ["human_review"] },
 ];
 
-const verdictText = (v) =>
-  v == null ? "—" : v.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+const verdictText = (v) => (v == null ? "—" : VERDICT_LABEL[v] || v);
 const pct = (x) => (x == null ? "—" : `${Math.round(x * 100)}%`);
 const ts = (s) => {
   if (!s) return "—";
   const d = new Date(s);
   return isNaN(d) ? s : d.toLocaleString();
 };
+const truncate = (text, n) => {
+  if (!text) return text;
+  return text.length > n ? text.slice(0, n).trim() + "…" : text;
+};
+
+// ---------------------------------------------------------------------------
+// clause modal (full text pop-up, replaces inline expansion)
+// ---------------------------------------------------------------------------
+function openClauseModal(title, text) {
+  $("#modal-title").textContent = title || "Cláusula completa";
+  $("#modal-body").textContent = text || "(vazio)";
+  $("#modal-backdrop").hidden = false;
+}
+function closeClauseModal() {
+  $("#modal-backdrop").hidden = true;
+}
+function setupModal() {
+  const backdrop = $("#modal-backdrop");
+  $("#modal-close").addEventListener("click", closeClauseModal);
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) closeClauseModal();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeClauseModal();
+  });
+}
+setupModal();
+
+// ---------------------------------------------------------------------------
+// relevance donut
+// ---------------------------------------------------------------------------
+function relevanceDonut(score) {
+  const p = Math.round((score || 0) * 100);
+  return h(
+    "div",
+    {
+      class: "donut",
+      style: `background:conic-gradient(var(--accent) ${p}%, var(--border) 0)`,
+    },
+    h("div", { class: "donut-hole" }, h("span", {}, `${p}%`)),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // router
@@ -179,7 +228,7 @@ function banner(kind, msg, onRetry) {
     msg,
     onRetry ? " " : null,
     onRetry
-      ? h("a", { href: "#", onclick: (e) => (e.preventDefault(), onRetry()) }, "Retry")
+      ? h("a", { href: "#", onclick: (e) => (e.preventDefault(), onRetry()) }, "Repetir")
       : null,
   );
 }
@@ -192,13 +241,7 @@ async function route() {
     else if (hash.startsWith("#/history")) await viewHistory();
     else await viewIntake();
   } catch (err) {
-    render(
-      h(
-        "div",
-        {},
-        banner("error", errText(err), route),
-      ),
-    );
+    render(h("div", {}, banner("error", errText(err), route)));
   }
 }
 const errText = (e) =>
@@ -215,13 +258,12 @@ async function viewIntake() {
   render(wrap);
 
   wrap.append(
-    h("h1", {}, "Assess a claim"),
+    h("h1", {}, "Avaliar um sinistro"),
     h(
       "p",
       { class: "lead" },
-      "Paste a claimant's narrative, optionally name the registered product it " +
-        "is filed against, and run it through the assessment graph. Or start " +
-        "from one of the prepared examples below.",
+      "Cole o relato do reclamante, informe o produto registrado ao qual o sinistro está " +
+        "vinculado e execute a avaliação. Ou comece a partir de um dos exemplos prontos abaixo.",
     ),
   );
 
@@ -231,7 +273,7 @@ async function viewIntake() {
     h(
       "div",
       { class: "field" },
-      h("label", { for: "raw" }, "Claim narrative"),
+      h("label", { for: "raw" }, "Relato do sinistro"),
       h("textarea", {
         id: "raw",
         lang: "pt-BR",
@@ -246,35 +288,36 @@ async function viewIntake() {
       h(
         "div",
         { class: "field", style: "flex:1;min-width:220px" },
-        h("label", { for: "policy" }, "SUSEP process (optional)"),
+        h("label", { for: "policy" }, "Processo SUSEP"),
         h("input", {
           id: "policy",
           type: "text",
+          required: "required",
           placeholder: "15414.610650/2024-59",
         }),
         h(
           "div",
           { class: "field-hint" },
-          "The registered product the claim is filed against.",
+          "O produto registrado ao qual o sinistro está vinculado.",
         ),
       ),
       h(
         "div",
         { class: "field", style: "flex:1;min-width:180px" },
-        h("label", { for: "cid" }, "Claim id (optional)"),
-        h("input", { id: "cid", type: "text", placeholder: "auto" }),
+        h("label", { for: "cid" }, "ID do sinistro (opcional)"),
+        h("input", { id: "cid", type: "text", placeholder: "automático" }),
       ),
     ),
     h(
       "div",
       { class: "btn-row" },
-      h("button", { type: "submit", class: "btn btn--primary" }, "Run assessment"),
+      h("button", { type: "submit", class: "btn btn--primary" }, "Executar avaliação"),
     ),
     h("div", { id: "form-msg" }),
   );
   wrap.append(form);
 
-  const exWrap = h("div", { class: "section" }, h("h2", {}, "Examples"));
+  const exWrap = h("div", { class: "section" }, h("h2", {}, "Exemplos"));
   wrap.append(exWrap);
   try {
     const examples = await apiFetch("/demo/api/examples");
@@ -284,14 +327,14 @@ async function viewIntake() {
       h(
         "p",
         { class: "muted", style: "font-size:13px" },
-        "Curated from the project's synthetic claim set. Verdicts are what each " +
-          "run should reach — a live run is non-deterministic. A full run takes " +
-          "about one to four minutes.",
+        "Selecionados do conjunto sintético de sinistros do projeto. Os veredictos indicam o " +
+          "que cada execução deveria alcançar — uma execução real é não-determinística. Uma " +
+          "execução completa leva de um a quatro minutos.",
       ),
       grid,
     );
   } catch (err) {
-    exWrap.append(banner("warn", `Could not load examples — ${errText(err)}`));
+    exWrap.append(banner("warn", `Não foi possível carregar os exemplos — ${errText(err)}`));
   }
 
   function exampleCard(ex) {
@@ -305,14 +348,10 @@ async function viewIntake() {
           $("#policy").value = ex.policy_ref || "";
           $("#cid").value = ex.claim_id || "";
           if (AUTOSUBMIT_EXAMPLES) submit();
-          else $("#raw").scrollIntoView({ behavior: "smooth", block: "center" });
+          else $("#raw").focus();
         },
       },
-      h(
-        "span",
-        { class: `pill pill--${ex.category}` },
-        verdictText(ex.expected_verdict),
-      ),
+      h("span", { class: `pill pill--${ex.category}` }, verdictText(ex.expected_verdict)),
       h("h3", {}, ex.label),
       h("p", {}, ex.note),
     );
@@ -320,20 +359,23 @@ async function viewIntake() {
 
   async function submit() {
     const raw = $("#raw").value.trim();
+    const policy = $("#policy").value.trim();
+    const cid = $("#cid").value.trim();
     const msg = $("#form-msg");
     msg.replaceChildren();
     if (!raw) {
-      msg.append(banner("error", "The narrative is required."));
+      msg.append(banner("error", "O relato é obrigatório."));
+      return;
+    }
+    if (!policy) {
+      msg.append(banner("error", "O processo SUSEP é obrigatório."));
       return;
     }
     const btn = form.querySelector("button[type=submit]");
     btn.disabled = true;
-    btn.textContent = "Submitting…";
+    btn.textContent = "Enviando…";
     try {
-      const body = { raw_text: raw };
-      const policy = $("#policy").value.trim();
-      const cid = $("#cid").value.trim();
-      if (policy) body.policy_ref = policy;
+      const body = { raw_text: raw, policy_ref: policy };
       if (cid) body.claim_id = cid;
       const res = await apiFetch("/v1/assessments", {
         method: "POST",
@@ -341,13 +383,13 @@ async function viewIntake() {
       });
       addRecent({
         assessment_id: res.assessment_id,
-        claim_id: cid || "(minted)",
+        claim_id: cid || "(gerado)",
         status: "pending",
       });
       location.hash = `#/a/${encodeURIComponent(res.assessment_id)}`;
     } catch (err) {
       btn.disabled = false;
-      btn.textContent = "Run assessment";
+      btn.textContent = "Executar avaliação";
       msg.append(banner("error", errText(err)));
     }
   }
@@ -359,7 +401,7 @@ async function viewIntake() {
 async function viewAssessment(id) {
   const root = h("div", {});
   render(root);
-  root.append(h("div", { class: "row" }, h("span", { class: "spinner" }), " Loading…"));
+  root.append(h("div", { class: "row" }, h("span", { class: "spinner" }), " Carregando…"));
 
   let stopped = false;
   let progressAvailable = true;
@@ -377,7 +419,7 @@ async function viewAssessment(id) {
       a = await apiFetch(`/v1/assessments/${encodeURIComponent(id)}`);
     } catch (err) {
       if (err.status === 404) {
-        root.replaceChildren(banner("error", "No assessment with that id."));
+        root.replaceChildren(banner("error", "Nenhuma avaliação com esse id."));
         return;
       }
       root.replaceChildren(banner("error", errText(err), () => route()));
@@ -416,8 +458,7 @@ async function viewAssessment(id) {
 
   function scheduleNext() {
     if (stopped) return;
-    const wait =
-      Date.now() - startedAt > MAX_WAIT_MS ? POLL_MS * 4 : POLL_MS;
+    const wait = Date.now() - startedAt > MAX_WAIT_MS ? POLL_MS * 4 : POLL_MS;
     setTimeout(tick, wait);
   }
 
@@ -440,8 +481,10 @@ function renderProgress(root, id, a, progress, startedAt) {
   const elapsed = Math.round((Date.now() - startedAt) / 1000);
   const over = Date.now() - startedAt > MAX_WAIT_MS;
 
-  const pipeline = h("div", { class: "pipeline" });
-  for (const stage of STAGES) {
+  const dots = [];
+  let activeIdx = -1;
+  let lastResolvedIdx = -1;
+  STAGES.forEach((stage, i) => {
     const st = progress
       ? stepState(stage, seen, next, a.status)
       : a.status === "running"
@@ -449,22 +492,36 @@ function renderProgress(root, id, a, progress, startedAt) {
           ? "active"
           : "pending"
         : "pending";
-    pipeline.append(
-      h(
-        "div",
-        { class: `step step--${st}` },
-        h("span", { class: "step-dot" }),
-        stage.label,
-      ),
-    );
-  }
+    if (st === "active" && activeIdx === -1) activeIdx = i;
+    if (st === "done" || st === "skipped") lastResolvedIdx = i;
+    dots.push(h("div", { class: `step step--${st}` }, h("span", { class: "step-dot" }), h("span", { class: "step-label" }, stage.label)));
+  });
+
+  let fraction;
+  if (a.status === "awaiting_review") fraction = 1;
+  else if (activeIdx >= 0) fraction = activeIdx / (STAGES.length - 1);
+  else if (lastResolvedIdx >= 0) fraction = (lastResolvedIdx + 1) / (STAGES.length - 1);
+  else fraction = 0;
+  fraction = Math.max(0, Math.min(1, fraction));
+
+  const pipeline = h(
+    "div",
+    { class: "pipeline" },
+    h("div", { class: "pipeline-line-bg" }),
+    h("div", {
+      class: "pipeline-line-fill",
+      style: `width:calc((100% - 76px) * ${fraction})`,
+    }),
+    h("div", { class: "pipeline-dots" }, ...dots),
+  );
 
   const clarNote =
     progress && seen.includes("clarification")
       ? h(
           "p",
           { class: "muted", style: "font-size:13px" },
-          "The claim is missing information — the clarification loop is running.",
+          "O sinistro está com informações pendentes — o ciclo de esclarecimento está em " +
+            "andamento.",
         )
       : null;
 
@@ -475,20 +532,20 @@ function renderProgress(root, id, a, progress, startedAt) {
       h(
         "div",
         { class: "card-title" },
-        h("h2", {}, "Assessing…"),
+        h("h2", {}, "Avaliando…"),
         h(
           "span",
           { class: "elapsed" },
           h("span", { class: "spinner" }),
-          `  ${elapsed}s elapsed`,
+          `  ${elapsed}s decorridos`,
         ),
       ),
       h(
         "p",
         { class: "muted" },
-        `Claim ${a.claim_id} · status: ${a.status}` +
+        `Sinistro ${a.claim_id} · status: ${a.status}` +
           (progress && !progress.available
-            ? " · live pipeline view unavailable — showing a timer"
+            ? " · visão ao vivo do pipeline indisponível — mostrando um cronômetro"
             : ""),
       ),
       pipeline,
@@ -496,8 +553,8 @@ function renderProgress(root, id, a, progress, startedAt) {
       over
         ? banner(
             "warn",
-            "This run has been going for over five minutes. It may still finish " +
-              "— polling continues, less often.",
+            "Esta execução já passa de cinco minutos. Ainda pode terminar — a consulta " +
+              "continua, com menos frequência.",
           )
         : null,
     ),
@@ -512,17 +569,17 @@ function renderFailed(id, a) {
     h(
       "div",
       { class: "card" },
-      h("h2", {}, "The run failed"),
-      h("p", { class: "muted" }, `Claim ${a.claim_id}`),
-      banner("error", a.error || "No cause recorded."),
+      h("h2", {}, "A execução falhou"),
+      h("p", { class: "muted" }, `Sinistro ${a.claim_id}`),
+      banner("error", a.error || "Nenhuma causa registrada."),
       h(
         "p",
         { class: "muted", style: "font-size:13px" },
-        "A real failure is worth showing. About one claim in ten fails at intake " +
-          "when the fast model returns empty structured output — re-running " +
-          "usually succeeds.",
+        "Uma falha real vale a pena mostrar. Cerca de um sinistro em dez falha na entrada " +
+          "quando o modelo rápido retorna uma saída estruturada vazia — repetir a execução " +
+          "geralmente funciona.",
       ),
-      h("a", { class: "btn btn--sm", href: "#/" }, "Start over"),
+      h("a", { class: "btn btn--sm", href: "#/" }, "Recomeçar"),
     ),
     backLink(),
   );
@@ -540,20 +597,18 @@ async function renderReview(root, id, a) {
       h(
         "div",
         { class: "card" },
-        h("h3", {}, "Still missing"),
+        h("h3", {}, "Informações pendentes"),
         h(
           "div",
           { class: "row" },
-          ...a.missing_information.map((t) =>
-            h("span", { class: "chip" }, MISSING_LABEL[t] || t),
-          ),
+          ...a.missing_information.map((t) => h("span", { class: "chip" }, MISSING_LABEL[t] || t)),
         ),
         a.clarification_exhausted
           ? h(
               "p",
-              { class: "muted", style: "margin:8px 0 0;font-size:13px" },
-              "The clarification loop asked for these and the answers never came " +
-                "back — the run terminated as insufficient_information.",
+              { class: "muted", style: "margin:12px 0 0;font-size:13px" },
+              "O ciclo de esclarecimento solicitou esta informação e a resposta nunca " +
+                "chegou — a execução foi encerrada como informação insuficiente.",
             )
           : null,
       ),
@@ -564,10 +619,10 @@ async function renderReview(root, id, a) {
     h(
       "div",
       { class: "card" },
-      h("h3", {}, "Reasoning"),
+      h("h3", {}, "Justificativa"),
       h("p", { lang: "pt-BR" }, a.reasoning || "—"),
       h("div", { class: "hr" }),
-      h("h3", {}, "Recommended action"),
+      h("h3", {}, "Ação recomendada"),
       h("p", { lang: "pt-BR", style: "margin:0" }, a.recommended_action || "—"),
     ),
   );
@@ -577,7 +632,7 @@ async function renderReview(root, id, a) {
       h(
         "div",
         { class: "card" },
-        h("h3", {}, `Consistency flags (${a.consistency_flags.length})`),
+        h("h3", {}, `Alertas de consistência (${a.consistency_flags.length})`),
         h(
           "div",
           { class: "stack" },
@@ -589,10 +644,10 @@ async function renderReview(root, id, a) {
                 "div",
                 { class: "row" },
                 h("span", { class: `pill pill--${f.severity}` }, f.severity),
-                h("b", { style: "font-size:13px" }, f.check),
+                h("b", { style: "font-size:13.5px" }, f.check),
                 h("span", { class: "pill pill--ghost" }, f.source),
               ),
-              h("p", { lang: "pt-BR", class: "muted", style: "margin:4px 0 0" }, f.detail),
+              h("p", { lang: "pt-BR", class: "muted", style: "margin:6px 0 0;font-size:13.5px" }, f.detail),
             ),
           ),
         ),
@@ -607,32 +662,30 @@ async function renderReview(root, id, a) {
 }
 
 function verdictBanner(a) {
+  const confPct = Math.round((a.confidence || 0) * 100);
   return h(
     "div",
     { class: "verdict" },
     h(
       "span",
-      { class: `pill pill--${a.verdict || "neutral"}`, style: "font-size:13px" },
+      { class: `pill pill--${a.verdict || "neutral"}`, style: "font-size:15px;padding:8px 18px" },
       verdictText(a.verdict),
     ),
-    h("span", { class: "verdict-label" }, verdictText(a.verdict)),
     h(
       "div",
       { class: "meter" },
       h(
         "div",
-        { class: "meter-track" },
-        h("div", {
-          class: "meter-fill",
-          style: `width:${Math.round((a.confidence || 0) * 100)}%`,
-        }),
+        { class: "meter-head" },
+        h("span", { class: "meter-label" }, "Confiança"),
+        h("span", { class: "meter-value" }, `${confPct}%`),
       ),
-      h("div", { class: "meter-cap" }, `confidence ${pct(a.confidence)}`),
+      h("div", { class: "meter-track" }, h("div", { class: "meter-fill", style: `width:${confPct}%` })),
     ),
     h(
       "span",
       { class: `pill pill--${a.is_grounded ? "accent" : "ghost"}` },
-      a.is_grounded ? "grounded" : "no citations",
+      a.is_grounded ? "fundamentado" : "sem citações",
     ),
   );
 }
@@ -641,14 +694,14 @@ function citationsCard(citations, ctxById) {
   const card = h(
     "div",
     { class: "card" },
-    h("h3", {}, `Citations (${(citations || []).length})`),
+    h("h3", {}, `Citações (${(citations || []).length})`),
   );
   if (!citations || !citations.length) {
     card.append(
       h(
         "p",
         { class: "muted", style: "margin:0" },
-        "This assessment cites no clause — it abstained.",
+        "Esta avaliação não cita nenhuma cláusula — o sistema se absteve.",
       ),
     );
     return card;
@@ -663,20 +716,20 @@ function citationsCard(citations, ctxById) {
           h("b", {}, ctx.insurer),
           ` · ${ctx.product_line} · SUSEP ${ctx.susep_process} · ${ctx.filing_year}`,
           h("br"),
-          ctx.title
-            ? h("span", { lang: "pt-BR" }, ctx.title)
-            : `clause ${c.clause_id}`,
+          ctx.title ? h("span", { lang: "pt-BR" }, ctx.title) : `cláusula ${c.clause_id}`,
           `  ·  p. ${
-            ctx.page_start === ctx.page_end
-              ? ctx.page_start
-              : `${ctx.page_start}–${ctx.page_end}`
+            ctx.page_start === ctx.page_end ? ctx.page_start : `${ctx.page_start}–${ctx.page_end}`
           }`,
         )
       : h(
           "div",
           { class: "citation-src" },
-          `SUSEP ${c.susep_process} · document ${c.document_id} · clause ${c.clause_id}`,
+          `SUSEP ${c.susep_process} · documento ${c.document_id} · cláusula ${c.clause_id}`,
         );
+
+    const fullText = ctx ? ctx.text : c.excerpt;
+    const shortExcerpt = truncate(c.excerpt, 200);
+    const open = () => openClauseModal(ctx && ctx.title, fullText);
 
     card.append(
       h(
@@ -684,23 +737,19 @@ function citationsCard(citations, ctxById) {
         { class: "citation" },
         h(
           "div",
-          { class: "row", style: "justify-content:space-between" },
+          { class: "row", style: "justify-content:space-between;align-items:center" },
           h("span", { class: "pill pill--ghost" }, c.clause_type),
           h(
-            "span",
-            { class: "faint", style: "font-size:12px" },
-            `relevance ${c.relevance_score != null ? c.relevance_score.toFixed(2) : "—"}`,
+            "div",
+            { class: "row", style: "gap:8px" },
+            h("span", { class: "donut-caption" }, "relevância"),
+            relevanceDonut(c.relevance_score),
           ),
         ),
         src,
-        h("blockquote", { class: "excerpt", lang: "pt-BR" }, c.excerpt || "—"),
-        ctx
-          ? h(
-              "details",
-              {},
-              h("summary", {}, "Full clause text"),
-              h("div", { class: "clause-full", lang: "pt-BR" }, ctx.text || "(empty)"),
-            )
+        h("blockquote", { class: "excerpt", lang: "pt-BR", onclick: open }, shortExcerpt || "—"),
+        ctx || c.excerpt
+          ? h("button", { type: "button", class: "link-btn", onclick: open }, "Ler cláusula completa →")
           : null,
       ),
     );
@@ -710,8 +759,8 @@ function citationsCard(citations, ctxById) {
       h(
         "p",
         { class: "faint", style: "font-size:12px;margin:10px 0 0" },
-        "Full clause text / page not shown for some citations — the parsed corpus " +
-          "(build/parsed_clauses.jsonl) is not available to this container.",
+        "Texto completo da cláusula / página não exibido para algumas citações — o corpus " +
+          "processado (build/parsed_clauses.jsonl) não está disponível neste container.",
       ),
     );
   }
@@ -722,39 +771,31 @@ function checkpointCard(id, a, ctxById) {
   const msg = h("div", { style: "margin-top:10px" });
   const card = h(
     "div",
-    { class: "card", style: "border-color:var(--accent)" },
-    h("h3", {}, "Human checkpoint"),
+    { class: "card", style: "border:2px solid var(--accent)" },
+    h("h3", {}, "Checkpoint humano"),
     h(
       "p",
       { class: "muted", style: "margin-top:0" },
-      "Nothing is recorded until you decide. Your decision is stored beside the " +
-        "system's opinion, never over it.",
+      "Nada é registrado até você decidir. Sua decisão é armazenada ao lado da opinião do " +
+        "sistema, nunca por cima dela.",
     ),
     h(
       "div",
       { class: "field" },
-      h("label", { for: "notes" }, "Notes (optional)"),
+      h("label", { for: "notes" }, "Observações (opcional)"),
       h("textarea", { id: "notes", rows: "2", lang: "pt-BR" }),
     ),
     h(
       "div",
       { class: "btn-row" },
-      h(
-        "button",
-        { class: "btn btn--ok", onclick: () => decide("approve") },
-        "Approve",
-      ),
-      h("button", { class: "btn", onclick: () => toggleEdit() }, "Edit"),
-      h(
-        "button",
-        { class: "btn btn--bad", onclick: () => decide("reject") },
-        "Reject",
-      ),
+      h("button", { class: "btn btn--ok", onclick: () => decide("approve") }, "Aprovar"),
+      h("button", { class: "btn", onclick: () => toggleEdit() }, "Editar"),
+      h("button", { class: "btn btn--bad", onclick: () => decide("reject") }, "Rejeitar"),
     ),
     msg,
   );
 
-  const editBox = h("div", { hidden: true, style: "margin-top:14px" });
+  const editBox = h("div", { hidden: true, style: "margin-top:20px;padding-top:20px;border-top:1px solid var(--border)" });
   card.append(editBox);
   let editBuilt = false;
 
@@ -769,7 +810,7 @@ function checkpointCard(id, a, ctxById) {
   async function decide(decision, edited) {
     const btns = card.querySelectorAll("button");
     btns.forEach((b) => (b.disabled = true));
-    msg.replaceChildren(h("span", { class: "spinner" }), " Submitting decision…");
+    msg.replaceChildren(h("span", { class: "spinner" }), " Enviando decisão…");
     try {
       const body = { decision, notes: $("#notes").value };
       if (edited) body.edited = edited;
@@ -781,24 +822,24 @@ function checkpointCard(id, a, ctxById) {
     } catch (err) {
       btns.forEach((b) => (b.disabled = false));
       if (err.status === 409) {
-        toast("Already decided.");
+        toast("Já decidido.");
         route();
         return;
       }
       let extra = "";
       if (err.code === "unknown_clause" && err.details && err.details.clause_ids)
-        extra = ` — unknown clause(s): ${err.details.clause_ids.join(", ")}`;
+        extra = ` — cláusula(s) desconhecida(s): ${err.details.clause_ids.join(", ")}`;
       msg.replaceChildren(banner("error", errText(err) + extra));
     }
   }
 
   function editForm(a) {
-    const wrap = h("div", {});
+    const wrap = h("div", { class: "stack" });
     const vSel = h(
       "select",
       { id: "e-verdict" },
       ...["compatible", "incompatible", "insufficient_information"].map((v) =>
-        h("option", { value: v, selected: v === a.verdict }, verdictText(v)),
+        h("option", { value: v, selected: v === a.verdict }, VERDICT_LABEL[v]),
       ),
     );
     const reasoning = h("textarea", { id: "e-reasoning", rows: "3", lang: "pt-BR" });
@@ -808,6 +849,7 @@ function checkpointCard(id, a, ctxById) {
     const conf = h("input", {
       id: "e-conf",
       type: "text",
+      style: "font-family:var(--mono)",
       value: String(a.confidence ?? 0.3),
     });
 
@@ -817,10 +859,10 @@ function checkpointCard(id, a, ctxById) {
       const r = h(
         "div",
         { class: "row", style: "gap:6px" },
-        mini("clause_id", c.clause_id),
-        mini("document_id", c.document_id),
-        mini("susep_process", c.susep_process),
-        mini("clause_type", c.clause_type),
+        mini("clause_id", "ID da cláusula", c.clause_id),
+        mini("document_id", "ID do documento", c.document_id),
+        mini("susep_process", "processo SUSEP", c.susep_process),
+        mini("clause_type", "tipo de cláusula", c.clause_type),
         h(
           "button",
           {
@@ -838,27 +880,30 @@ function checkpointCard(id, a, ctxById) {
       rows.push(entry);
       citeWrap.append(r);
     }
-    function mini(name, val) {
+    function mini(fieldKey, placeholder, val) {
       const i = h("input", {
         type: "text",
-        placeholder: name,
+        placeholder,
         value: val || "",
-        style: "flex:1;min-width:90px;font-size:12px",
+        style: "flex:1;min-width:110px;font-size:12px",
       });
-      i.dataset.field = name;
+      i.dataset.field = fieldKey;
       return i;
     }
     (a.citations || []).forEach(addCiteRow);
 
     wrap.append(
-      h("p", { class: "muted", style: "font-size:13px" },
-        "Your revision is recorded in the decision — the system's own verdict, " +
-          "prose and citations stay unchanged."),
-      field("Verdict", vSel),
-      field("Reasoning", reasoning),
-      field("Recommended action", action),
-      field("Confidence (0–1)", conf),
-      h("label", {}, "Citations (at least one)"),
+      h(
+        "p",
+        { class: "muted", style: "font-size:13px" },
+        "Sua revisão é registrada na decisão — o veredito, o texto e as citações originais " +
+          "do sistema permanecem inalterados.",
+      ),
+      field("Veredito", vSel),
+      field("Justificativa", reasoning),
+      field("Ação recomendada", action),
+      field("Confiança (0–1)", conf),
+      h("label", {}, "Citações (pelo menos uma)"),
       citeWrap,
       h(
         "div",
@@ -868,15 +913,14 @@ function checkpointCard(id, a, ctxById) {
           {
             type: "button",
             class: "btn btn--sm",
-            onclick: () =>
-              addCiteRow({ susep_process: a.citations?.[0]?.susep_process || "" }),
+            onclick: () => addCiteRow({ susep_process: a.citations?.[0]?.susep_process || "" }),
           },
-          "+ citation",
+          "+ citação",
         ),
         h(
           "button",
           { type: "button", class: "btn btn--sm btn--primary", onclick: submitEdit },
-          "Submit edit",
+          "Enviar edição",
         ),
       ),
     );
@@ -893,7 +937,7 @@ function checkpointCard(id, a, ctxById) {
         return o;
       });
       if (!citations.length) {
-        msg.replaceChildren(banner("error", "An edit needs at least one citation."));
+        msg.replaceChildren(banner("error", "Uma edição precisa de pelo menos uma citação."));
         return;
       }
       decide("edit", {
@@ -922,16 +966,16 @@ async function renderDecided(root, id, a) {
   body.append(
     h(
       "div",
-      { class: `card` },
+      { class: "card" },
       h(
         "div",
         { class: "card-title" },
-        h("h2", {}, "Decided"),
-        h("span", { class: `pill pill--${decisionPill(d.decision)}` }, d.decision || "—"),
+        h("h2", {}, "Decidido"),
+        h("span", { class: `pill pill--${decisionPill(d.decision)}` }, DECISION_LABEL[d.decision] || d.decision || "—"),
       ),
-      h("div", { class: "kv" }, h("b", {}, "Decided at"), ts(d.decided_at)),
+      h("div", { class: "kv" }, h("b", {}, "Decidido em"), ts(d.decided_at)),
       d.notes
-        ? h("div", { class: "kv" }, h("b", {}, "Notes"), h("span", { lang: "pt-BR" }, d.notes))
+        ? h("div", { class: "kv" }, h("b", {}, "Observações"), h("span", { lang: "pt-BR" }, d.notes))
         : null,
     ),
   );
@@ -939,19 +983,29 @@ async function renderDecided(root, id, a) {
   const system = h(
     "div",
     { class: "card" },
-    h("h3", {}, "System opinion"),
-    h("p", {}, h("span", { class: `pill pill--${a.verdict}` }, verdictText(a.verdict)), ` · confidence ${pct(a.confidence)}`),
+    h("h3", {}, "Opinião do sistema"),
+    h(
+      "p",
+      {},
+      h("span", { class: `pill pill--${a.verdict}` }, verdictText(a.verdict)),
+      ` · confiança ${pct(a.confidence)}`,
+    ),
     h("p", { lang: "pt-BR", class: "muted" }, a.reasoning || "—"),
   );
   const analyst = h(
     "div",
     { class: "card" },
-    h("h3", {}, "Analyst decision"),
+    h("h3", {}, "Decisão do analista"),
     d.edited_assessment
       ? h(
           "div",
           {},
-          h("p", {}, h("span", { class: `pill pill--${d.edited_assessment.verdict}` }, verdictText(d.edited_assessment.verdict)), ` · confidence ${pct(d.edited_assessment.confidence)}`),
+          h(
+            "p",
+            {},
+            h("span", { class: `pill pill--${d.edited_assessment.verdict}` }, verdictText(d.edited_assessment.verdict)),
+            ` · confiança ${pct(d.edited_assessment.confidence)}`,
+          ),
           h("p", { lang: "pt-BR", class: "muted" }, d.edited_assessment.reasoning || "—"),
           h("p", { lang: "pt-BR", class: "muted", style: "margin:0" }, d.edited_assessment.recommended_action || ""),
         )
@@ -959,9 +1013,9 @@ async function renderDecided(root, id, a) {
           "p",
           { class: "muted", style: "margin:0" },
           d.decision === "approve"
-            ? "Approved as recommended."
+            ? "Aprovado conforme recomendado."
             : d.decision === "reject"
-              ? "Rejected. The system's opinion stands on record, unchanged."
+              ? "Rejeitado. A opinião do sistema permanece registrada, sem alterações."
               : "—",
         ),
   );
@@ -973,12 +1027,12 @@ async function renderDecided(root, id, a) {
   const auditCard = h(
     "div",
     { class: "card" },
-    h("h3", {}, "Audit trail"),
+    h("h3", {}, "Trilha de auditoria"),
     h(
       "p",
       { class: "muted", style: "margin-top:0;font-size:13px" },
-      "Empty until a decision is submitted — the durable trail is written once, " +
-        "at the checkpoint.",
+      "Vazia até que uma decisão seja registrada — a trilha definitiva é gravada uma única " +
+        "vez, no checkpoint.",
     ),
   );
   body.append(auditCard);
@@ -986,7 +1040,7 @@ async function renderDecided(root, id, a) {
     const trail = await apiFetch(`/v1/assessments/${encodeURIComponent(id)}/audit`);
     auditCard.append(auditTable(trail.entries || []));
   } catch (err) {
-    auditCard.append(banner("warn", `Could not load the audit trail — ${errText(err)}`));
+    auditCard.append(banner("warn", `Não foi possível carregar a trilha de auditoria — ${errText(err)}`));
   }
 
   body.append(backLink());
@@ -1007,9 +1061,7 @@ function auditTable(entries) {
       h(
         "tr",
         {},
-        ...["#", "node", "action", "model", "tokens", "conf", "detail", "time"].map((t) =>
-          h("th", {}, t),
-        ),
+        ...["N°", "nó", "ação", "modelo", "tokens", "conf.", "detalhe", "hora"].map((t) => h("th", {}, t)),
       ),
     ),
   );
@@ -1021,7 +1073,7 @@ function auditTable(entries) {
       { class: isDecision ? "audit-row--decision" : "" },
       h("td", {}, String(e.sequence)),
       h("td", {}, NODE_LABEL[e.node] || e.node),
-      h("td", {}, ACTION_LABEL[e.action] || e.action.replace(/^human_decision:/, "decision: ")),
+      h("td", {}, ACTION_LABEL[e.action] || e.action.replace(/^human_decision:/, "decisão: ")),
       h("td", {}, e.model || "—"),
       h(
         "td",
@@ -1047,11 +1099,7 @@ function auditTable(entries) {
               "details",
               { open: isDecision ? "open" : null },
               h("summary", {}, "payload"),
-              h(
-                "pre",
-                { class: "audit-payload", lang: "pt-BR" },
-                JSON.stringify(e.payload, null, 2),
-              ),
+              h("pre", { class: "audit-payload", lang: "pt-BR" }, JSON.stringify(e.payload, null, 2)),
             ),
           ),
         ),
@@ -1067,13 +1115,13 @@ function auditTable(entries) {
 // view: history
 // ===========================================================================
 async function viewHistory() {
-  const root = h("div", {}, h("h1", {}, "History"));
+  const root = h("div", {}, h("h1", {}, "Histórico"));
   render(root);
 
   const local = recents();
   if (local.length) {
     root.append(
-      h("h2", { class: "section" }, "This session"),
+      h("h2", { class: "section" }, "Nesta sessão"),
       list(local, (r) => ({
         id: r.assessment_id,
         claim: r.claim_id,
@@ -1084,16 +1132,16 @@ async function viewHistory() {
       h(
         "p",
         { class: "faint", style: "font-size:12px" },
-        "Kept in this browser. In-flight and failed runs never appear in the " +
-          "server list below — only awaiting-review and decided ones do.",
+        "Mantido neste navegador. Execuções em andamento e falhas nunca aparecem na lista do " +
+          "servidor abaixo — só as que aguardam revisão ou já foram decididas.",
       ),
     );
   }
 
-  root.append(h("h2", { class: "section" }, "On the server"));
+  root.append(h("h2", { class: "section" }, "No servidor"));
   try {
     const rows = await apiFetch("/v1/assessments?limit=50");
-    if (!rows.length) root.append(h("p", { class: "muted" }, "Nothing decided yet."));
+    if (!rows.length) root.append(h("p", { class: "muted" }, "Nada decidido ainda."));
     else
       root.append(
         list(rows, (a) => ({
@@ -1115,7 +1163,7 @@ async function viewHistory() {
       ul.append(
         h(
           "li",
-          { class: "card", style: "padding:12px 16px" },
+          { class: "card", style: "padding:14px 18px" },
           h(
             "a",
             { href: `#/a/${encodeURIComponent(v.id)}`, style: "display:block" },
@@ -1127,18 +1175,14 @@ async function viewHistory() {
                 {},
                 h("b", {}, v.claim || v.id),
                 v.verdict
-                  ? h(
-                      "span",
-                      { class: `pill pill--${v.verdict}`, style: "margin-left:8px" },
-                      verdictText(v.verdict),
-                    )
+                  ? h("span", { class: `pill pill--${v.verdict}`, style: "margin-left:8px" }, verdictText(v.verdict))
                   : null,
               ),
               h("span", { class: "pill pill--ghost" }, v.status || "—"),
             ),
             h(
               "div",
-              { class: "faint", style: "font-size:12px;margin-top:4px" },
+              { class: "faint", style: "font-size:12px;margin-top:6px;font-family:var(--mono)" },
               `${v.id}${v.at ? ` · ${new Date(v.at).toLocaleString()}` : ""}`,
             ),
           ),
@@ -1167,9 +1211,9 @@ async function clauseContext(citations) {
 function backLink() {
   return h(
     "p",
-    { style: "margin-top:18px" },
-    h("a", { href: "#/" }, "← New assessment"),
+    { style: "margin-top:20px" },
+    h("a", { href: "#/" }, "← Nova avaliação"),
     "   ",
-    h("a", { href: "#/history" }, "History"),
+    h("a", { href: "#/history" }, "Histórico"),
   );
 }

@@ -1,23 +1,43 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>Claims Assessment — local demo</title>
+    <title>Compatibilidade de Sinistros — demo local</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="topbar">
       <a class="brand" href="#/">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span class="brand-name">Claims Assessment</span>
-        <span class="brand-tag">local demo</span>
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <polyline
+              points="4 13 9.5 18.5 20 6"
+              stroke="white"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></polyline>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">Verificador de Compatibilidade de Sinistros</span>
+          <span class="brand-tagline"
+            >Confere um relato de sinistro contra as condições do produto registrado</span
+          >
+        </span>
+        <span class="brand-tag">Demo local</span>
       </a>
       <nav class="topnav">
-        <a href="#/">New assessment</a>
-        <a href="#/history">History</a>
+        <a href="#/">Nova avaliação</a>
+        <a href="#/history">Histórico</a>
         <a href="/docs" target="_blank" rel="noopener">API</a>
       </nav>
     </header>
@@ -26,14 +46,31 @@
 
     <footer class="foot">
       <p>
-        A recording surface, not a product. It checks a described event against a
-        registered SUSEP motor-insurance product's filed conditions — it does not
-        decide whether a real claim would be paid. Every run stops at a human
-        checkpoint.
+        Uma interface de demonstração, não um produto. Verifica um evento descrito em relação às
+        condições filiadas de um produto de seguro automotivo registrado na SUSEP — não decide se
+        um sinistro real seria pago. Toda execução para em um checkpoint humano.
+      </p>
+      <p class="foot-credit">
+        Desenvolvido por Warley Xavier —
+        <a href="https://github.com/wrlxavier" target="_blank" rel="noopener"
+          >github.com/wrlxavier</a
+        >
       </p>
     </footer>
 
     <div id="toast" class="toast" hidden></div>
+
+    <div id="modal-backdrop" class="modal-backdrop" hidden>
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+          <h3 id="modal-title">Cláusula completa</h3>
+          <button id="modal-close" class="modal-close" type="button" aria-label="Fechar">
+            ×
+          </button>
+        </div>
+        <div id="modal-body" class="modal-body" lang="pt-BR"></div>
+      </div>
+    </div>
 
     <script type="module" src="./app.js"></script>
   </body>
